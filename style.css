@@ -1,0 +1,472 @@
+* {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #07101c;
+      color: #ffffff;
+      min-height: 100vh;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      font: inherit;
+    }
+
+    /* ==============================
+       整体布局
+    ============================== */
+
+    .app {
+      display: grid;
+      grid-template-columns: 200px 1fr 380px;
+      min-height: 100vh;
+    }
+
+    /* ==============================
+       左侧 Sidebar
+    ============================== */
+
+    .sidebar {
+      background: #09121f;
+      border-right: 1px solid #1d2939;
+      padding: 24px 18px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+
+    .logo-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #3b82f6, #7c3aed);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .logo h2 {
+      font-size: 20px;
+    }
+
+    .logo p {
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-item {
+      padding: 14px;
+      border-radius: 8px;
+      color: #94a3b8;
+      text-decoration: none;
+      transition: 0.2s;
+    }
+
+    .nav-item:hover,
+    .nav-item.active {
+      color: #ffffff;
+      background: #1a2140;
+    }
+
+    .nav-item.active {
+      border-left: 3px solid #7c5cff;
+    }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    /* ==============================
+       中间主要区域
+    ============================== */
+
+    .main {
+      padding: 32px 22px;
+      overflow-y: auto;
+    }
+
+    .hero {
+      min-height: 340px;
+      border: 1px solid #253353;
+      border-radius: 16px;
+      padding: 48px 36px;
+
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+
+      background:
+        radial-gradient(
+          circle at 80% 30%,
+          rgba(124, 92, 255, 0.45),
+          transparent 22%
+        ),
+        radial-gradient(
+          circle at 70% 80%,
+          rgba(59, 130, 246, 0.3),
+          transparent 30%
+        ),
+        linear-gradient(
+          135deg,
+          #0b1730,
+          #111936,
+          #090f1c
+        );
+    }
+
+    .hero-small {
+      color: #94a3b8;
+      letter-spacing: 4px;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      font-size: 42px;
+      line-height: 1.15;
+      max-width: 600px;
+    }
+
+    .purple-text {
+      color: #7c5cff;
+    }
+
+    .hero-description {
+      color: #b8c2d3;
+      margin-top: 18px;
+      line-height: 1.7;
+      max-width: 600px;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 14px;
+      margin-top: 26px;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, #6757ff, #5365ff);
+      color: white;
+      padding: 13px 22px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    .secondary-btn {
+      color: white;
+      padding: 13px 22px;
+      border-radius: 8px;
+      border: 1px solid #6d5dfc;
+      background: transparent;
+    }
+
+    /* ==============================
+       Stats
+    ============================== */
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .stat-card {
+      background: #0d1726;
+      border: 1px solid #1e2a3c;
+      border-radius: 12px;
+      padding: 22px;
+    }
+
+    .stat-title {
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    .stat-value {
+      font-size: 23px;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+
+    .positive {
+      color: #20e0a0;
+      font-size: 13px;
+    }
+
+    /* ==============================
+       Ecosystem
+    ============================== */
+
+    .ecosystem {
+      margin-top: 30px;
+    }
+
+    .ecosystem h2 {
+      margin-bottom: 6px;
+    }
+
+    .ecosystem-description {
+      color: #8492a6;
+      margin-bottom: 20px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: #0d1726;
+      border: 1px solid #1f2d40;
+      padding: 24px;
+      border-radius: 12px;
+      transition: 0.2s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-3px);
+      border-color: #665cf6;
+    }
+
+    .feature-icon {
+      font-size: 26px;
+      margin-bottom: 18px;
+    }
+
+    .feature-card h3 {
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 42px;
+    }
+
+    .feature-link {
+      color: #8073ff;
+      display: inline-block;
+      margin-top: 18px;
+      text-decoration: none;
+    }
+
+    /* ==============================
+       右侧面板
+    ============================== */
+
+    .right-panel {
+      background: #08111d;
+      border-left: 1px solid #1d2939;
+      padding: 10px 20px 30px;
+    }
+
+    .top-connect {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+    }
+
+    .panel-card {
+      background: #0d1726;
+      border: 1px solid #1f2c3e;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .badge {
+      background: #161f31;
+      color: #94a3b8;
+      padding: 6px 10px;
+      border-radius: 7px;
+      font-size: 12px;
+    }
+
+    .wallet-text {
+      color: #a6b2c3;
+      margin-bottom: 18px;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .wallet-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #6355ff, #5867ff);
+      color: white;
+      border-radius: 9px;
+      font-weight: bold;
+    }
+
+    /* Swap */
+
+    .token-label {
+      display: flex;
+      justify-content: space-between;
+      color: #94a3b8;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .token-box {
+      height: 62px;
+      border: 1px solid #243249;
+      border-radius: 10px;
+      background: #121d30;
+      padding: 0 16px;
+
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .token {
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .amount {
+      color: #8090a6;
+      font-size: 17px;
+    }
+
+    .swap-arrow {
+      width: 38px;
+      height: 38px;
+      margin: 10px auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #172339;
+      border-radius: 9px;
+    }
+
+    /* Tokens */
+
+    .token-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+    }
+
+    .token-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .coin {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4f74ff, #724cff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .token-name {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .token-full-name {
+      color: #76869b;
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .price {
+      text-align: right;
+      font-size: 14px;
+    }
+
+    .price-change {
+      color: #20e0a0;
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    /* ==============================
+       Responsive
+    ============================== */
+
+    @media (max-width: 1200px) {
+      .app {
+        grid-template-columns: 180px 1fr;
+      }
+
+      .right-panel {
+        display: none;
+      }
+    }
+
+    @media (max-width: 800px) {
+      .app {
+        display: block;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .main {
+        padding: 18px;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero h1 {
+        font-size: 34px;
+      }
+    }
+
+/* Former inline styles */
+.swap-connect-btn {
+  margin-top: 18px;
+}
+
+.view-all-link {
+  color: #7c6cff;
+  font-size: 12px;
+}

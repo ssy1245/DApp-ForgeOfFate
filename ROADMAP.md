@@ -165,7 +165,7 @@ React 页面 ── 当前请求所需的 API Key、消息、工具定义 ──
 
 ## 10. 代码同步备注
 
-当前 GitHub 私有仓库是 `https://github.com/ssy1245/DApp`。首次上传通过 GitHub 连接器完成；本机 Git 的登录凭据仍需修复，本地和远程提交历史需要对齐后再使用常规 pull/push。本文件暂仅写入本地，不自动上传。
+当前 GitHub 私有仓库是 `https://github.com/ssy1245/DApp`。首次上传通过 GitHub 连接器完成；本机 Git 的登录凭据仍需修复，本地和远程提交历史需要对齐后再使用常规 pull/push。后续文档和代码更新可通过 GitHub 连接器同步。
 
 ## 11. 参考资料
 

@@ -1,201 +1,363 @@
-import { useEffect, useState } from "react";
-import { BrowserProvider, Contract, isAddress } from "ethers";
-import {
-  CONTRACT_ADDRESS,
-  SEPOLIA_CHAIN_ID,
-  SEPOLIA_EXPLORER_URL,
-  TICKET_ABI,
-} from "./contract.js";
-
-const shortAddress = (address) =>
-  address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
-
-function readableError(error) {
-  if (error?.code === 4001 || error?.code === "ACTION_REJECTED") {
-    return "The MetaMask request was rejected. You can try again when ready.";
-  }
-
-  return (
-    error?.revert?.args?.[0] ||
-    error?.info?.error?.message ||
-    error?.shortMessage ||
-    error?.message ||
-    "Something went wrong"
-  );
-}
-
 export default function App() {
-  const [account, setAccount] = useState("");
-  const [hasMinted, setHasMinted] = useState(false);
-  const [txHash, setTxHash] = useState("");
-  const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  // A deployed contract address is always a 20-byte Ethereum address.
-  const contractConfigured = isAddress(CONTRACT_ADDRESS);
-
-  let mintButtonLabel = "Mint Ticket";
-  if (!contractConfigured) mintButtonLabel = "Configure contract first";
-  if (hasMinted) mintButtonLabel = "Ticket already minted";
-  if (busy) mintButtonLabel = "Minting...";
-
-  function getProvider() {
-    // MetaMask injects window.ethereum, an EIP-1193 provider, into the page.
-    if (!window.ethereum) throw new Error("Install MetaMask to continue");
-    return new BrowserProvider(window.ethereum);
-  }
-
-  async function ensureSepolia() {
-    const currentChainId = await window.ethereum.request({ method: "eth_chainId" });
-    if (currentChainId === SEPOLIA_CHAIN_ID) return;
-
-    // Ask MetaMask to move away from Mainnet or another network before minting.
-    await window.ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: SEPOLIA_CHAIN_ID }],
-    });
-  }
-
-  async function refreshMintStatus(address) {
-    if (!address || !contractConfigured) {
-      setHasMinted(false);
-      return;
-    }
-
-    try {
-      // A provider is enough for free, read-only calls; MetaMask does not prompt.
-      const provider = getProvider();
-      const contract = new Contract(CONTRACT_ADDRESS, TICKET_ABI, provider);
-      setHasMinted(await contract.hasMinted(address));
-    } catch {
-      setHasMinted(false);
-    }
-  }
-
-  async function connectWallet() {
-    setStatus("");
-    try {
-      const provider = getProvider();
-
-      // eth_requestAccounts opens MetaMask's account permission prompt.
-      const accounts = await provider.send("eth_requestAccounts", []);
-      await ensureSepolia();
-      setAccount(accounts[0]);
-      await refreshMintStatus(accounts[0]);
-    } catch (error) {
-      setStatus(readableError(error));
-    }
-  }
-
-  async function mintTicket() {
-    if (!contractConfigured) {
-      setStatus("Add the deployed contract address to your .env file first.");
-      return;
-    }
-
-    setBusy(true);
-    setStatus("Confirm the transaction in MetaMask...");
-    setTxHash("");
-
-    try {
-      await ensureSepolia();
-
-      const provider = getProvider();
-      // A signer represents the connected account and can approve state-changing calls.
-      const signer = await provider.getSigner();
-      const contract = new Contract(CONTRACT_ADDRESS, TICKET_ABI, signer);
-
-      // This sends a transaction. The Solidity mint() function runs only after
-      // the user confirms in MetaMask and Sepolia includes it in a block.
-      const transaction = await contract.mint();
-
-      setTxHash(transaction.hash);
-      setStatus("Transaction submitted. Waiting for confirmation...");
-
-      // wait() resolves after the transaction is mined, not merely submitted.
-      await transaction.wait();
-
-      setHasMinted(true);
-      setStatus("Ticket minted successfully!");
-    } catch (error) {
-      setStatus(readableError(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!window.ethereum) return undefined;
-
-    // Keep the interface accurate when the user changes account or network in MetaMask.
-    const onAccountsChanged = (accounts) => {
-      const nextAccount = accounts[0] || "";
-      setAccount(nextAccount);
-      setTxHash("");
-      setStatus("");
-      refreshMintStatus(nextAccount);
-    };
-    const onChainChanged = () => window.location.reload();
-
-    window.ethereum.on("accountsChanged", onAccountsChanged);
-    window.ethereum.on("chainChanged", onChainChanged);
-
-    // Removing listeners prevents duplicate handlers after React remounts the component.
-    return () => {
-      window.ethereum.removeListener("accountsChanged", onAccountsChanged);
-      window.ethereum.removeListener("chainChanged", onChainChanged);
-    };
-  }, [contractConfigured]);
-
   return (
-    <main className="page">
-      <section className="card">
-        <span className="eyebrow">ETHEREUM SEPOLIA</span>
-        <div className="ticket-icon" aria-hidden="true">🎟️</div>
-        <h1>NFT Event Ticket</h1>
-        <p className="subtitle">Connect your wallet and mint one free ticket.</p>
+    <div className="app">
 
-        {!contractConfigured && (
-          <p className="config-notice" role="status">
-            Setup needed: add your deployed Sepolia contract address to <code>.env</code>.
-          </p>
-        )}
+        {/* =========================
+             LEFT SIDEBAR
+        ========================== */}
 
-        {!account ? (
-          <button onClick={connectWallet}>Connect MetaMask</button>
-        ) : (
-          <>
-            <div className="wallet">
-              <span>Connected wallet</span>
-              <strong title={account}>{shortAddress(account)}</strong>
+        <aside className="sidebar">
+
+          <div className="logo">
+            <div className="logo-icon">C</div>
+
+            <div>
+              <h2>ChainFlow</h2>
+              <p>Build. Swap. Earn.</p>
             </div>
-            <button onClick={mintTicket} disabled={busy || hasMinted || !contractConfigured}>
-              {mintButtonLabel}
+          </div>
+
+          <nav className="nav">
+            <a href="#" className="nav-item active">⌂ &nbsp; Home</a>
+            <a href="#" className="nav-item">⇄ &nbsp; Swap</a>
+            <a href="#" className="nav-item">💧 &nbsp; Pool</a>
+            <a href="#" className="nav-item">▣ &nbsp; Earn</a>
+            <a href="#" className="nav-item">▧ &nbsp; NFT</a>
+            <a href="#" className="nav-item">🌉 &nbsp; Bridge</a>
+            <a href="#" className="nav-item">🏛 &nbsp; Governance</a>
+            <a href="#" className="nav-item">☷ &nbsp; Docs</a>
+          </nav>
+
+          <div className="sidebar-bottom">
+            A more open<br />
+            on-chain future.
+          </div>
+
+        </aside>
+
+        {/* =========================
+             MAIN CONTENT
+        ========================== */}
+
+        <main className="main">
+
+          {/* HERO */}
+
+          <section className="hero">
+
+            <div className="hero-small">
+              DECENTRALIZED · OPEN · FOR EVERYONE
+            </div>
+
+            <h1>
+              Trade. Earn. Build.<br />
+              <span className="purple-text">Onchain</span>
+              Together.
+            </h1>
+
+            <p className="hero-description">
+              A simple and powerful DeFi platform for everyone.
+              Swap tokens, earn yield, and explore Web3.
+            </p>
+
+            <div className="hero-buttons">
+              <button className="primary-btn">
+                Get Started →
+              </button>
+
+              <button className="secondary-btn">
+                Learn More
+              </button>
+            </div>
+
+          </section>
+
+          {/* STATISTICS */}
+
+          <section className="stats">
+
+            <div className="stat-card">
+              <div className="stat-title">Total Value Locked</div>
+              <div className="stat-value">$12.48M</div>
+              <div className="positive">↑ 12.3%</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-title">Total Users</div>
+              <div className="stat-value">25,361</div>
+              <div className="positive">↑ 8.6%</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-title">Total Volume</div>
+              <div className="stat-value">$86.72M</div>
+              <div className="positive">↑ 21.4%</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-title">Protocol Revenue</div>
+              <div className="stat-value">$124.6K</div>
+              <div className="positive">↑ 15.7%</div>
+            </div>
+
+          </section>
+
+          {/* ECOSYSTEM */}
+
+          <section className="ecosystem">
+
+            <h2>Explore the Ecosystem</h2>
+
+            <p className="ecosystem-description">
+              Everything you need in one place.
+              Simple. Secure. Decentralized.
+            </p>
+
+            <div className="feature-grid">
+
+              <div className="feature-card">
+                <div className="feature-icon">⇄</div>
+                <h3>Swap</h3>
+                <p>
+                  Swap tokens instantly with the best rates.
+                </p>
+                <a href="#" className="feature-link">
+                  Start Swapping →
+                </a>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">💧</div>
+                <h3>Pool</h3>
+                <p>
+                  Provide liquidity and earn fees.
+                </p>
+                <a href="#" className="feature-link">
+                  Provide Liquidity →
+                </a>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">🌱</div>
+                <h3>Earn</h3>
+                <p>
+                  Stake tokens and earn rewards.
+                </p>
+                <a href="#" className="feature-link">
+                  Start Earning →
+                </a>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">🖼</div>
+                <h3>NFT</h3>
+                <p>
+                  Discover and trade unique assets.
+                </p>
+                <a href="#" className="feature-link">
+                  Explore NFTs →
+                </a>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">🌉</div>
+                <h3>Bridge</h3>
+                <p>
+                  Move assets across chains seamlessly.
+                </p>
+                <a href="#" className="feature-link">
+                  Start Bridging →
+                </a>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">🏛</div>
+                <h3>Governance</h3>
+                <p>
+                  Participate in the future of the protocol.
+                </p>
+                <a href="#" className="feature-link">
+                  View Proposals →
+                </a>
+              </div>
+
+            </div>
+
+          </section>
+
+        </main>
+
+        {/* =========================
+             RIGHT PANEL
+        ========================== */}
+
+        <aside className="right-panel">
+
+          <div className="top-connect">
+            <button className="primary-btn">
+              Connect Wallet
             </button>
-          </>
-        )}
+          </div>
 
-        {status && <p className="status" role="status">{status}</p>}
-        {txHash && (
-          <a
-            className="tx-link"
-            href={`${SEPOLIA_EXPLORER_URL}/tx/${txHash}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            View transaction: {shortAddress(txHash)} ↗
-          </a>
-        )}
+          {/* WALLET */}
 
-        <div className="mint-flow">
-          <strong>What happens when you mint?</strong>
-          <ol>
-            <li>MetaMask connects your public wallet address.</li>
-            <li>You approve a Sepolia transaction and its testnet gas fee.</li>
-            <li>The contract creates the NFT and records your wallet as its owner.</li>
-          </ol>
-        </div>
-      </section>
-    </main>
+          <div className="panel-card">
+
+            <div className="panel-title">
+              <h3>My Wallet</h3>
+              <span className="badge">Not Connected</span>
+            </div>
+
+            <p className="wallet-text">
+              Connect your wallet to access all features.
+            </p>
+
+            <button className="wallet-btn">
+              Connect Wallet
+            </button>
+
+          </div>
+
+          {/* SWAP */}
+
+          <div className="panel-card">
+
+            <div className="panel-title">
+              <h3>Swap</h3>
+              <span>⚙</span>
+            </div>
+
+            <div className="token-label">
+              <span>From</span>
+              <span>Balance: 0.0</span>
+            </div>
+
+            <div className="token-box">
+              <span className="token">
+                ◈ ETH⌄
+              </span>
+
+              <span className="amount">
+                0.0
+              </span>
+            </div>
+
+            <div className="swap-arrow">
+              ⇅
+            </div>
+
+            <div className="token-label">
+              <span>To</span>
+              <span>Balance: 0.0</span>
+            </div>
+
+            <div className="token-box">
+              <span className="token">
+                ◉ USDC⌄
+              </span>
+
+              <span className="amount">
+                0.0
+              </span>
+            </div>
+
+            <button
+              className="wallet-btn swap-connect-btn"
+            >
+              Connect Wallet
+            </button>
+
+          </div>
+
+          {/* POPULAR TOKENS */}
+
+          <div className="panel-card">
+
+            <div className="panel-title">
+              <h3>Popular Tokens</h3>
+              <span className="view-all-link">
+                View All →
+              </span>
+            </div>
+
+            <div className="token-row">
+
+              <div className="token-info">
+                <div className="coin">ETH</div>
+
+                <div>
+                  <div className="token-name">ETH</div>
+                  <div className="token-full-name">Ethereum</div>
+                </div>
+              </div>
+
+              <div className="price">
+                $3,248.12
+                <div className="price-change">+2.4%</div>
+              </div>
+
+            </div>
+
+            <div className="token-row">
+
+              <div className="token-info">
+                <div className="coin">$</div>
+
+                <div>
+                  <div className="token-name">USDC</div>
+                  <div className="token-full-name">USD Coin</div>
+                </div>
+              </div>
+
+              <div className="price">
+                $1.00
+                <div className="price-change">+0.01%</div>
+              </div>
+
+            </div>
+
+            <div className="token-row">
+
+              <div className="token-info">
+                <div className="coin">D</div>
+
+                <div>
+                  <div className="token-name">DAI</div>
+                  <div className="token-full-name">Dai Stablecoin</div>
+                </div>
+              </div>
+
+              <div className="price">
+                $1.00
+                <div className="price-change">+0.00%</div>
+              </div>
+
+            </div>
+
+            <div className="token-row">
+
+              <div className="token-info">
+                <div className="coin">₿</div>
+
+                <div>
+                  <div className="token-name">WBTC</div>
+                  <div className="token-full-name">
+                    Wrapped Bitcoin
+                  </div>
+                </div>
+              </div>
+
+              <div className="price">
+                $68,421.20
+                <div className="price-change">+1.8%</div>
+              </div>
+
+            </div>
+
+          </div>
+
+        </aside>
+
+      </div>
   );
 }

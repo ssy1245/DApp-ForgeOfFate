@@ -1,4 +1,144 @@
+import PriceChart from "./PriceChart.jsx";
+import PopularTokens from "./PopularTokens.jsx";
+import { useEffect, useRef, useState } from "react";
+import { BrowserProvider, formatEther } from "ethers";
+import { describeConnectionError, findBrowserWallet } from "./wallet.js";
+
 export default function App() {
+  const [chartCoin, setChartCoin] = useState("bitcoin");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [walletError, setWalletError] = useState("");
+  const [networkLabel, setNetworkLabel] = useState("");
+  const [balance, setBalance] = useState(null);
+  const [chainVersion, setChainVersion] = useState(0);
+  const [modelProvider, setModelProvider] = useState("");
+  const [model, setModel] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const walletDialog = useRef(null);
+  const connectionPending = useRef(false);
+  const [walletAvailable, setWalletAvailable] = useState(false);
+  const discoveredWallets = useRef([]);
+  const [activeWallet, setActiveWallet] = useState(null);
+
+  useEffect(() => {
+    function handleAnnouncement(event) {
+      const detail = event.detail;
+      if (!detail?.provider?.request || !detail?.info?.uuid) return;
+      if (!discoveredWallets.current.some(({ info }) => info.uuid === detail.info.uuid)) {
+        discoveredWallets.current.push(detail);
+      }
+    }
+    window.addEventListener("eip6963:announceProvider", handleAnnouncement);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    return () => window.removeEventListener("eip6963:announceProvider", handleAnnouncement);
+  }, []);
+
+  async function connectWallet() {
+    if (walletAddress) {
+      if (!walletDialog.current.open) walletDialog.current.showModal();
+      return;
+    }
+    if (connectionPending.current) return;
+
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    const wallet = findBrowserWallet(discoveredWallets.current, window.ethereum);
+    setWalletAvailable(Boolean(wallet?.request));
+    if (!wallet?.request) {
+      setWalletError("No wallet extension is available on this page. Open this same URL in the browser profile where MetaMask is installed, allow the extension to access this site, then refresh. A wallet installed in a different browser cannot receive this request.");
+      if (!walletDialog.current.open) walletDialog.current.showModal();
+      return;
+    }
+
+    walletDialog.current.close();
+    setActiveWallet(wallet);
+    connectionPending.current = true;
+    setIsConnecting(true);
+    setWalletError("");
+
+    try {
+      // Request permission to connect the user's wallet.
+      const accounts = await wallet.request({ method: "eth_requestAccounts" });
+      if (!accounts[0]) {
+        setWalletError("No account was shared. Please choose an account in your wallet and try again.");
+        if (!walletDialog.current.open) walletDialog.current.showModal();
+        return;
+      }
+      setWalletAddress(accounts[0]);
+    } catch (error) {
+      setWalletError(describeConnectionError(error));
+      if (!walletDialog.current.open) walletDialog.current.showModal();
+    } finally {
+      connectionPending.current = false;
+      setIsConnecting(false);
+    }
+  }
+
+  useEffect(() => {
+    const wallet = activeWallet;
+    if (!wallet?.on) return;
+
+    function handleAccountsChanged(accounts) {
+      setWalletAddress(accounts[0] ?? "");
+      setNetworkLabel("");
+      setBalance(null);
+      setWalletError("");
+    }
+    function handleChainChanged() {
+      setNetworkLabel("");
+      setBalance(null);
+      setChainVersion((version) => version + 1);
+    }
+    function handleDisconnect() {
+      handleAccountsChanged([]);
+    }
+
+    wallet.on("accountsChanged", handleAccountsChanged);
+    wallet.on("chainChanged", handleChainChanged);
+    wallet.on("disconnect", handleDisconnect);
+    return () => {
+      wallet.removeListener?.("accountsChanged", handleAccountsChanged);
+      wallet.removeListener?.("chainChanged", handleChainChanged);
+      wallet.removeListener?.("disconnect", handleDisconnect);
+    };
+  }, [activeWallet]);
+
+  useEffect(() => {
+    if (!walletAddress || !activeWallet) return;
+    let cancelled = false;
+    setNetworkLabel("");
+    setBalance(null);
+    setWalletError("");
+
+    async function loadWalletDetails() {
+      try {
+        const provider = new BrowserProvider(activeWallet);
+        const [network, value] = await Promise.all([
+          provider.getNetwork(),
+          provider.getBalance(walletAddress),
+        ]);
+        if (cancelled) return;
+        const ethereumNetworks = {
+          "1": "Ethereum Mainnet",
+          "11155111": "Sepolia",
+          "17000": "Holesky",
+          "560048": "Hoodi",
+        };
+        const chainId = network.chainId.toString();
+        setNetworkLabel(ethereumNetworks[chainId] ?? `Chain ${chainId}`);
+        // Use a generic unit for unknown chains instead of assuming ETH.
+        setBalance(`${formatEther(value)} ${ethereumNetworks[chainId] ? "ETH" : "native tokens"}`);
+      } catch {
+        if (!cancelled) {
+          setNetworkLabel("Unavailable");
+          setWalletError("Wallet connected, but network details could not be loaded. Try reconnecting from your wallet or refresh the page.");
+        }
+      }
+    }
+    loadWalletDetails();
+    return () => { cancelled = true; };
+  }, [walletAddress, chainVersion, activeWallet]);
+
   return (
     <div className="app">
 
@@ -41,66 +181,7 @@ export default function App() {
 
         <main className="main">
 
-          {/* HERO */}
-
-          <section className="hero">
-
-            <div className="hero-small">
-              DECENTRALIZED · OPEN · FOR EVERYONE
-            </div>
-
-            <h1>
-              Trade. Earn. Build.<br />
-              <span className="purple-text">Onchain</span>
-              Together.
-            </h1>
-
-            <p className="hero-description">
-              A simple and powerful DeFi platform for everyone.
-              Swap tokens, earn yield, and explore Web3.
-            </p>
-
-            <div className="hero-buttons">
-              <button className="primary-btn">
-                Get Started →
-              </button>
-
-              <button className="secondary-btn">
-                Learn More
-              </button>
-            </div>
-
-          </section>
-
-          {/* STATISTICS */}
-
-          <section className="stats">
-
-            <div className="stat-card">
-              <div className="stat-title">Total Value Locked</div>
-              <div className="stat-value">$12.48M</div>
-              <div className="positive">↑ 12.3%</div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-title">Total Users</div>
-              <div className="stat-value">25,361</div>
-              <div className="positive">↑ 8.6%</div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-title">Total Volume</div>
-              <div className="stat-value">$86.72M</div>
-              <div className="positive">↑ 21.4%</div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-title">Protocol Revenue</div>
-              <div className="stat-value">$124.6K</div>
-              <div className="positive">↑ 15.7%</div>
-            </div>
-
-          </section>
+          <PriceChart coin={chartCoin} onCoinChange={setChartCoin} />
 
           {/* ECOSYSTEM */}
 
@@ -194,169 +275,184 @@ export default function App() {
         <aside className="right-panel">
 
           <div className="top-connect">
-            <button className="primary-btn">
-              Connect Wallet
+            <button
+              className={`primary-btn${walletAddress ? " wallet-connected" : ""}`}
+              onClick={connectWallet}
+              disabled={isConnecting}
+              aria-haspopup="dialog"
+              title={walletAddress || "Connect your browser wallet"}
+            >
+              {isConnecting
+                ? "Connecting..."
+                : walletAddress
+                  ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+                  : "Connect Wallet"}
             </button>
           </div>
 
           {/* WALLET */}
 
-          <div className="panel-card">
-
+          <section className="panel-card" aria-labelledby="wallet-heading">
             <div className="panel-title">
-              <h3>My Wallet</h3>
-              <span className="badge">Not Connected</span>
+              <h3 id="wallet-heading">My Wallet</h3>
+              <span className={`badge${walletAddress ? " badge-connected" : ""}`}>
+                {walletAddress ? "Connected" : "Not Connected"}
+              </span>
             </div>
-
             <p className="wallet-text">
-              Connect your wallet to access all features.
+              {walletAddress
+                ? "Your wallet stays in control of every transaction."
+                : "Use Connect Wallet above to view your account."}
             </p>
+            {isConnecting && (
+              <p className="connection-pending" role="status">
+                Check your wallet extension for the authorization request. If it is hidden, open it from your browser toolbar.
+              </p>
+            )}
+            <dl className="wallet-details" aria-live="polite">
+              <div>
+                <dt>Account</dt>
+                <dd title={walletAddress || undefined}>
+                  {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>Network</dt>
+                <dd>{walletAddress ? networkLabel || "Loading..." : "—"}</dd>
+              </div>
+              <div>
+                <dt>Balance</dt>
+                <dd>{walletAddress ? balance ?? (networkLabel === "Unavailable" ? "—" : "Loading...") : "—"}</dd>
+              </div>
+            </dl>
+            {walletError && <p className="wallet-error" role="alert">{walletError}</p>}
+          </section>
 
-            <button className="wallet-btn">
-              Connect Wallet
-            </button>
+          {/* AGENT SETTINGS */}
 
-          </div>
-
-          {/* SWAP */}
-
-          <div className="panel-card">
-
+          <section className="panel-card" aria-labelledby="agent-settings-heading">
             <div className="panel-title">
-              <h3>Swap</h3>
-              <span>⚙</span>
+              <h3 id="agent-settings-heading">Agent Settings</h3>
+              <span className="badge">BYOK</span>
             </div>
-
-            <div className="token-label">
-              <span>From</span>
-              <span>Balance: 0.0</span>
+            <p className="wallet-text">Bring your own API key to power your agent.</p>
+            <div className="agent-fields">
+              <label htmlFor="model-provider">Model provider</label>
+              <select
+                id="model-provider"
+                value={modelProvider}
+                onChange={(event) => {
+                  setModelProvider(event.target.value);
+                  setModel("");
+                  setApiKey("");
+                }}
+              >
+                <option value="">Select a provider</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="deepseek">DeepSeek</option>
+              </select>
+              <label htmlFor="agent-model">Model ID</label>
+              <input
+                id="agent-model"
+                value={model}
+                onChange={(event) => setModel(event.target.value)}
+                placeholder="Enter your model ID"
+                spellCheck={false}
+                autoComplete="off"
+              />
+              <div className="field-label-row">
+                <label htmlFor="agent-api-key">API key</label>
+                <button
+                  type="button"
+                  className="clear-key-btn"
+                  onClick={() => setApiKey("")}
+                  disabled={!apiKey}
+                >
+                  Clear key
+                </button>
+              </div>
+              <input
+                id="agent-api-key"
+                type="password"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder="Enter your model API key"
+                autoComplete="off"
+                spellCheck={false}
+                aria-describedby="api-key-note"
+              />
             </div>
-
-            <div className="token-box">
-              <span className="token">
-                ◈ ETH⌄
-              </span>
-
-              <span className="amount">
-                0.0
-              </span>
-            </div>
-
-            <div className="swap-arrow">
-              ⇅
-            </div>
-
-            <div className="token-label">
-              <span>To</span>
-              <span>Balance: 0.0</span>
-            </div>
-
-            <div className="token-box">
-              <span className="token">
-                ◉ USDC⌄
-              </span>
-
-              <span className="amount">
-                0.0
-              </span>
-            </div>
-
-            <button
-              className="wallet-btn swap-connect-btn"
-            >
-              Connect Wallet
+            <p id="api-key-note" className="settings-note">
+              Kept in page memory only and cleared on refresh. Never enter your wallet private key or recovery phrase.
+            </p>
+            <button className="agent-test-btn" disabled aria-describedby="agent-availability">
+              Test Connection
             </button>
+            <p id="agent-availability" className="settings-note">
+              Model connections are coming soon. These settings are not sent anywhere yet.
+            </p>
+          </section>
 
-          </div>
-
-          {/* POPULAR TOKENS */}
-
-          <div className="panel-card">
-
-            <div className="panel-title">
-              <h3>Popular Tokens</h3>
-              <span className="view-all-link">
-                View All →
-              </span>
-            </div>
-
-            <div className="token-row">
-
-              <div className="token-info">
-                <div className="coin">ETH</div>
-
-                <div>
-                  <div className="token-name">ETH</div>
-                  <div className="token-full-name">Ethereum</div>
-                </div>
-              </div>
-
-              <div className="price">
-                $3,248.12
-                <div className="price-change">+2.4%</div>
-              </div>
-
-            </div>
-
-            <div className="token-row">
-
-              <div className="token-info">
-                <div className="coin">$</div>
-
-                <div>
-                  <div className="token-name">USDC</div>
-                  <div className="token-full-name">USD Coin</div>
-                </div>
-              </div>
-
-              <div className="price">
-                $1.00
-                <div className="price-change">+0.01%</div>
-              </div>
-
-            </div>
-
-            <div className="token-row">
-
-              <div className="token-info">
-                <div className="coin">D</div>
-
-                <div>
-                  <div className="token-name">DAI</div>
-                  <div className="token-full-name">Dai Stablecoin</div>
-                </div>
-              </div>
-
-              <div className="price">
-                $1.00
-                <div className="price-change">+0.00%</div>
-              </div>
-
-            </div>
-
-            <div className="token-row">
-
-              <div className="token-info">
-                <div className="coin">₿</div>
-
-                <div>
-                  <div className="token-name">WBTC</div>
-                  <div className="token-full-name">
-                    Wrapped Bitcoin
-                  </div>
-                </div>
-              </div>
-
-              <div className="price">
-                $68,421.20
-                <div className="price-change">+1.8%</div>
-              </div>
-
-            </div>
-
-          </div>
+          <PopularTokens selectedCoin={chartCoin} onSelectCoin={setChartCoin} />
 
         </aside>
+
+        <dialog
+          ref={walletDialog}
+          className="wallet-drawer"
+          aria-labelledby="wallet-dialog-heading"
+          aria-describedby="wallet-dialog-description"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) walletDialog.current.close();
+          }}
+        >
+          <div className="wallet-drawer-content">
+            <header className="wallet-drawer-header">
+              <span className="badge">Wallet connection</span>
+              <button
+                type="button"
+                className="drawer-close"
+                aria-label="Close wallet panel"
+                onClick={() => walletDialog.current.close()}
+              >×</button>
+            </header>
+            <div className="wallet-drawer-icon" aria-hidden="true">◈</div>
+            <h2 id="wallet-dialog-heading">
+              {walletAddress ? "Wallet connected" : isConnecting ? "Check your wallet" : "Connect your wallet"}
+            </h2>
+            <p id="wallet-dialog-description" className="wallet-text">
+              {walletAddress
+                ? "Your account is connected to ChainFlow."
+                : isConnecting
+                  ? "Approve the account access request in your wallet extension. If no window appears, open the extension from your browser toolbar."
+                  : "Authorize ChainFlow to view your public wallet address. Approval takes place in your wallet, not on this page."}
+            </p>
+            <div aria-live="polite">
+              {isConnecting && <p className="connection-pending">Waiting for wallet approval...</p>}
+              {walletAddress && <p className="connected-account">{walletAddress}</p>}
+              {walletError && <p className="wallet-error" role="alert">{walletError}</p>}
+            </div>
+            <div className="wallet-drawer-actions">
+              {walletAddress ? (
+                <button className="primary-btn" onClick={() => walletDialog.current.close()}>Done</button>
+              ) : !walletAvailable ? (
+                <>
+                  <a className="primary-btn" href="https://metamask.io/download/" target="_blank" rel="noreferrer">Get MetaMask ↗</a>
+                  <button className="secondary-btn" onClick={connectWallet}>Check Again</button>
+                </>
+              ) : (
+                <button className="primary-btn" onClick={connectWallet} disabled={isConnecting}>
+                  {isConnecting ? "Waiting for approval..." : "Try Again"}
+                </button>
+              )}
+            </div>
+            <p className="settings-note">
+              Connecting does not send a transaction. Never enter a recovery phrase or private key here.
+            </p>
+            {isConnecting && <p className="settings-note">Closing this panel does not cancel the request in your wallet.</p>}
+          </div>
+        </dialog>
 
       </div>
   );

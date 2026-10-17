@@ -1,6 +1,78 @@
-node_modules/
-dist/
+# Local secrets and configuration
 .env
 .env.*
 !.env.example
+!.env.*.example
+/secrets/
+/credentials/
+/keystore/
+/keystores/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# macOS and editors
 .DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node / frontend / contracts
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+.eslintcache
+*.tsbuildinfo
+artifacts/
+cache/
+typechain-types/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+# Test and browser output
+playwright-report/
+test-results/
+blob-report/
+
+# Runtime data, local credentials, deployment state and logs
+.local/
+backend/data/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+*.pid
+*.pid.lock
+*.prof
+*.lprof
+
+# Local backups / exports / scratch data (keep source migrations and assets)
+/backups/
+/database-backups/
+/tmp/
+/temp/
+*.bak
+*.orig
+*.rej
+
+# Keep source, README files, dependency locks, .env.example and assets/3d/*.glb.
+# Never ignore all *.json, *.sql, *.png or *.glb: these can be project sources.

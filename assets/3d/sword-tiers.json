@@ -1,0 +1,78 @@
+[
+  {
+    "id": "weathered",
+    "branch": "longsword",
+    "min_level": 0,
+    "name": "余烬长剑",
+    "model": "sword",
+    "size": 3.5
+  },
+  {
+    "id": "forged",
+    "branch": "longsword",
+    "min_level": 3,
+    "name": "淬火长剑",
+    "model": "sword-upgraded",
+    "size": 3.5
+  },
+  {
+    "id": "noble",
+    "branch": "longsword",
+    "min_level": 10,
+    "name": "贵族骑士剑",
+    "model": "nobel+knight+sword+3d+model",
+    "size": 3.5
+  },
+  {
+    "id": "oathbound",
+    "branch": "longsword",
+    "min_level": 25,
+    "name": "誓约圣剑",
+    "model": "fantasy+sword+3d+model",
+    "size": 3.6
+  },
+  {
+    "id": "gilded",
+    "branch": "longsword",
+    "min_level": 50,
+    "name": "鎏金誓约圣剑",
+    "model": "top+fantasy+sword+model",
+    "size": 3.85
+  },
+  {
+    "id": "rapier-forged",
+    "branch": "rapier",
+    "min_level": 3,
+    "name": "轻型刺剑",
+    "model": "medieval+sword+model",
+    "size": 3.5,
+    "design": "朴素钢制窄刃、深棕皮柄、开放式弧形护手，作为轻盈优雅的起点。"
+  },
+  {
+    "id": "rapier-silver-crest",
+    "branch": "rapier",
+    "min_level": 10,
+    "name": "银徽刺剑",
+    "model": "medieval+sword+model",
+    "size": 3.5,
+    "design": "精炼银钢窄刃、黑色皮柄；护手中央与剑首呼应同一家徽，体现贵族身份。新模型待制作，暂用基础刺剑。"
+  },
+  {
+    "id": "rapier-regent",
+    "branch": "rapier",
+    "min_level": 25,
+    "name": "摄政刺剑",
+    "model": "medieval+sword+model",
+    "size": 3.6,
+    "design": "银白窄刃、黑柄、香槟金月桂弧形护手、一颗深紫宝石；剑根短段纹章雕刻，呈现宫廷掌权者的从容。新模型待制作，暂用基础刺剑。"
+  },
+  {
+    "id": "rapier-coronation",
+    "branch": "rapier",
+    "min_level": 50,
+    "name": "加冕刺剑",
+    "model": "medieval+sword+model",
+    "size": 3.7,
+    "design": "护手与剑首形成呼应的冠冕轮廓，银白剑身、香槟金骨架、深紫主石；装饰集中在护手与剑首，保留修长单手比例与干净刃面，象征女王的权力与优雅。新模型待制作，暂用基础刺剑。"
+  }
+]

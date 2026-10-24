@@ -10,18 +10,19 @@ import Anvil from './Anvil';
 import WorkshopRoom from './WorkshopRoom';
 import { ANVIL_POSITION, CABINET_POSITION, CABINET_ROTATION, CRATE_POSITION, FURNACE_POSITION, FURNACE_RAISE, FURNACE_WIDTH_SCALE } from './workshopLayout';
 import { IMPACT_MS, SWING_MS, IMPACT_GRIP, IMPACT_ROTATION, WINDUP_GRIP, WINDUP_ROTATION, smooth } from './forgeMotion';
-const UpgradeContext=createContext(3);
+import { swordTiers, swordTier, nextSwordTier, branchTiers, type SwordTier } from './swordTiers';
+const UpgradeContext=createContext<SwordTier[]>(swordTiers);
 const assetCache = new Map<string, Group>();
 
 function cloneAsset(source:Group){const root=source.clone(true);root.traverse(o=>{if(o instanceof Mesh)o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();});return root;}
 function Asset({name,size,children,heat=0}:{name:string;size:number;children:ReactNode;heat?:number}) {
   const [model,setModel]=useState<Group|null>(null);
-  useEffect(()=>{let live=true;const key=`${name}:${size}`;const cached=assetCache.get(key);if(cached){setModel(cloneAsset(cached));return;} fetch(`/models/${name}.glb`).then(r=>r.ok?r.arrayBuffer():null).then(buffer=>{if(!buffer)return;new GLTFLoader().parse(buffer,'/',g=>{if(!live)return;const root=g.scene;const bounds=new Box3().setFromObject(root);const center=bounds.getCenter(new Vector3());const extent=bounds.getSize(new Vector3());root.position.sub(center);const wrapper=new Group();wrapper.add(root);wrapper.scale.setScalar(size/Math.max(extent.x,extent.y,extent.z,0.001));wrapper.traverse(o=>{if(o instanceof Mesh){o.castShadow=true;o.receiveShadow=true;}});assetCache.set(key,wrapper);setModel(cloneAsset(wrapper));},()=>{});}).catch(()=>{});return()=>{live=false;};},[name,size]);
+  useEffect(()=>{let live=true;setModel(null);const key=`${name}:${size}`;const cached=assetCache.get(key);if(cached){setModel(cloneAsset(cached));return;} fetch(`/models/${encodeURIComponent(name)}.glb`).then(r=>r.ok?r.arrayBuffer():null).then(buffer=>{if(!buffer)return;new GLTFLoader().parse(buffer,'/',g=>{if(!live)return;const root=g.scene;const bounds=new Box3().setFromObject(root);const center=bounds.getCenter(new Vector3());const extent=bounds.getSize(new Vector3());root.position.sub(center);const wrapper=new Group();wrapper.add(root);wrapper.scale.setScalar(size/Math.max(extent.x,extent.y,extent.z,0.001));wrapper.traverse(o=>{if(o instanceof Mesh){o.castShadow=true;o.receiveShadow=true;}});assetCache.set(key,wrapper);setModel(cloneAsset(wrapper));},()=>{});}).catch(()=>{});return()=>{live=false;};},[name,size]);
   useEffect(()=>{model?.traverse(o=>{if(o instanceof Mesh){for(const m of Array.isArray(o.material)?o.material:[o.material]){if('emissive' in m){m.emissive.set('#ff4b06');m.emissiveIntensity=heat*1.5;}}}});},[model,heat]);
   return model?<primitive object={model}/>:<>{children}</>;
 }
-function Sword({level,flat=true,heat=0}:{level:number;flat?:boolean;heat?:number}) {const upgradeLevel=useContext(UpgradeContext);return <group rotation={flat?[Math.PI/2,0,-Math.PI/2]:[0,0,Math.PI]}>
-  <Asset name={level>=upgradeLevel?"sword-upgraded":"sword"} size={3.5} heat={heat}><group>
+function Sword({level,flat=true,heat=0}:{level:number;flat?:boolean;heat?:number}) {const tier=swordTier(level,useContext(UpgradeContext));return <group rotation={flat?[Math.PI/2,0,-Math.PI/2]:[0,0,Math.PI]}>
+  <Asset key={tier.model} name={tier.model} size={tier.size} heat={heat}><group>
     <mesh position={[0,0.55,0]} castShadow><boxGeometry args={[0.27,2.3,0.1]}/><meshStandardMaterial color="#bac0bd" metalness={0.85} roughness={0.25} emissive="#c36322" emissiveIntensity={0.12+level*0.015}/></mesh>
     <mesh position={[0,1.83,0]} rotation={[0,0,Math.PI/4]} castShadow><boxGeometry args={[0.19,0.19,0.08]}/><meshStandardMaterial color="#d4d6cc" metalness={0.8} roughness={0.3}/></mesh>
     <mesh position={[0,-0.65,0]} castShadow><boxGeometry args={[0.95,0.13,0.2]}/><meshStandardMaterial color="#9d7740" metalness={0.7} roughness={0.4}/></mesh>
@@ -75,7 +76,7 @@ function Hammer({hit,equipped}:{hit:number;equipped:boolean}) {
 }
 function Embers(){const ref=useRef<Group>(null);useFrame(({clock})=>{if(ref.current){ref.current.rotation.y=clock.elapsedTime*0.08;ref.current.position.y=(clock.elapsedTime*0.2)%0.7;}});return <group ref={ref}>{Array.from({length:22},(_,i)=><mesh key={i} position={[Math.sin(i*7)*2.7,0.2+(i%7)*0.45,Math.cos(i*5)*1.8]}><sphereGeometry args={[0.012+(i%3)*0.008,4,4]}/><meshBasicMaterial color={i%2?'#e79838':'#d74a24'}/></mesh>)}</group>;}
 type SwordPlace = 'anvil' | 'held' | 'cabinet' | 'furnace' | 'empty';
-export type SceneWeapon={id:string;level:number;status:string;heat_charges:number;heat_ready_at:number;protected_left:number};
+export type SceneWeapon={branch?:string;id:string;level:number;status:string;heat_charges:number;heat_ready_at:number;protected_left:number};
 function HeldSword({level,heat}:{level:number;heat:number}) {
   const ref=useRef<Group>(null);
   useFrame(({camera,size})=>{if(!ref.current)return;ref.current.position.set(Math.min(0.45,size.width/size.height*0.35),-0.22,-1.7).applyQuaternion(camera.quaternion).add(camera.position);ref.current.quaternion.copy(camera.quaternion);});
@@ -135,11 +136,12 @@ function Furnace({occupied,level,heat,onInteract}:{occupied:boolean;level:number
   </group>;
 }
 function World({level,hit,place,heat,result,hammerEquipped,onStation,roomView}:{level:number;hit:number;place:SwordPlace;heat:number;result:string;hammerEquipped:boolean;onStation:(station:Station)=>void;roomView:ViewMode}){return <>
-  <color attach="background" args={['#191a18']}/><fog attach="fog" args={['#191a18',roomView==='orbit'?90:14,roomView==='orbit'?220:42]}/>
+  <color attach="background" args={['#090e13']}/><fog attach="fog" args={['#090e13',roomView==='orbit'?24:8,roomView==='orbit'?65:30]}/>
   <WorkshopRoom cutaway={roomView==='orbit'}/>
 
-  <ambientLight intensity={1}/><directionalLight position={[4,7,4]} intensity={3} color="#e6d4ae" castShadow shadow-mapSize={[1024,1024]}/>
-  <pointLight position={[ANVIL_POSITION[0]-3,1.7,ANVIL_POSITION[2]+1]} intensity={28} color="#f07428"/><pointLight position={[ANVIL_POSITION[0]+3,3,ANVIL_POSITION[2]+2]} intensity={13} color="#829fa7"/>
+  <pointLight position={[ANVIL_POSITION[0],3.8,ANVIL_POSITION[2]+0.5]} intensity={16} distance={6} color="#a3b2bc"/>
+  <ambientLight intensity={0.5} color="#8296ac"/><directionalLight position={[4,7,4]} intensity={1.05} color="#91a9c0" castShadow shadow-mapSize={[1024,1024]}/>
+  <pointLight position={[ANVIL_POSITION[0]-3,1.7,ANVIL_POSITION[2]+1]} intensity={12} distance={8} color="#f07428"/><pointLight position={[ANVIL_POSITION[0]+3,3,ANVIL_POSITION[2]+2]} intensity={9} distance={7} color="#91adbf"/>
   <group position={[ANVIL_POSITION[0],0,ANVIL_POSITION[2]]}>
     <mesh position={[0,-0.55,0]} castShadow receiveShadow><boxGeometry args={[6.8,0.4,2.9]}/><meshStandardMaterial color="#45443b" roughness={1}/></mesh>
     <mesh position={[0,-0.15,0]} castShadow receiveShadow><boxGeometry args={[6.5,0.4,2.7]}/><meshStandardMaterial color="#555348" roughness={0.95}/></mesh>
@@ -153,11 +155,13 @@ function World({level,hit,place,heat,result,hammerEquipped,onStation,roomView}:{
   <mesh position={[...CRATE_POSITION]} castShadow><boxGeometry args={[1,0.8,0.75]}/><meshStandardMaterial color="#594330" roughness={0.9}/></mesh><group position={[ANVIL_POSITION[0],0,ANVIL_POSITION[2]+1]}><Embers/></group>
 </>;}
 class Fallback extends Component<{children:ReactNode},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return{failed:true};}render(){return this.state.failed?<div className="scene-fallback">⚒<span>命运锻造台 · 3D 暂不可用，游戏操作仍可继续</span></div>:this.props.children;}}
-export default function ForgeScene({level,hit,weapon,result,busy,probabilities,shield,shields,onShield,onPlacement,onHeat,onStrike,upgradeLevel,maxLevel,heatSeconds,heatStrikes}: {
+export default function ForgeScene({level,hit,weapon,result,busy,probabilities,shield,shields,onShield,onPlacement,onHeat,onStrike,visualTiers=swordTiers,maxLevel,heatSeconds,heatStrikes}: {
   level:number;hit:number;weapon?:SceneWeapon;result:string;busy:boolean;probabilities:Record<string,number>;
   onPlacement:(place:string)=>void;
-  shield:boolean;shields:number;onShield:(value:boolean)=>void;onHeat:()=>void;onStrike:()=>void;upgradeLevel:number;maxLevel:number;heatSeconds:number;heatStrikes:number;
+  shield:boolean;shields:number;onShield:(value:boolean)=>void;onHeat:()=>void;onStrike:()=>void;visualTiers?:SwordTier[];maxLevel:number;heatSeconds:number;heatStrikes:number;
 }){
+  const appearanceTiers=branchTiers(weapon?.branch,visualTiers);
+  const nextAppearance=nextSwordTier(level,appearanceTiers);
   const [mode,setMode]=useState<ViewMode>('walk');
   const [active,setActive]=useState(false);
   const [hudOpen,setHudOpen]=useState(()=>window.innerWidth>700);
@@ -203,7 +207,7 @@ export default function ForgeScene({level,hit,weapon,result,busy,probabilities,s
   const changeMode=(next:ViewMode)=>{movement.current.clear();setMode(next);setHint(next==='walk'?'点击画面进入：鼠标移动转头，WASD 移动，E 拿放；按 Esc 暂停并释放鼠标。':'拖动旋转视角，滚轮缩放；点击剑或下方按钮拿起。');};
   const hammerEquipped=mode==='walk'&&!!weapon&&place==='anvil'&&near==='anvil';
   const nearLabel=near==='anvil'?'锻造台':near==='cabinet'?'展示柜':near==='furnace'?'熔炉':'靠近锻造设施';
-  return <UpgradeContext.Provider value={upgradeLevel}><Fallback><div ref={container} className={`workshop-view ${expanded?'workshop-expanded':''}`}>
+  return <UpgradeContext.Provider value={appearanceTiers}><Fallback><div ref={container} className={`workshop-view ${expanded?'workshop-expanded':''}`}>
     <div className="workshop-toolbar"><div className="view-modes"><button aria-pressed={mode==='orbit'} onClick={()=>changeMode('orbit')}>环绕查看</button><button aria-pressed={mode==='walk'} onClick={()=>changeMode('walk')}>第一人称</button></div><div><button onClick={()=>{movement.current.clear();setReset(r=>r+1);}}>复位</button><button aria-pressed={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded?'收起':'展开'}</button></div></div>
     <label className="look-sensitivity">视角灵敏度 <input aria-label="视角灵敏度" type="range" min="0.2" max="2.5" step="0.1" value={sensitivity} onChange={e=>setSensitivity(Number(e.target.value))}/><output>{sensitivity.toFixed(1)}×</output></label>
     <Canvas shadows camera={{position:[6.6,6.3,9.3],fov:44}} dpr={[1,1.6]}>
@@ -215,9 +219,9 @@ export default function ForgeScene({level,hit,weapon,result,busy,probabilities,s
     <div className="workshop-interactions"><span>{place==='held'?'持剑中':place==='anvil'?'长剑在锻造台':place==='furnace'?'长剑在熔炉':place==='empty'?'请先锻造武器':'长剑在展示柜'}{mode==='walk'?` · ${active?nearLabel:'已暂停'}`:''}{hammerEquipped?' · 已取出锻造锤':''}</span><div>
       {place!=='empty'&&place!=='held'?<button disabled={mode==='walk'&&(!active||near!==place)} onClick={()=>interact(place==='furnace'?'furnace':place==='cabinet'?'cabinet':'anvil')}>拿起长剑{mode==='walk'?' · E':''}</button>:place==='held'?<><button disabled={mode==='walk'&&(!active||near!=='anvil')} onClick={()=>interact('anvil')}>放回锻造台</button><button disabled={mode==='walk'&&(!active||near!=='cabinet')} onClick={()=>interact('cabinet')}>放进展示柜</button></>:null}
     </div><small role="status">{hint}</small></div>
-    <aside className={`forge-hud ${hudOpen?'hud-open':'hud-compact'}`} aria-label="铁砧锻造面板"><button className="hud-heading" aria-label={hudOpen?'收起武器面板':'展开武器面板'} aria-expanded={hudOpen} onClick={()=>setHudOpen(v=>!v)}><span className="hud-heading-label">武器状态 <small>{hudOpen?'收起 −':'展开 +'}</small></span><span className="hud-weapon"><span>{level>=upgradeLevel?'淬火长剑':'余烬长剑'}</span><strong>+{level}</strong></span></button>{hudOpen&&<><p>{!weapon?'尚未锻造武器':weapon.status!=='active'?'已封存 · 属性固定':warming?`熔炉加热中 · ${Math.max(0,weapon.heat_ready_at-clock).toFixed(1)} 秒`:hot?`烧红 · 可敲 ${weapon.heat_charges} 锤`:`需要加热 · 每炉可敲 ${heatStrikes} 锤`}</p>
+    <aside className={`forge-hud ${hudOpen?'hud-open':'hud-compact'}`} aria-label="铁砧锻造面板"><button className="hud-heading" aria-label={hudOpen?'收起武器面板':'展开武器面板'} aria-expanded={hudOpen} onClick={()=>setHudOpen(v=>!v)}><span className="hud-heading-label">武器状态 <small>{hudOpen?'收起 −':'展开 +'}</small></span><span className="hud-weapon"><span>{swordTier(level,appearanceTiers).name}</span><strong>+{level}</strong></span></button>{hudOpen&&<><p>{!weapon?'尚未锻造武器':weapon.status!=='active'?'已封存 · 属性固定':warming?`熔炉加热中 · ${Math.max(0,weapon.heat_ready_at-clock).toFixed(1)} 秒`:hot?`烧红 · 可敲 ${weapon.heat_charges} 锤`:`需要加热 · 每炉可敲 ${heatStrikes} 锤`}</p>
       <div className={`hud-heat ${warming?'warming':''}`} aria-label={`剩余热量 ${weapon?.heat_charges??0} / ${heatStrikes} 锤`}><span>锻造热量</span><div>{Array.from({length:heatStrikes},(_,i)=><i key={i} className={i<(weapon?.heat_charges??0)?'charged':''}/>)}</div><b>{weapon?.heat_charges??0}/{heatStrikes}</b></div>
-      <div className="hud-transitions">{[['up','升级',`+${Math.min(maxLevel,level+1)}`],['double','大成功',`+${Math.min(maxLevel,level+2)}`],['down','降级',`+${Math.max(0,level-1)}`],['destroy','损毁','永久消失'],...(probabilities.saved?[['saved','保护生效',`维持 +${level}`]]:[])].map(([key,label,next])=><div key={key}><span>{label} → {next}</span><b>{weapon?`${((probabilities[key]||0)*100).toFixed(1)}%`:'—'}</b></div>)}</div>
+      <p>{nextAppearance?`Next appearance: +${nextAppearance.min_level} · ${nextAppearance.name}`:"Current route appearance complete"}</p><div className="hud-transitions">{[['up','升级',`+${Math.min(maxLevel,level+1)}`],['double','大成功',`+${Math.min(maxLevel,level+2)}`],['down','降级',`+${Math.max(0,level-1)}`],['destroy','损毁','永久消失'],...(probabilities.saved?[['saved','保护生效',`维持 +${level}`]]:[])].map(([key,label,next])=><div key={key}><span>{label} → {next}</span><b>{weapon?`${((probabilities[key]||0)*100).toFixed(1)}%`:'—'}</b></div>)}</div>
       <label className="hud-shield"><input type="checkbox" checked={shield} disabled={busy||!weapon||weapon.status!=='active'||weapon.protected_left>0||shields<1} onChange={e=>onShield(e.target.checked)}/>单锤保护符 · {shields} 张</label>
       {weapon?.protected_left? <p>免损毁阶段 · 剩余 {weapon.protected_left} 锤</p>:null}
       <div className="hud-buttons"><button disabled={busy||!weapon||weapon.status!=='active'||weapon.heat_charges>0} onClick={onHeat}>送入熔炉</button>{place==='furnace'?<button disabled={busy||warming} onClick={()=>{setPlace('anvil');setHint('已将烧红的武器放回铁砧。');}}>取回铁砧</button>:<button disabled={!ready} onClick={onStrike}>敲击 · 空格 / 左键</button>}</div>

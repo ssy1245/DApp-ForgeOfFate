@@ -18,7 +18,6 @@
   "heat_seconds": 3,
   "heat_strikes": 5,
   "heat_materials": 2,
-  "visual_upgrade_level": 3,
   "daily_swords": 3,
   "destroy_base": 0.01,
   "destroy_per_level": 0.002,

@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from web3 import Web3
 
 from .accounts import normalize_username, hash_password, verify_password
-from .game import BALANCE, probabilities, recycle_price, strike, weapon_name
+from .game import BALANCE, probabilities, recycle_price, strike, weapon_name, SWORD_BRANCHES
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCAL = ROOT / '.local'
@@ -40,6 +40,9 @@ class StrikeBody(BaseModel):
     expected_level: int
     expected_strikes: int
     expected_protected_left: int
+
+class BranchChoice(BaseModel):
+    branch: Literal['longsword','rapier']
 
 class Credentials(BaseModel):
     username: str = Field(min_length=3,max_length=24)
@@ -73,7 +76,7 @@ class Store:
             CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,game_address TEXT UNIQUE NOT NULL,created INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS operations(address TEXT,key TEXT,fingerprint TEXT,response TEXT,PRIMARY KEY(address,key));
             ''')
-            for table,column,definition in [('accounts','role',"TEXT NOT NULL DEFAULT 'player'"),('weapons','heat_ready_at','REAL DEFAULT 0'),('weapons','heat_charges','INTEGER DEFAULT 0'),('players','practice','INTEGER DEFAULT 0'),('players','guest','INTEGER DEFAULT 0'),('challenges','guest_owner','TEXT'),('players','sword_day','TEXT'),('weapons','quality',"TEXT DEFAULT '普通'"),('weapons','source',"TEXT DEFAULT 'forge'")]:
+            for table,column,definition in [('accounts','role',"TEXT NOT NULL DEFAULT 'player'"),('weapons','heat_ready_at','REAL DEFAULT 0'),('weapons','heat_charges','INTEGER DEFAULT 0'),('players','practice','INTEGER DEFAULT 0'),('players','guest','INTEGER DEFAULT 0'),('challenges','guest_owner','TEXT'),('players','sword_day','TEXT'),('weapons','quality',"TEXT DEFAULT '普通'"),('weapons','source',"TEXT DEFAULT 'forge'"),('weapons','branch',"TEXT NOT NULL DEFAULT 'longsword'")]:
                 if column not in {row['name'] for row in db.execute(f'PRAGMA table_info({table})')}:
                     db.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
     @contextmanager
@@ -109,10 +112,10 @@ def chain():
 
 def metadata(weapon):
     image = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#181713"/><text x="256" y="245" text-anchor="middle" fill="#e8ac5c" font-size="36">FORGE OF FATE</text><text x="256" y="310" text-anchor="middle" fill="white" font-size="48">+' + str(weapon['level']) + '</text></svg>'
-    data = {'name': f"{'[DEMO] ' if weapon['demo'] else ''}{weapon_name(weapon['level'])} +{weapon['level']}",
+    data = {'name': f"{'[DEMO] ' if weapon['demo'] else ''}{weapon_name(weapon['level'], weapon.get('branch', 'longsword'))} +{weapon['level']}",
             'description': 'Sealed Forge of Fate collectible. Attributes are permanently fixed.',
             'image': 'data:image/svg+xml;base64,' + base64.b64encode(image.encode()).decode(),
-            'attributes': [{'trait_type': 'Level', 'value': weapon['level']}, {'trait_type': 'Demo', 'value': bool(weapon['demo'])}]}
+            'attributes': [{'trait_type': 'Level', 'value': weapon['level']}, {'trait_type': 'Demo', 'value': bool(weapon['demo'])}, {'trait_type': 'Weapon Type', 'value': weapon.get('branch', 'longsword')}]}
     return 'data:application/json;base64,' + base64.b64encode(json.dumps(data, ensure_ascii=False).encode()).decode()
 
 
@@ -318,7 +321,7 @@ def create_app(db_path=None, demo=None):
             weapons = [dict(w) for w in db.execute("SELECT * FROM weapons WHERE owner=? AND status NOT IN ('destroyed','recycled') ORDER BY created DESC", (address,)).fetchall()]
         player['can_claim'] = player['claim_day'] != datetime.now(timezone.utc).date().isoformat()
         for w in weapons:
-            w['name'] = weapon_name(w['level'])
+            w['name'] = weapon_name(w['level'], w['branch'])
             w['probabilities'] = probabilities(w['level'], w['protected_left'] > 0)
             w['recycle_price'] = recycle_price(w['level'])
         return {'player': player, 'weapons': weapons,'can_rescue':demo_enabled and not any(w['status']=='active' for w in weapons)}
@@ -436,6 +439,18 @@ def create_app(db_path=None, demo=None):
             db.execute('UPDATE players SET materials=materials+? WHERE address=?', (BALANCE['material_pack_size'], address))
             return {'message': '材料已补充。'}
         return mutate(address, idempotency_key, 'materials', {}, run)
+
+    @app.post('/api/weapons/{wid}/branch')
+    def choose_branch(wid: str, body: BranchChoice, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address = authenticated(authorization)
+        def run(db):
+            w = owned(db, address, wid)
+            branch = next(b for b in SWORD_BRANCHES if b['id'] == body.branch)
+            if w['level'] < branch['unlock_level']:
+                raise HTTPException(409, f"Branch selection unlocks at +{branch['unlock_level']}.")
+            db.execute('UPDATE weapons SET branch=? WHERE id=?', (body.branch, wid))
+            return {'weapon_id': wid, 'branch': body.branch, 'message': f"Weapon type: {branch['name']}"}
+        return mutate(address, idempotency_key, 'branch/' + wid, body.model_dump(), run)
 
     @app.post('/api/weapons/{wid}/heat')
     def heat(wid: str, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):

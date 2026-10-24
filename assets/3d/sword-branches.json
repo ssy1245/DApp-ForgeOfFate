@@ -1,0 +1,14 @@
+[
+  {
+    "id": "longsword",
+    "name": "长剑",
+    "unlock_level": 3,
+    "tiers": null
+  },
+  {
+    "id": "rapier",
+    "name": "轻型刺剑",
+    "unlock_level": 3,
+    "tiers": null
+  }
+]

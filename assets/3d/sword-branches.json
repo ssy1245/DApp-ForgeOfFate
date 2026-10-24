@@ -1,14 +1,14 @@
 [
   {
     "id": "longsword",
-    "name": "长剑",
-    "unlock_level": 3,
+    "name": "骑士剑",
+    "unlock_level": 5,
     "tiers": null
   },
   {
     "id": "rapier",
-    "name": "轻型刺剑",
-    "unlock_level": 3,
+    "name": "刺剑",
+    "unlock_level": 5,
     "tiers": null
   }
 ]

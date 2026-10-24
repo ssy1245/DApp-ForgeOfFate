@@ -447,9 +447,9 @@ def create_app(db_path=None, demo=None):
             w = owned(db, address, wid)
             branch = next(b for b in SWORD_BRANCHES if b['id'] == body.branch)
             if w['level'] < branch['unlock_level']:
-                raise HTTPException(409, f"Branch selection unlocks at +{branch['unlock_level']}.")
+                raise HTTPException(409, f"强化至 +{branch['unlock_level']} 后可选择突变路线。")
             db.execute('UPDATE weapons SET branch=? WHERE id=?', (body.branch, wid))
-            return {'weapon_id': wid, 'branch': body.branch, 'message': f"Weapon type: {branch['name']}"}
+            return {'weapon_id': wid, 'branch': body.branch, 'message': f"已选择{branch['name']}路线。"}
         return mutate(address, idempotency_key, 'branch/' + wid, body.model_dump(), run)
 
     @app.post('/api/weapons/{wid}/heat')

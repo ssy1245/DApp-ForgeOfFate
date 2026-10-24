@@ -11,13 +11,14 @@ import WorkshopRoom from './WorkshopRoom';
 import { ANVIL_POSITION, CABINET_POSITION, CABINET_ROTATION, CRATE_POSITION, FURNACE_POSITION, FURNACE_RAISE, FURNACE_WIDTH_SCALE } from './workshopLayout';
 import { IMPACT_MS, SWING_MS, IMPACT_GRIP, IMPACT_ROTATION, WINDUP_GRIP, WINDUP_ROTATION, smooth } from './forgeMotion';
 import { swordTiers, swordTier, nextSwordTier, branchTiers, type SwordTier } from './swordTiers';
+import { modelUrl } from './modelAssets';
 const UpgradeContext=createContext<SwordTier[]>(swordTiers);
 const assetCache = new Map<string, Group>();
 
 function cloneAsset(source:Group){const root=source.clone(true);root.traverse(o=>{if(o instanceof Mesh)o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();});return root;}
 function Asset({name,size,children,heat=0}:{name:string;size:number;children:ReactNode;heat?:number}) {
   const [model,setModel]=useState<Group|null>(null);
-  useEffect(()=>{let live=true;setModel(null);const key=`${name}:${size}`;const cached=assetCache.get(key);if(cached){setModel(cloneAsset(cached));return;} fetch(`/models/${encodeURIComponent(name)}.glb`).then(r=>r.ok?r.arrayBuffer():null).then(buffer=>{if(!buffer)return;new GLTFLoader().parse(buffer,'/',g=>{if(!live)return;const root=g.scene;const bounds=new Box3().setFromObject(root);const center=bounds.getCenter(new Vector3());const extent=bounds.getSize(new Vector3());root.position.sub(center);const wrapper=new Group();wrapper.add(root);wrapper.scale.setScalar(size/Math.max(extent.x,extent.y,extent.z,0.001));wrapper.traverse(o=>{if(o instanceof Mesh){o.castShadow=true;o.receiveShadow=true;}});assetCache.set(key,wrapper);setModel(cloneAsset(wrapper));},()=>{});}).catch(()=>{});return()=>{live=false;};},[name,size]);
+  useEffect(()=>{let live=true;setModel(null);const key=`${name}:${size}`;const cached=assetCache.get(key);if(cached){setModel(cloneAsset(cached));return;} fetch(modelUrl(name)).then(r=>r.ok?r.arrayBuffer():null).then(buffer=>{if(!buffer)return;new GLTFLoader().parse(buffer,'/',g=>{if(!live)return;const root=g.scene;const bounds=new Box3().setFromObject(root);const center=bounds.getCenter(new Vector3());const extent=bounds.getSize(new Vector3());root.position.sub(center);const wrapper=new Group();wrapper.add(root);wrapper.scale.setScalar(size/Math.max(extent.x,extent.y,extent.z,0.001));wrapper.traverse(o=>{if(o instanceof Mesh){o.castShadow=true;o.receiveShadow=true;}});assetCache.set(key,wrapper);setModel(cloneAsset(wrapper));},()=>{});}).catch(()=>{});return()=>{live=false;};},[name,size]);
   useEffect(()=>{model?.traverse(o=>{if(o instanceof Mesh){for(const m of Array.isArray(o.material)?o.material:[o.material]){if('emissive' in m){m.emissive.set('#ff4b06');m.emissiveIntensity=heat*1.5;}}}});},[model,heat]);
   return model?<primitive object={model}/>:<>{children}</>;
 }

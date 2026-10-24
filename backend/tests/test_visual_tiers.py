@@ -8,12 +8,24 @@ from backend.game import BALANCE, SWORD_CATALOG, SWORD_TIERS, probabilities, str
 from backend.app import metadata
 
 @pytest.mark.parametrize('level,model', [
-    (0,'sword'),(2,'sword'),(3,'sword-upgraded'),(9,'sword-upgraded'),
-    (10,'nobel+knight+sword+3d+model'),(24,'nobel+knight+sword+3d+model'),
-    (25,'fantasy+sword+3d+model'),(49,'fantasy+sword+3d+model'),
-    (50,'top+fantasy+sword+model'),(100,'top+fantasy+sword+model')])
+    (0,'sword'),(3,'sword'),(9,'sword'),
+    (10,'knight sword/l0-sword-upgraded'),(19,'knight sword/l0-sword-upgraded'),
+    (20,'knight sword/l1-nobel+knight+sword+3d+model'),(29,'knight sword/l1-nobel+knight+sword+3d+model'),
+    (30,'knight sword/l2-fantasy+sword+3d+model'),(39,'knight sword/l2-fantasy+sword+3d+model'),
+    (40,'knight sword/l3-fantasy+sword+model'),(49,'knight sword/l3-fantasy+sword+model'),
+    (50,'knight sword/best+fantasy+sword+3d+model'),(100,'knight sword/best+fantasy+sword+3d+model')])
 def test_appearance_boundaries(level, model):
     assert weapon_tier(level)['model'] == model
+
+
+@pytest.mark.parametrize('branch,nodes',[
+    ('longsword',[0,10,20,30,40,50]),
+    ('rapier',[0,5,10,20,30,40,50])])
+def test_route_nodes_and_final_appearance(branch,nodes):
+    assert sorted({weapon_tier(level,branch)['min_level'] for level in range(51)}) == nodes
+    final=weapon_tier(50,branch)
+    for level in range(51,BALANCE['max_level']+1):
+        assert weapon_tier(level,branch) == final
 
 @pytest.mark.parametrize('tier', [tier for tier in SWORD_CATALOG if tier['min_level'] > 0])
 def test_strike_crosses_tiers_in_both_directions(tier):
@@ -40,3 +52,11 @@ def test_catalog_assets_and_mint_metadata():
     uri=metadata({'level':level,'demo':0})
     data=json.loads(base64.b64decode(uri.split(',')[1]))
     assert weapon_name(level) in data['name']
+
+
+def test_every_supplied_sword_is_connected():
+    assets=Path(__file__).resolve().parents[2]/'assets/3d'
+    supplied={path.relative_to(assets).as_posix() for path in assets.rglob('*.glb')} - {'hammer.glb','anvil.glb'}
+    configured={f"{tier['model']}.glb" for tier in SWORD_CATALOG}
+    assert configured==supplied
+    assert all(tier.get('model_status')!='placeholder' for tier in SWORD_CATALOG)

@@ -29,7 +29,11 @@ export default defineConfig({
       fs.mkdirSync(target, { recursive: true });
       for (const name of models) {
         const file = path.join(assets, name);
-        if (fs.existsSync(file)) fs.copyFileSync(file, path.join(target, name));
+        if (fs.existsSync(file)) {
+          const destination = path.join(target, name);
+          fs.mkdirSync(path.dirname(destination), { recursive: true });
+          fs.copyFileSync(file, destination);
+        }
       }
     }
   }],

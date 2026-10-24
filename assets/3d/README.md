@@ -1,58 +1,79 @@
 # 3D 模型与升级版图
 
-更新日期：2026-10-24。当前落盘并接入 **6 把剑 + 1 把锻造锤**。刺剑已配置四个升级档位，高阶新模型待制作，当前复用基础刺剑模型。
+更新日期：2026-10-24。当前已接入 **12 把剑 + 1 把锻造锤**：共用初始剑 1 把、骑士剑进阶模型 5 把、刺剑模型 6 把。所有现有武器 GLB 均有实际用途，各阶段不再复用临时模型。
 
 ## 当前可以玩的路线
 
-“二级剑”指美术外观档次，**不等于强化 +2**；当前二级分支从强化 **+3** 开放。强化等级仍是 +0～+100，NFT 封存门槛仍为 +50。
+初始剑达到 **+5** 后可在锻造页主动选择突变为刺剑，也可继续骑士剑路线。突变选择免费，封存前可切换。骑士剑按 +0 / +10 / +20 / +30 / +40 / +50 升级；刺剑在 +5 增加基础突变形态，再于 +10 / +20 / +30 / +40 / +50 逐级升级。两条路线 **+50 以后保持最终名称、模型和长度**，强化仍可继续到 +100，NFT 封存门槛仍为 +50。
+
+| 等级 | 骑士剑路线 | 刺剑路线 |
+|---|---|---|
+| +0～4 | 余烬长剑 | 共用余烬长剑，尚未开放突变 |
+| +5～9 | 余烬长剑 | 轻型刺剑，基础突变形态 |
+| +10～19 | 淬火长剑 | 银徽刺剑 |
+| +20～29 | 贵族骑士剑 | 月桂刺剑 |
+| +30～39 | 王庭骑士剑 | 摄政刺剑 |
+| +40～49 | 誓约圣剑 | 加冕刺剑 |
+| +50～100 | 鎏金誓约圣剑 | 鎏金加冕刺剑 |
 
 ```mermaid
 flowchart TD
-    A[基础余烬长剑 · +0～2] --> B{达到 +3 · 选择剑种}
-    B --> C[长剑路线：淬火长剑 · +3～9]
-    C --> D[贵族骑士剑 · +10～24]
-    D --> E[誓约圣剑 · +25～49]
-    E --> F[鎏金誓约圣剑 · +50～100]
-    B --> G[轻型刺剑 · +3～9]
-    G --> J[银徽刺剑 · +10～24]
-    J --> K[摄政刺剑 · +25～49]
-    K --> L[加冕刺剑 · +50～100]
-    B -. 概念保留，未开放 .-> H[宽刃／巨剑]
-    B -. 概念保留，未开放 .-> I[像素铁剑异变]
+    A[初始余烬长剑 · +0～4] --> B{达到 +5 · 选择突变路线}
+    B --> C[继续余烬长剑 · +5～9]
+    C --> D[淬火长剑 · +10～19]
+    D --> E[贵族骑士剑 · +20～29]
+    E --> F[王庭骑士剑 · +30～39]
+    F --> G[誓约圣剑 · +40～49]
+    G --> H[鎏金誓约圣剑 · +50～100]
+    B --> I[轻型刺剑 · +5～9]
+    I --> J[银徽刺剑 · +10～19]
+    J --> K[月桂刺剑 · +20～29]
+    K --> L[摄政刺剑 · +30～39]
+    L --> M[加冕刺剑 · +40～49]
+    M --> N[鎏金加冕刺剑 · +50～100]
 ```
 
 ## 模型清单
 
-| 文件 | 识别结果／用途 | 状态 |
-|---|---|---|
-| `sword.glb` | 旧钢、磨损皮柄，余烬长剑 | 两条路线共用的起点 |
-| `sword-upgraded.glb` | 朴素钢制标准长剑 | 长剑 +3 起 |
-| `nobel+knight+sword+3d+model.glb` | 蓝宝石与金边的贵族骑士剑 | 长剑 +10 起 |
-| `fantasy+sword+3d+model.glb` | 翼形护手、蓝宝石的誓约圣剑 | 长剑 +25 起 |
-| `top+fantasy+sword+model.glb` | 更多金色剑身纹样的鎏金圣剑 | 长剑 +50 起，场景长度略增加 |
-| `medieval+sword+model.glb` | 无护手环的轻型刺剑，弧形横护手 | 刺剑 +3 起；2,244 三角面，约 276 KiB |
-| `hammer.glb` | 锻造锤 | 交互工具，不属于升级树 |
+下列路径均相对本目录；配置中的 `model` 省略 `.glb`。
 
-新刺剑已通过实际渲染确认；文件名中的 `medieval` 不能用于判断剑种。当前保留原文件名，通过配置映射。
+| 文件 | 名称／用途 | 等级 |
+|---|---|---|
+| `sword.glb` | 余烬长剑，共用初始剑 | +0 起 |
+| `knight sword/l0-sword-upgraded.glb` | 淬火长剑 | +10 起 |
+| `knight sword/l1-nobel+knight+sword+3d+model.glb` | 贵族骑士剑 | +20 起 |
+| `knight sword/l2-fantasy+sword+3d+model.glb` | 王庭骑士剑 | +30 起 |
+| `knight sword/l3-fantasy+sword+model.glb` | 誓约圣剑 | +40 起 |
+| `knight sword/best+fantasy+sword+3d+model.glb` | 鎏金誓约圣剑，骑士终阶 | +50 起 |
+| `rapier/l0-slim sowrd.glb` | 轻型刺剑，基础突变 | +5 起 |
+| `rapier/l1-slim-sword+3d+model.glb` | 银徽刺剑，银色鸢尾盾徽 | +10 起 |
+| `rapier/l2-slim-sword+3d+model.glb` | 月桂刺剑，月桂与暖金细节 | +20 起 |
+| `rapier/l3-slim+sword+3d+model.glb` | 摄政刺剑，王权纹章 | +30 起 |
+| `rapier/l4-rapier+3d+model.glb` | 加冕刺剑，完整冠冕与金色镶嵌 | +40 起 |
+| `rapier/l5-rapier+3d+model.glb` | 鎏金加冕刺剑，红宝石皇冠剑首，刺剑终阶 | +50 起 |
+| `hammer.glb` | 锻造锤，交互工具 | 不属于升级树 |
+
+保留用户提供的实际文件名，包括 `l0-slim sowrd.glb` 中的拼写。刺剑六张概念图位于 `../reference_page/Rapier/`，按 l0～l5 对应上述六把刺剑。
 
 ## 当前程序规则
 
-- 在锻造页的 **Weapon type** 选择框切换长剑／轻型刺剑，要求武器未封存且等级至少 +3。
-- 当前试玩版允许免费切换，不新增材料消耗，也未引入战斗属性差异。后续是否锁定分支另行决定。
-- 剑种存入数据库，刷新、重新登录、强化和降级都保留。旧存档默认归为长剑，无需清空数据。
-- 低于 +3 时两条路线共用基础外观；升回 +3 后恢复所选路线。刺剑在高等级继续用现有刺剑模型，不会换成贵族剑或圣剑。
-- 刺剑以女性宫廷角色的权力与优雅为设计方向：+10 银徽、+25 摄政、+50 加冕；名称随当前等级升降，长度依次为 3.5 / 3.5 / 3.6 / 3.7。高阶设计描述已记录在配置的 `design` 字段，尚未制作对应新模型。
-- 模型与名称在铁砧、手持、熔炉和展示柜保持一致。背包使用服务端返回的名称。
-- 封存后不可切换剑种。新铸造 NFT 的名称及 `Weapon Type` 属性记录当前路线；不重写已有 NFT。
-- 现有强化概率、消耗、保护机制、最高等级和 +50 NFT 门槛不变。
+- 在锻造页的“突变路线”选择框切换骑士剑／刺剑，要求武器未封存且等级至少 +5。默认继续骑士剑路线，突变由玩家主动选择。
+- 当前试玩版允许免费切换；剑种不影响强化概率、材料消耗或战斗属性。
+- 剑种存入数据库，刷新、重新登录、强化和降级都保留。旧存档默认归为骑士剑，无需清空数据。
+- 刺剑降至 +5 以下时恢复共用余烬长剑外观，剑种选择仍保留；升回 +5 后自动恢复基础刺剑。其余节点的升级和降级也跟随当前等级切换。
+- 铁砧、手持、熔炉、展示柜和背包使用同一条路线与当前阶段；+50～100 的最终外观不再变化。
+- 刺剑依次采用 3.5 / 3.5 / 3.55 / 3.6 / 3.7 / 3.85 的场景长度。终阶皇冠内部是一颗大红宝石，设计描述已同步至配置。
+- 封存后不可切换剑种。新铸造 NFT 的名称及 `Weapon Type` 属性记录当前路线；已有 NFT 元数据不重写。
+- 强化概率、消耗、保护机制、最高 +100 和 +50 封存门槛沿用当前数值。
 
 ## 配置与维护
 
-- `sword-tiers.json`：两条路线的等级门槛、名称、模型与场景长度；`branch` 区分 `longsword` 与 `rapier`，各路线内部按 `min_level` 升序排列。刺剑的 `design` 字段记录后续模型的美术方向。
-- `sword-branches.json`：已开放剑种、解锁等级及可选的分支档位覆盖；`tiers: null` 表示按剑种从 `sword-tiers.json` 读取档位。
+- `sword-tiers.json`：所有阶段的等级门槛、名称、模型与场景长度；`branch` 区分 `longsword` 与 `rapier`，各路线内部按 `min_level` 升序排列。`design` 记录对应武器的美术特征。现有模型均已接入，没有临时模型标记。
+- `sword-branches.json`：路线名称与突变解锁等级，目前两条路线均为 +5；`tiers: null` 表示按剑种从 `sword-tiers.json` 读取阶段。内部 ID 保留 `longsword` / `rapier`，兼容已有存档。
 - `backend/game.py`：根据等级及剑种解析外观；`backend/app.py` 保存分支，并校验所有权、等级及封存状态。
-- `frontend/src/swordTiers.ts`：前端使用相同配置；`frontend/vite.config.ts` 自动服务并打包配置里的模型。
-- 修改配置后重启后端，重启开发前端或重新构建。新增剑种还需更新服务端 `BranchChoice` 白名单并补测，不能仅添加文件。
+- `frontend/src/swordTiers.ts`：前端使用相同配置，刺剑路线自动补上共用的 +0 初始剑；`frontend/vite.config.ts` 服务并打包配置引用的模型。
+- 修改配置后重启后端，重启开发前端或重新构建。新增剑种还需更新服务端 `BranchChoice` 白名单并补测。
+- 验证：`npm run test:backend` 检查等级、突变、降级与元数据；`npm run test:models -w frontend` 构建并检查开发／预览中的实际模型请求。
 
 ## 暂不接入的设计
 
@@ -71,7 +92,7 @@ flowchart TD
 
 ## 资产投放目录
 
-把生成的模型直接放在本文件夹。开发服务器会从这里读取，不需要复制到其他位置。暂时缺少模型时，页面自动使用程序生成的占位模型。
+把生成的模型放在本文件夹或其子文件夹。`sword-tiers.json` 的 `model` 填写相对此目录的路径，省略 `.glb`，例如 `knight sword/l0-sword-upgraded`；路径可包含空格和 `+`。开发服务器按该路径读取，构建时保留子文件夹结构，不需要手动复制。暂时缺少模型时，页面自动使用程序生成的占位模型。
 
 ## 请优先生成
 
@@ -93,7 +114,7 @@ flowchart TD
 - 基础刀剑使用 1 套 PBR 材质，最多 2 个材质槽；基础色、法线、粗糙度／金属度贴图以 1K（1024×1024）为默认。需要近距离看刀纹时可以升至 2K，首版无需 4K。细小划痕通过贴图表达，不必堆面数。
 - 刀剑 GLB 目标 1–5 MB，尽量小于 10 MB；文件体积主要也受贴图影响，不能单凭面数推算。
 - 基础刀剑为刚性静态网格，不需要骨骼、蒙皮和内置动画；锻造运动由程序控制。
-- 当前已支持长剑与轻型刺剑两条路线；其余剑种暂不增加生成预算。
+- 当前已支持骑士剑与刺剑两条路线；其余剑种暂不增加生成预算。
 
 ## 可以直接使用的生成描述
 
@@ -125,20 +146,8 @@ Blender 导出 glTF 时会把四边面和多边面转换为三角面：[Blender 
 
 用户提供的 `fantasy+hammer+3d+model.glb` 已改名为 `hammer.glb` 并接入。模型约 396 KB、2,418 个三角面。锤子不再作为场景中的悬浮物；第一人称走近铁砧且剑位于台面时自动取出，拿起剑、离开铁砧、将剑放入展示柜或切换环绕模式时自动收起，取用与收起有短暂过渡动画。
 
-## Five-stage sword progression
+## Runtime asset checks
 
-The shared source of truth is `sword-tiers.json`. Each tier's `branch` selects its route; branch definitions live in `sword-branches.json`. Both backend and frontend share these files; Vite serves and packages every listed model, including filenames containing `+`. Rapier stages at +3 / +10 / +25 / +50 currently reuse the existing rapier GLB while their new designs await production.
+All 12 sword GLBs and the forging hammer are connected. Sword geometry ranges from 2,107 to 4,367 triangles; textures are embedded, with no external image or buffer dependencies. The supplied assets use Y as their longest axis, and existing scene rotations are retained.
 
-| Level | Appearance | Model | Scene length |
-|---|---|---|---|
-| +0–2 | 余烬长剑 | `sword.glb` | 3.5 |
-| +3–9 | 淬火长剑 | `sword-upgraded.glb` | 3.5 |
-| +10–24 | 贵族骑士剑 | `nobel+knight+sword+3d+model.glb` | 3.5 |
-| +25–49 | 誓约圣剑 | `fantasy+sword+3d+model.glb` | 3.6 |
-| +50–100 | 鎏金誓约圣剑 | `top+fantasy+sword+model.glb` | 3.85 |
-
-Thresholds are provisional. Edit `min_level` in ascending order within each branch, keeping the shared longsword base stage at zero, then restart the backend and rebuild/restart the frontend. `size` controls normalized model length. The final sword is slightly longer instead of being normalized to the base sword's size.
-
-Within each route, appearance follows current level, including double upgrades and downgrades. The chosen weapon type persists separately. The anvil, furnace, held sword and cabinet share the same selection. Sealed weapons keep their level. Newly minted metadata uses the matching name; existing on-chain metadata is not rewritten. NFT eligibility remains +50, and forging odds/costs are unchanged.
-
-Five sword GLBs were inspected: 2,492–4,025 triangles and approximately 0.51–1.65 MB each, embedded textures, aligned on the Y axis. Their supplied geometry has the tip toward -Y. Existing scene rotations are retained. These five assets form the longsword route. The additional rapier GLB is a parallel branch; concept images alone do not create playable stages.
+The catalog is authoritative for names, models, stage thresholds and normalized lengths. Knight stages remain +0 / +10 / +20 / +30 / +40 / +50. Rapier adds a +5 mutation stage before +10 / +20 / +30 / +40 / +50, sharing the initial sword below +5. Both routes retain their final appearance from +50 through +100. The player's selected branch survives downgrades, and sealed weapons remain fixed.

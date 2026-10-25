@@ -4,7 +4,7 @@ import json
 import uuid
 import pytest
 from backend.app import metadata
-from backend.game import weapon_tier, weapon_name
+from backend.game import BALANCE, weapon_tier, weapon_name
 from backend.tests.test_game import client, login, forge, post, weapon
 
 
@@ -66,3 +66,23 @@ def test_branch_authorization_and_sealing(client):
 def test_rapier_uses_its_own_stage_model(level,name,model):
     assert weapon_tier(level,'rapier')['model']==model
     assert weapon_name(level,'rapier')==name
+
+
+@pytest.mark.parametrize('branch,level',[('longsword',39),('rapier',50)])
+@pytest.mark.parametrize('materials',[0,1])
+def test_new_models_heat_after_materials_are_replenished(client,branch,level,materials):
+    h,*_=login(client);wid=forge(client,h)
+    with client.app.state.store.connection() as db:
+        db.execute('UPDATE weapons SET level=?,branch=? WHERE id=?',(level,branch,wid))
+        db.execute('UPDATE players SET materials=?',(materials,))
+    response=post(client,f'/weapons/{wid}/heat',h)
+    assert response.status_code==409
+    assert f"加热需要 {BALANCE['heat_materials']} 材料，当前剩余 {materials}" in response.json()['detail']
+    assert weapon(client,h)['heat_charges']==0
+    with client.app.state.store.connection() as db:
+        db.execute('UPDATE players SET materials=?',(BALANCE['heat_materials'],))
+    assert post(client,f'/weapons/{wid}/heat',h).status_code==200
+    heated=weapon(client,h)
+    assert heated['level']==level and heated['branch']==branch
+    assert heated['heat_charges']==BALANCE['heat_strikes']
+    assert client.get('/api/state',headers=h).json()['player']['materials']==0

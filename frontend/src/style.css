@@ -37,3 +37,5 @@
 
 /* Keep the cursor hidden across the page while first-person mouse control is active. */
 body.forge-mouse-captured,body.forge-mouse-captured *{cursor:none!important}
+
+.forge-hud .hud-warning,.workshop-interactions .workshop-warning{color:#ffd09a;line-height:1.6}.forge-hud .hud-warning{padding:8px 9px;background:#51352270;border:1px solid #976443;border-radius:6px;margin-bottom:0}

@@ -459,6 +459,9 @@ def create_app(db_path=None, demo=None):
             w = owned(db,address,wid)
             if w['heat_charges'] > 0:
                 raise HTTPException(409, '武器正在加热或尚有热量，请先完成本轮敲击。')
+            materials = db.execute('SELECT materials FROM players WHERE address=?', (address,)).fetchone()['materials']
+            if materials < BALANCE['heat_materials']:
+                raise HTTPException(409, f"加热需要 {BALANCE['heat_materials']} 材料，当前剩余 {materials}。请领取每日补给或补充材料。")
             charge(db,address,materials=BALANCE['heat_materials'])
             ready = time.time()+BALANCE['heat_seconds']
             db.execute('UPDATE weapons SET heat_ready_at=?,heat_charges=? WHERE id=?',(ready,BALANCE['heat_strikes'],wid))

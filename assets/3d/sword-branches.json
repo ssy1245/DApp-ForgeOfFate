@@ -3,12 +3,27 @@
     "id": "longsword",
     "name": "骑士剑",
     "unlock_level": 5,
-    "tiers": null
+    "tiers": null,
+    "max_level": 80,
+    "pending_visual_levels": [],
+    "name_en": "Knight Sword"
   },
   {
     "id": "rapier",
     "name": "刺剑",
     "unlock_level": 5,
-    "tiers": null
+    "tiers": null,
+    "max_level": 80,
+    "pending_visual_levels": [],
+    "name_en": "Rapier"
+  },
+  {
+    "id": "greatsword",
+    "name": "巨剑",
+    "unlock_level": 10,
+    "tiers": null,
+    "max_level": 60,
+    "pending_visual_levels": [],
+    "name_en": "Greatsword"
   }
 ]

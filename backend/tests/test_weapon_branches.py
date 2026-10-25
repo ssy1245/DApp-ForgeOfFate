@@ -3,7 +3,8 @@ import base64
 import json
 import uuid
 import pytest
-from backend.app import metadata
+from backend.app import metadata, create_app
+from fastapi.testclient import TestClient
 from backend.game import BALANCE, weapon_tier, weapon_name
 from backend.tests.test_game import client, login, forge, post, weapon
 
@@ -24,25 +25,25 @@ def test_branch_selection_persistence_and_retry(client):
     first=post(client,f'/weapons/{wid}/branch',h,{'branch':'rapier'},key)
     assert first.status_code==200
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'rapier'},key).json()==first.json()
-    assert weapon(client,h)['name']=='轻型刺剑'
+    assert weapon(client,h)['name']=='精铁刺剑'
     set_level(client,wid,4)
     assert weapon(client,h)['branch']=='rapier'
     assert weapon(client,h)['name']=='余烬长剑'
     set_level(client,wid,5)
-    assert weapon(client,h)['name']=='轻型刺剑'
+    assert weapon(client,h)['name']=='精铁刺剑'
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==200
     assert weapon(client,h)['name']=='余烬长剑'
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'rapier'}).status_code==200
     set_level(client,wid,10)
-    assert weapon(client,h)['name']=='银徽刺剑'
+    assert weapon(client,h)['name']=='银锋刺剑'
     set_level(client,wid,50)
     w=weapon(client,h)
-    assert w['name']=='鎏金加冕刺剑'
+    assert w['name']=='绯冠刺剑'
     data=json.loads(base64.b64decode(metadata(w).split(',')[1]))
-    assert '鎏金加冕刺剑' in data['name']
+    assert '绯冠刺剑' in data['name']
     assert {'trait_type':'Weapon Type','value':'rapier'} in data['attributes']
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==200
-    assert weapon(client,h)['name']=='鎏金誓约圣剑'
+    assert weapon(client,h)['name']=='王庭圣剑'
 
 
 def test_branch_authorization_and_sealing(client):
@@ -56,19 +57,20 @@ def test_branch_authorization_and_sealing(client):
 
 @pytest.mark.parametrize('level,name,model',[
     (0,'余烬长剑','sword'),(4,'余烬长剑','sword'),
-    (5,'轻型刺剑','rapier/l0-slim sowrd'),(9,'轻型刺剑','rapier/l0-slim sowrd'),
-    (10,'银徽刺剑','rapier/l1-slim-sword+3d+model'),(19,'银徽刺剑','rapier/l1-slim-sword+3d+model'),
-    (20,'月桂刺剑','rapier/l2-slim-sword+3d+model'),(29,'月桂刺剑','rapier/l2-slim-sword+3d+model'),
-    (30,'摄政刺剑','rapier/l3-slim+sword+3d+model'),(39,'摄政刺剑','rapier/l3-slim+sword+3d+model'),
-    (40,'加冕刺剑','rapier/l4-rapier+3d+model'),(49,'加冕刺剑','rapier/l4-rapier+3d+model'),
-    (50,'鎏金加冕刺剑','rapier/l5-rapier+3d+model'),(60,'鎏金加冕刺剑','rapier/l5-rapier+3d+model'),
-    (70,'鎏金加冕刺剑','rapier/l5-rapier+3d+model'),(100,'鎏金加冕刺剑','rapier/l5-rapier+3d+model')])
+    (5,'精铁刺剑','rapier/+5rapier'),(9,'精铁刺剑','rapier/+5rapier'),
+    (10,'银锋刺剑','rapier/+10rapier'),(19,'银锋刺剑','rapier/+10rapier'),
+    (20,'宫廷细剑','rapier/+20rapier'),(29,'宫廷细剑','rapier/+20rapier'),
+    (30,'鸢尾刺剑','rapier/+30rapier'),(39,'鸢尾刺剑','rapier/+30rapier'),
+    (40,'王室誓剑','rapier/+40rapier'),(49,'王室誓剑','rapier/+40rapier'),
+    (50,'绯冠刺剑','rapier/+50rapier'),(59,'绯冠刺剑','rapier/+50rapier'),
+    (60,'赤蔷誓约','rapier/+60rapier'),(69,'赤蔷誓约','rapier/+60rapier'),
+    (70,'炽翼天使','rapier/+70rapier'),(79,'炽翼天使','rapier/+70rapier'),(80,'炽翼天使','rapier/+70rapier')])
 def test_rapier_uses_its_own_stage_model(level,name,model):
     assert weapon_tier(level,'rapier')['model']==model
     assert weapon_name(level,'rapier')==name
 
 
-@pytest.mark.parametrize('branch,level',[('longsword',39),('rapier',50)])
+@pytest.mark.parametrize('branch,level',[('longsword',39),('rapier',70),('greatsword',50)])
 @pytest.mark.parametrize('materials',[0,1])
 def test_new_models_heat_after_materials_are_replenished(client,branch,level,materials):
     h,*_=login(client);wid=forge(client,h)
@@ -86,3 +88,77 @@ def test_new_models_heat_after_materials_are_replenished(client,branch,level,mat
     assert heated['level']==level and heated['branch']==branch
     assert heated['heat_charges']==BALANCE['heat_strikes']
     assert client.get('/api/state',headers=h).json()['player']['materials']==0
+
+
+@pytest.mark.parametrize('level,name,model',[
+    (0,'余烬长剑','sword'),(5,'余烬长剑','sword'),(9,'余烬长剑','sword'),
+    (10,'铁匠大剑','GreatSword/+10GreatSword'),(19,'铁匠大剑','GreatSword/+10GreatSword'),
+    (20,'烬炉大剑','GreatSword/+20GreatSword'),(29,'烬炉大剑','GreatSword/+20GreatSword'),
+    (30,'渊角龙骸','GreatSword/+30GreatSword'),(39,'渊角龙骸','GreatSword/+30GreatSword'),
+    (40,'深渊炉心','GreatSword/+40GreatSword'),(49,'深渊炉心','GreatSword/+40GreatSword'),
+    (50,'余烬君王','GreatSword/+50GreatSword'),(100,'余烬君王','GreatSword/+50GreatSword'),
+])
+def test_greatsword_uses_its_own_stage_model(level,name,model):
+    assert weapon_tier(level,'greatsword')['model']==model
+    assert weapon_name(level,'greatsword')==name
+
+
+def test_greatsword_unlocks_at_ten_and_preserves_progress(client):
+    h,*_=login(client);wid=forge(client,h)
+    for level in [0,5,9]:
+        set_level(client,wid,level)
+        response=post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'})
+        assert response.status_code==409 and '+10' in response.json()['detail']
+        assert weapon(client,h)['branch']=='longsword'
+    set_level(client,wid,10)
+    before=client.get('/api/state',headers=h).json()
+    key=str(uuid.uuid4())
+    result=post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'},key)
+    assert result.status_code==200 and result.json()['branch']=='greatsword'
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'},key).json()==result.json()
+    after=client.get('/api/state',headers=h).json()
+    assert after['player']==before['player']
+    w=weapon(client,h)
+    assert w['name']=='铁匠大剑' and w['max_level']==60
+    assert before['weapons'][0]['max_level']==80
+    assert {k:v for k,v in w.items() if k not in ['branch','name','name_en','tier_id','max_level']}=={k:v for k,v in before['weapons'][0].items() if k not in ['branch','name','name_en','tier_id','max_level']}
+    restored=TestClient(create_app(client.app.state.store.path,demo=False))
+    assert next(w for w in restored.get('/api/state',headers=h).json()['weapons'] if w['id']==wid)['branch']=='greatsword'
+    set_level(client,wid,9)
+    assert weapon(client,h)['branch']=='greatsword' and weapon(client,h)['name']=='余烬长剑'
+    set_level(client,wid,10)
+    assert weapon(client,h)['name']=='铁匠大剑'
+    set_level(client,wid,9)
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==200
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'}).status_code==409
+
+
+def test_greatsword_authorization_sealing_and_metadata(client):
+    h,*_=login(client);wid=forge(client,h);set_level(client,wid,50)
+    other,*_=login(client)
+    assert post(client,f'/weapons/{wid}/branch',other,{'branch':'greatsword'}).status_code==404
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'}).status_code==200
+    assert post(client,f'/weapons/{wid}/seal',h).status_code==200
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==409
+    w=weapon(client,h)
+    data=json.loads(base64.b64decode(metadata(w).split(',')[1]))
+    assert w['status']=='sealed' and '余烬君王' in data['name']
+    assert {'trait_type':'Weapon Type','value':'greatsword'} in data['attributes']
+
+
+def test_rapier_final_stage_persists_and_seals_at_eighty(client):
+    h,*_=login(client);wid=forge(client,h);set_level(client,wid,70)
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'rapier'}).status_code==200
+    assert weapon(client,h)['name']=='炽翼天使'
+    set_level(client,wid,69)
+    assert weapon(client,h)['branch']=='rapier' and weapon(client,h)['name']=='赤蔷誓约'
+    set_level(client,wid,80)
+    w=weapon(client,h)
+    assert w['name']=='炽翼天使' and w['max_level']==80
+    restored=TestClient(create_app(client.app.state.store.path,demo=False))
+    assert weapon(restored,h)['branch']=='rapier' and weapon(restored,h)['name']=='炽翼天使'
+    assert post(client,f'/weapons/{wid}/seal',h).status_code==200
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==409
+    data=json.loads(base64.b64decode(metadata(weapon(client,h)).split(',')[1]))
+    assert '炽翼天使' in data['name']
+    assert {'trait_type':'Weapon Type','value':'rapier'} in data['attributes']

@@ -84,7 +84,7 @@ def test_recycle_is_atomic_and_terminal(client):
 def test_insufficient_resources_rollback(client):
     h, *_ = login(client)
     assert post(client, '/forge', h).status_code == 409
-    assert len(client.get('/api/state', headers=h).json()['weapons']) == BALANCE['daily_swords']
+    assert len(client.get('/api/state', headers=h).json()['weapons']) == 0
 
 def test_strike_retry_and_stale_state(client, monkeypatch):
     h, *_ = login(client)

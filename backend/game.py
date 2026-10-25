@@ -9,6 +9,10 @@ BALANCE['visual_tiers'] = SWORD_TIERS
 SWORD_BRANCHES = json.loads((Path(__file__).resolve().parents[1] / 'assets/3d/sword-branches.json').read_text())
 BALANCE['sword_branches'] = SWORD_BRANCHES
 
+def weapon_max_level(branch='longsword'):
+    route=next((b for b in SWORD_BRANCHES if b['id']==branch),SWORD_BRANCHES[0])
+    return min(BALANCE['max_level'],route['max_level'])
+
 def probabilities(level, protected=False):
     destroy = min(BALANCE['destroy_base'] + level * BALANCE['destroy_per_level'], BALANCE['destroy_cap'])
     down = min(0.12 + level * 0.002, 0.22)
@@ -32,7 +36,7 @@ def strike(weapon, roll, shield):
     if result == 'up': level += 1
     elif result == 'double': level += 2
     elif result == 'down': level -= 1
-    level = max(0, min(level, BALANCE['max_level']))
+    level = max(0, min(level, weapon_max_level(weapon.get('branch','longsword'))))
     count, left = weapon['strikes'], weapon['protected_left']
     if stage:
         left -= 1
@@ -42,6 +46,7 @@ def strike(weapon, roll, shield):
             count = 0
             left = BALANCE['protection_duration']
     return {'level': level, 'strikes': count, 'protected_left': left,
+            'branch':weapon.get('branch','longsword'),
             'status': 'destroyed' if result == 'destroy' else 'active',
             'result': result, 'shield_used': bool(shield and not stage)}
 
@@ -56,5 +61,6 @@ def weapon_tier(level, branch='longsword'):
     return next(tier for tier in reversed(tiers) if level >= tier['min_level'])
 
 
-def weapon_name(level, branch='longsword'):
-    return weapon_tier(level, branch)['name']
+def weapon_name(level, branch='longsword', locale='zh'):
+    tier = weapon_tier(level, branch)
+    return tier['name_en'] if locale == 'en' else tier['name']

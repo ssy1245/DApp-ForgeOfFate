@@ -31,7 +31,8 @@ def test_new_accounts_cannot_self_assign_test_role(tmp_path):
     assert r.status_code==200 and r.json()['role']=='player'
     state=c.get('/api/state').json()
     assert not state['player']['can_cheat']
-    assert len(state['weapons'])==3
+    assert len(state['weapons'])==0
+    assert state['player']['daily_swords_remaining']==3
     for path,body in [('/cheats/daily',{}),('/cheats/resources',{'resource':'all','amount':100}),('/cheats/weapons',{'count':1}),('/cheats/weapons/fake',{'level':50}),('/demo/seed',{})]:
         assert post(c,path,{},body).status_code==403
     c.post('/api/account/logout');c.post('/api/session')
@@ -55,7 +56,8 @@ def test_unlimited_daily_grants_and_idempotency(tester):
     assert post(c,'/cheats/daily',{},key=key).json()==result.json()
     assert post(c,'/cheats/daily',{}).status_code==200
     state=c.get('/api/state').json()
-    assert len(state['weapons'])==BALANCE['daily_swords']*3
+    assert len(state['weapons'])==BALANCE['daily_swords']*2
+    assert state['player']['daily_swords_remaining']==before['player']['daily_swords_remaining']==3
     assert state['player']['ap']==2*BALANCE['daily_ap']
     assert state['player']['sword_day']==before['player']['sword_day']
     assert state['player']['claim_day']==before['player']['claim_day']
@@ -115,6 +117,7 @@ def test_invalid_resource_fields_and_empty_edit(tester):
     c,_,_=tester
     for body in [{'resource':'role','amount':1},{'resource':'coins','amount':-1},{'resource':'all','amount':1000001}]:
         assert post(c,'/cheats/resources',{},body).status_code==422
+    assert post(c,'/supply/sword',{}).status_code==200
     wid=c.get('/api/state').json()['weapons'][0]['id']
     assert post(c,f'/cheats/weapons/{wid}',{},{}).status_code==400
 
@@ -156,3 +159,19 @@ def test_local_account_setup_is_non_destructive(tmp_path):
     with store.connection() as db:assert dict(db.execute('SELECT * FROM accounts').fetchone())==old
     with pytest.raises(RuntimeError):provision(store,data['username'],data['password'],'player')
     assert c.post('/api/account/login',json=data).json()['role']=='tester'
+
+
+def test_cheat_levels_respect_weapon_route_caps(tester):
+    c,_,_=tester
+    assert post(c,'/cheats/weapons',{}, {'count':1,'level':81}).status_code==422
+    spawned=post(c,'/cheats/weapons',{}, {'count':1,'level':80})
+    assert spawned.status_code==200
+    wid=spawned.json()['weapon_id']
+    assert post(c,f'/cheats/weapons/{wid}',{}, {'level':81}).status_code==409
+    assert post(c,f'/cheats/weapons/{wid}',{}, {'level':60}).status_code==200
+    assert post(c,f'/weapons/{wid}/branch',{}, {'branch':'greatsword'}).status_code==200
+    assert post(c,f'/cheats/weapons/{wid}',{}, {'level':61}).status_code==409
+    assert post(c,f'/cheats/weapons/{wid}',{}, {'level':60}).status_code==200
+    assert post(c,f'/weapons/{wid}/branch',{}, {'branch':'rapier'}).status_code==200
+    assert post(c,f'/cheats/weapons/{wid}',{}, {'level':80}).status_code==200
+    assert post(c,f'/cheats/weapons/{wid}',{}, {'level':81}).status_code==409

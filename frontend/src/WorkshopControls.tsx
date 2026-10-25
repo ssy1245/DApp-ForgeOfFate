@@ -1,13 +1,18 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Euler, Vector3 } from 'three';
-import { ANVIL_POSITION, CABINET_POSITION, FURNACE_POSITION, FURNACE_FOOTPRINT, canStand } from './workshopLayout';
+import { ANVIL_POSITION, CABINETS, CABINET_SCALE, FURNACE_POSITION, FURNACE_FOOTPRINT, SWORD_SUPPLY_POSITION, SWORD_SUPPLY_FOOTPRINT, canStand, type CabinetId } from './workshopLayout';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 export type ViewMode = 'orbit' | 'walk';
-export type Station = 'anvil' | 'cabinet' | 'furnace' | null;
+export type Station = 'anvil' | CabinetId | 'furnace' | 'supply' | null;
 export type MoveKey = 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD';
-export const STATIONS = {anvil: new Vector3(ANVIL_POSITION[0],0,ANVIL_POSITION[2]), cabinet: new Vector3(CABINET_POSITION[0]-0.8,0,CABINET_POSITION[2]), furnace:new Vector3(FURNACE_POSITION[0],0,FURNACE_POSITION[2]+FURNACE_FOOTPRINT.front)};
+export const STATIONS:Record<Exclude<Station,null>,Vector3> = {
+ anvil:new Vector3(ANVIL_POSITION[0],0,ANVIL_POSITION[2]),
+ ...Object.fromEntries(CABINETS.map(({id,position})=>[id,new Vector3(position[0]-0.45*CABINET_SCALE[2]-0.35,0,position[2])])) as Record<CabinetId,Vector3>,
+ furnace:new Vector3(FURNACE_POSITION[0],0,FURNACE_POSITION[2]+FURNACE_FOOTPRINT.front),
+ supply:new Vector3(SWORD_SUPPLY_POSITION[0]+SWORD_SUPPLY_FOOTPRINT.halfDepth+0.4,0,SWORD_SUPPLY_POSITION[2]),
+};
 
 export { canStand } from './workshopLayout';
 
@@ -41,7 +46,7 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, on
     active.current=false;onActiveChange(false);
     if (mode === 'orbit') {
       const fit = Math.max(1, 1.2 / (size.width / size.height));
-      camera.position.set(18,13,23).sub(new Vector3(0,1.6,1)).multiplyScalar(fit).add(new Vector3(0,1.6,1));
+      camera.position.set(-18,13,23).sub(new Vector3(0,1.6,1)).multiplyScalar(fit).add(new Vector3(0,1.6,1));
       const control = new OrbitControls(camera, canvas);
       control.target.set(0,1.6,1);
       control.enableDamping = true; control.enablePan = false;

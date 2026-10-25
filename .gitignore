@@ -14,6 +14,8 @@
 
 # macOS and editors
 .DS_Store
+._*
+.AppleDouble/
 .idea/
 .vscode/
 *.swp
@@ -52,6 +54,9 @@ blob-report/
 
 # Runtime data, local credentials, deployment state and logs
 .local/
+# Known local credential exports, if copied into the project root.
+/test-accounts.md
+/mint-key
 backend/data/
 *.sqlite
 *.sqlite-*
@@ -74,5 +79,6 @@ backend/data/
 *.orig
 *.rej
 
-# Keep source, README files, dependency locks, .env.example and assets/3d/*.glb.
+# Keep source, README files, dependency locks and .env.example.
+# Keep assets/stories/**/*.md, assets/3d/**/*.glb and assets/reference_page/**/*.png.
 # Never ignore all *.json, *.sql, *.png or *.glb: these can be project sources.

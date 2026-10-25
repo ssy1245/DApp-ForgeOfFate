@@ -7,7 +7,7 @@ import sqlite3
 import time
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from web3 import Web3
 
 from .accounts import normalize_username, hash_password, verify_password
-from .game import BALANCE, probabilities, recycle_price, strike, weapon_name, SWORD_BRANCHES
+from .game import BALANCE, probabilities, recycle_price, strike, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCAL = ROOT / '.local'
@@ -42,7 +42,7 @@ class StrikeBody(BaseModel):
     expected_protected_left: int
 
 class BranchChoice(BaseModel):
-    branch: Literal['longsword','rapier']
+    branch: Literal['longsword','rapier','greatsword']
 
 class Credentials(BaseModel):
     username: str = Field(min_length=3,max_length=24)
@@ -54,7 +54,7 @@ class CheatResources(BaseModel):
 
 class CheatWeapons(BaseModel):
     count: int = Field(default=1,ge=1,le=100,strict=True)
-    level: int = Field(default=0,ge=0,le=BALANCE['max_level'],strict=True)
+    level: int = Field(default=0,ge=0,le=weapon_max_level('longsword'),strict=True)
     quality: Literal['普通','精良'] = '普通'
 
 class CheatWeaponEdit(BaseModel):
@@ -79,6 +79,10 @@ class Store:
             for table,column,definition in [('accounts','role',"TEXT NOT NULL DEFAULT 'player'"),('weapons','heat_ready_at','REAL DEFAULT 0'),('weapons','heat_charges','INTEGER DEFAULT 0'),('players','practice','INTEGER DEFAULT 0'),('players','guest','INTEGER DEFAULT 0'),('challenges','guest_owner','TEXT'),('players','sword_day','TEXT'),('weapons','quality',"TEXT DEFAULT '普通'"),('weapons','source',"TEXT DEFAULT 'forge'"),('weapons','branch',"TEXT NOT NULL DEFAULT 'longsword'")]:
                 if column not in {row['name'] for row in db.execute(f'PRAGMA table_info({table})')}:
                     db.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
+            if 'daily_swords_claimed' not in {row['name'] for row in db.execute('PRAGMA table_info(players)')}:
+                db.execute('ALTER TABLE players ADD COLUMN daily_swords_claimed INTEGER NOT NULL DEFAULT 0')
+                # Earlier versions delivered the entire allowance when state was read.
+                db.execute('UPDATE players SET daily_swords_claimed=? WHERE sword_day IS NOT NULL', (BALANCE['daily_swords'],))
     @contextmanager
     def connection(self):
         db = sqlite3.connect(self.path, timeout=15, isolation_level=None)
@@ -111,8 +115,13 @@ def chain():
 
 
 def metadata(weapon):
+    branch = weapon.get('branch', 'longsword')
+    tier = weapon_tier(weapon['level'], branch)
+    prefix = '[DEMO] ' if weapon['demo'] else ''
     image = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#181713"/><text x="256" y="245" text-anchor="middle" fill="#e8ac5c" font-size="36">FORGE OF FATE</text><text x="256" y="310" text-anchor="middle" fill="white" font-size="48">+' + str(weapon['level']) + '</text></svg>'
-    data = {'name': f"{'[DEMO] ' if weapon['demo'] else ''}{weapon_name(weapon['level'], weapon.get('branch', 'longsword'))} +{weapon['level']}",
+    data = {'name': f"{prefix}{tier['name']} +{weapon['level']}",
+            'name_en': f"{prefix}{tier['name_en']} +{weapon['level']}",
+            'tier_id': tier['id'],
             'description': 'Sealed Forge of Fate collectible. Attributes are permanently fixed.',
             'image': 'data:image/svg+xml;base64,' + base64.b64encode(image.encode()).decode(),
             'attributes': [{'trait_type': 'Level', 'value': weapon['level']}, {'trait_type': 'Demo', 'value': bool(weapon['demo'])}, {'trait_type': 'Weapon Type', 'value': weapon.get('branch', 'longsword')}]}
@@ -292,7 +301,10 @@ def create_app(db_path=None, demo=None):
                     raise HTTPException(409,'此钱包已绑定其他账号，请使用该账号登录。')
                 db.execute('UPDATE accounts SET game_address=? WHERE game_address=?',(row['address'],row['guest_owner']))
                 db.execute('UPDATE weapons SET owner=? WHERE owner=?',(row['address'],row['guest_owner']))
-                db.execute("UPDATE players SET ap=ap+?,materials=materials+?,shields=shields+?,coins=coins+?,sword_day=MAX(COALESCE(sword_day,''),COALESCE(?,'')),claim_day=MAX(COALESCE(claim_day,''),COALESCE(?,'')) WHERE address=?",(guest['ap'],guest['materials'],guest['shields'],guest['coins'],guest['sword_day'],guest['claim_day'],row['address']))
+                target=db.execute('SELECT * FROM players WHERE address=?',(row['address'],)).fetchone()
+                sword_day=max(guest['sword_day'] or '',target['sword_day'] or '')
+                claimed=min(BALANCE['daily_swords'],sum(p['daily_swords_claimed'] for p in [guest,target] if p['sword_day']==sword_day))
+                db.execute("UPDATE players SET ap=ap+?,materials=materials+?,shields=shields+?,coins=coins+?,sword_day=?,daily_swords_claimed=?,claim_day=MAX(COALESCE(claim_day,''),COALESCE(?,'')) WHERE address=?",(guest['ap'],guest['materials'],guest['shields'],guest['coins'],sword_day or None,claimed,guest['claim_day'],row['address']))
                 db.execute('DELETE FROM sessions WHERE address=?',(row['guest_owner'],))
                 db.execute('DELETE FROM players WHERE address=?',(row['guest_owner'],))
             token = secrets.token_urlsafe(32)
@@ -306,13 +318,12 @@ def create_app(db_path=None, demo=None):
         address = authenticated(authorization)
         with store.connection() as db:
             player = dict(db.execute('SELECT * FROM players WHERE address=?', (address,)).fetchone())
-            day=datetime.now(timezone.utc).date().isoformat()
-            if player['sword_day']!=day:
-                for i in range(BALANCE['daily_swords']):
-                    wid=new_weapon(db,address)
-                    db.execute("UPDATE weapons SET source='daily' WHERE id=?",(wid,))
-                db.execute('UPDATE players SET sword_day=? WHERE address=?',(day,address))
-                player['sword_day']=day
+            now=datetime.now(timezone.utc)
+            day=now.date().isoformat()
+            claimed=player['daily_swords_claimed'] if player['sword_day']==day else 0
+            player['daily_swords_claimed']=claimed
+            player['daily_swords_remaining']=max(0,BALANCE['daily_swords']-claimed)
+            player['daily_swords_reset_at']=(now.replace(hour=0,minute=0,second=0,microsecond=0)+timedelta(days=1)).timestamp()
             account=db.execute('SELECT username,created,role FROM accounts WHERE game_address=?',(address,)).fetchone()
             player['username']=account['username'] if account else None
             player['registered_at']=account['created'] if account else None
@@ -322,9 +333,28 @@ def create_app(db_path=None, demo=None):
         player['can_claim'] = player['claim_day'] != datetime.now(timezone.utc).date().isoformat()
         for w in weapons:
             w['name'] = weapon_name(w['level'], w['branch'])
+            w['name_en'] = weapon_name(w['level'], w['branch'], 'en')
+            w['tier_id'] = weapon_tier(w['level'], w['branch'])['id']
+            w['max_level'] = weapon_max_level(w['branch'])
             w['probabilities'] = probabilities(w['level'], w['protected_left'] > 0)
             w['recycle_price'] = recycle_price(w['level'])
-        return {'player': player, 'weapons': weapons,'can_rescue':demo_enabled and not any(w['status']=='active' for w in weapons)}
+        return {'player': player, 'weapons': weapons,'can_rescue':demo_enabled and player['daily_swords_remaining']==0 and not any(w['status']=='active' for w in weapons)}
+
+    @app.post('/api/supply/sword')
+    def claim_sword(authorization: str | None = Header(default=None),idempotency_key: str | None = Header(default=None)):
+        address=authenticated(authorization)
+        def run(db):
+            day=datetime.now(timezone.utc).date().isoformat()
+            player=db.execute('SELECT sword_day,daily_swords_claimed FROM players WHERE address=?',(address,)).fetchone()
+            claimed=player['daily_swords_claimed'] if player['sword_day']==day else 0
+            if claimed>=BALANCE['daily_swords']:
+                raise HTTPException(409,'今天的基础剑已领完，UTC 零点刷新额度。')
+            wid=new_weapon(db,address)
+            db.execute("UPDATE weapons SET source='daily' WHERE id=?",(wid,))
+            db.execute('UPDATE players SET sword_day=?,daily_swords_claimed=? WHERE address=?',(day,claimed+1,address))
+            remaining=BALANCE['daily_swords']-claimed-1
+            return {'weapon_id':wid,'daily_swords_remaining':remaining,'message':f'已领取一把 +0 普通剑，今日还可领 {remaining} 把。'}
+        return mutate(address,idempotency_key,'daily_sword',{},run)
 
     @app.post('/api/claim')
     def claim(authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
@@ -397,10 +427,13 @@ def create_app(db_path=None, demo=None):
         address=authenticated(authorization)
         def run(db):
             require_tester(db,address)
-            owned(db,address,wid)
+            w=owned(db,address,wid)
             fields={k:v for k,v in body.model_dump().items() if v is not None}
             if not fields:raise HTTPException(400,'请选择要调整的属性。')
-            if body.level is not None:db.execute('UPDATE weapons SET level=? WHERE id=?',(body.level,wid))
+            if body.level is not None:
+                limit=weapon_max_level(w['branch'])
+                if body.level>limit:raise HTTPException(409,f'当前路线最高 +{limit}，不能设置更高等级。')
+                db.execute('UPDATE weapons SET level=? WHERE id=?',(body.level,wid))
             if body.protected_left is not None:db.execute('UPDATE weapons SET protected_left=? WHERE id=?',(body.protected_left,wid))
             if body.heated is not None:db.execute('UPDATE weapons SET heat_ready_at=0,heat_charges=? WHERE id=?',(BALANCE['heat_strikes'] if body.heated else 0,wid))
             db.execute("UPDATE weapons SET demo=1,source='cheat' WHERE id=?",(wid,))
@@ -413,6 +446,10 @@ def create_app(db_path=None, demo=None):
         address=authenticated(authorization)
         if not demo_enabled:raise HTTPException(404,'测试补给未启用。')
         def run(db):
+            player=db.execute('SELECT sword_day,daily_swords_claimed FROM players WHERE address=?',(address,)).fetchone()
+            day=datetime.now(timezone.utc).date().isoformat()
+            if player['sword_day']!=day or player['daily_swords_claimed']<BALANCE['daily_swords']:
+                raise HTTPException(409,'请先到领剑处领取今日的基础剑。')
             if db.execute("SELECT 1 FROM weapons WHERE owner=? AND status='active'",(address,)).fetchone():
                 raise HTTPException(409,'背包仍有可强化的剑，请先使用已有武器。')
             wid=new_weapon(db,address,demo_flag=1)
@@ -448,6 +485,8 @@ def create_app(db_path=None, demo=None):
             branch = next(b for b in SWORD_BRANCHES if b['id'] == body.branch)
             if w['level'] < branch['unlock_level']:
                 raise HTTPException(409, f"强化至 +{branch['unlock_level']} 后可选择突变路线。")
+            if w['level']>weapon_max_level(body.branch):
+                raise HTTPException(409,f"{branch['name']}路线最高 +{weapon_max_level(body.branch)}，当前等级过高，无法切换。")
             db.execute('UPDATE weapons SET branch=? WHERE id=?', (body.branch, wid))
             return {'weapon_id': wid, 'branch': body.branch, 'message': f"已选择{branch['name']}路线。"}
         return mutate(address, idempotency_key, 'branch/' + wid, body.model_dump(), run)
@@ -457,6 +496,8 @@ def create_app(db_path=None, demo=None):
         address = authenticated(authorization)
         def run(db):
             w = owned(db,address,wid)
+            if w['level']>=weapon_max_level(w['branch']):
+                raise HTTPException(409,f"已达到当前路线最高等级 +{weapon_max_level(w['branch'])}，无需继续加热。")
             if w['heat_charges'] > 0:
                 raise HTTPException(409, '武器正在加热或尚有热量，请先完成本轮敲击。')
             materials = db.execute('SELECT materials FROM players WHERE address=?', (address,)).fetchone()['materials']
@@ -475,8 +516,8 @@ def create_app(db_path=None, demo=None):
             w = owned(db, address, wid)
             if (w['level'], w['strikes'], w['protected_left']) != (body.expected_level, body.expected_strikes, body.expected_protected_left):
                 raise HTTPException(409, '武器已被其他操作改变，请刷新后查看当前概率。')
-            if w['level'] >= BALANCE['max_level']:
-                raise HTTPException(409, '已达到当前最高等级。')
+            if w['level'] >= weapon_max_level(w['branch']):
+                raise HTTPException(409, f"已达到当前路线最高等级 +{weapon_max_level(w['branch'])}。")
             if w['heat_charges'] <= 0 or w['heat_ready_at'] > time.time():
                 raise HTTPException(409, '请先在熔炉完成加热，再进行敲击。')
             result = strike(w, secrets.randbelow(1_000_000) / 1_000_000, body.shield)

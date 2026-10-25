@@ -5,101 +5,259 @@
     "min_level": 0,
     "name": "余烬长剑",
     "model": "sword",
-    "size": 3.5
+    "size": 3.5,
+    "name_en": "Ember Longsword"
   },
   {
     "id": "forged",
     "branch": "longsword",
     "min_level": 10,
-    "name": "淬火长剑",
-    "model": "knight sword/l0-sword-upgraded",
-    "size": 3.5
+    "name": "精铁骑士剑",
+    "model": "KnightSword/+10KnightSword",
+    "size": 3.5,
+    "reference": "KnightSword/+10KnightSword.png",
+    "name_en": "Knight's Iron Sword",
+    "name_status": "official"
   },
   {
     "id": "noble",
     "branch": "longsword",
     "min_level": 20,
-    "name": "贵族骑士剑",
-    "model": "knight sword/l1-nobel+knight+sword+3d+model",
-    "size": 3.5
+    "name": "银誓长剑",
+    "model": "KnightSword/+20KnightSword",
+    "size": 3.5,
+    "reference": "KnightSword/+20KnightSword.png",
+    "name_en": "Silver Oath",
+    "name_status": "official"
   },
   {
     "id": "royal-court",
     "branch": "longsword",
     "min_level": 30,
-    "name": "王庭骑士剑",
-    "model": "knight sword/l2-fantasy+sword+3d+model",
+    "name": "王国卫剑",
+    "model": "KnightSword/+30KnightSword",
     "size": 3.55,
-    "design": "由贵族佩剑演化为王庭规格，银钢剑身、蓝宝石与翼形护手形成更鲜明的宫廷轮廓，承接后续誓约圣剑。"
+    "design": "由贵族佩剑演化为王庭规格，银钢剑身、蓝宝石与翼形护手形成更鲜明的宫廷轮廓，承接后续荣耀骑士剑。",
+    "reference": "KnightSword/+30KnightSword.png",
+    "name_en": "Kingdom Guardian",
+    "name_status": "official"
   },
   {
     "id": "oathbound",
     "branch": "longsword",
     "min_level": 40,
-    "name": "誓约圣剑",
-    "model": "knight sword/l3-fantasy+sword+model",
-    "size": 3.6
+    "name": "荣耀骑士剑",
+    "model": "KnightSword/+40KnightSword",
+    "size": 3.6,
+    "reference": "KnightSword/+40KnightSword.png",
+    "name_en": "Blade of Valor",
+    "name_status": "official"
   },
   {
     "id": "gilded",
     "branch": "longsword",
     "min_level": 50,
-    "name": "鎏金誓约圣剑",
-    "model": "knight sword/best+fantasy+sword+3d+model",
-    "size": 3.85
+    "name": "王庭圣剑",
+    "model": "KnightSword/+50KnightSword",
+    "size": 3.85,
+    "reference": "KnightSword/+50KnightSword.png",
+    "name_en": "Royal Court Blade",
+    "name_status": "official"
+  },
+  {
+    "id": "radiant-oath",
+    "branch": "longsword",
+    "min_level": 60,
+    "name": "王庭誓约",
+    "model": "KnightSword/+60KnightSword",
+    "size": 4.05,
+    "reference": "KnightSword/+60KnightSword.png",
+    "design": "银钢长刃与连贯金色镶纹，蓝宝石剑首与护手保留荣耀骑士剑体系，层叠翼形护手进一步舒展。",
+    "name_en": "Royal Oathblade",
+    "name_status": "official"
+  },
+  {
+    "id": "sacred-ring",
+    "branch": "longsword",
+    "min_level": 70,
+    "name": "黄金誓约",
+    "model": "KnightSword/+70KnightSword",
+    "size": 4.2,
+    "reference": "KnightSword/+70KnightSword.png",
+    "tip_direction": "negative_y",
+    "design": "层叠翼形护手承托中央蓝宝石，护手后的黄金圣环开始显现，银白长刃、深蓝纵纹与细密金饰延续荣耀骑士剑的轮廓。",
+    "name_en": "Golden Oath",
+    "name_status": "official"
+  },
+  {
+    "id": "last-dawn",
+    "branch": "longsword",
+    "min_level": 80,
+    "name": "最后的黎明",
+    "model": "KnightSword/+80KnightSword",
+    "size": 4.35,
+    "reference": "KnightSword/+80KnightSword.png",
+    "tip_direction": "negative_y",
+    "design": "骑士剑终阶。完整太阳圣环围绕中央深蓝宝石，银钢剑身与连贯黄金圣纹承接无名者共同誓约的暂定世界观。正式名称为“最后的黎明 / The Last Dawn”，独立故事词条待后续编写。",
+    "name_en": "The Last Dawn",
+    "name_status": "official"
   },
   {
     "id": "rapier-forged",
     "branch": "rapier",
     "min_level": 5,
-    "name": "轻型刺剑",
-    "model": "rapier/l0-slim sowrd",
+    "name": "精铁刺剑",
+    "model": "rapier/+5rapier",
     "size": 3.5,
-    "design": "初始剑达到 +5 后可主动突变为基础刺剑。朴素银钢窄刃、深棕皮柄与开放式弧形护手，作为刺剑路线的起点。"
+    "design": "初始剑达到 +5 后可主动突变为基础刺剑。朴素银钢窄刃、深棕皮柄与开放式弧形护手，作为刺剑路线的起点。",
+    "reference": "Rapier/+5rapier.png",
+    "name_en": "Iron Rapier",
+    "name_status": "official"
   },
   {
     "id": "rapier-silver-crest",
     "branch": "rapier",
     "min_level": 10,
-    "name": "银徽刺剑",
-    "model": "rapier/l1-slim-sword+3d+model",
+    "name": "银锋刺剑",
+    "model": "rapier/+10rapier",
     "size": 3.5,
-    "design": "冷银窄刃、黑色皮柄、鸢尾盾徽与修长切面剑首；不镶宝石，以精良工艺和家族纹章体现贵族身份。"
+    "design": "冷银窄刃、黑色皮柄、鸢尾盾徽与修长切面剑首；不镶宝石，以精良工艺和家族纹章体现贵族身份。",
+    "reference": "Rapier/+10rapier.png",
+    "name_en": "Silverthorn",
+    "name_status": "official"
   },
   {
     "id": "rapier-laurel",
     "branch": "rapier",
     "min_level": 20,
-    "name": "月桂刺剑",
-    "model": "rapier/l2-slim-sword+3d+model",
+    "name": "宫廷细剑",
+    "model": "rapier/+20rapier",
     "size": 3.55,
-    "design": "延续鸢尾盾徽与银白窄刃，月桂沿双弧护手舒展，少量暖金细节与剑根纹样体现宫廷授勋身份。"
+    "design": "延续鸢尾盾徽与银白窄刃，月桂沿双弧护手舒展，少量暖金细节与剑根纹样体现宫廷授勋身份。",
+    "reference": "Rapier/+20rapier.png",
+    "name_en": "Courtly Rapier",
+    "name_status": "official"
   },
   {
     "id": "rapier-regent",
     "branch": "rapier",
     "min_level": 30,
-    "name": "摄政刺剑",
-    "model": "rapier/l3-slim+sword+3d+model",
+    "name": "鸢尾刺剑",
+    "model": "rapier/+30rapier",
     "size": 3.6,
-    "design": "月桂与低冠形盾框整合为更庄重的权威纹章，银白主体、黑柄及局部香槟金，保持修长优雅的单手比例。"
+    "design": "月桂与低冠形盾框整合为更庄重的权威纹章，银白主体、黑柄及局部香槟金，保持修长优雅的单手比例。",
+    "reference": "Rapier/+30rapier.png",
+    "name_en": "Fleur-de-Lis",
+    "name_status": "official"
   },
   {
     "id": "rapier-coronation",
     "branch": "rapier",
     "min_level": 40,
-    "name": "加冕刺剑",
-    "model": "rapier/l4-rapier+3d+model",
+    "name": "王室誓剑",
+    "model": "rapier/+40rapier",
     "size": 3.7,
-    "design": "完整冠冕托起鸢尾盾徽，金色月桂与纵向镶嵌沿剑根收束；银白窄刃、黑柄与连贯金饰形成王权礼剑。"
+    "design": "完整冠冕托起鸢尾盾徽，金色月桂与纵向镶嵌沿剑根收束；银白窄刃、黑柄与连贯金饰形成王权礼剑。",
+    "reference": "Rapier/+40rapier.png",
+    "name_en": "Royal Vow",
+    "name_status": "official"
   },
   {
     "id": "rapier-gilded-coronation",
     "branch": "rapier",
     "min_level": 50,
-    "name": "鎏金加冕刺剑",
-    "model": "rapier/l5-rapier+3d+model",
+    "name": "绯冠刺剑",
+    "model": "rapier/+50rapier",
     "size": 3.85,
-    "design": "终阶王权刺剑。剑首的金色笼状皇冠包镶一颗完整的大红宝石，银色鸢尾盾徽、双侧月桂与剑身纹样形成连续结构。+50 以后保持此最终形态。"
+    "design": "鎏金加冕形态。剑首的金色笼状皇冠包镶一颗完整的大红宝石，银色鸢尾盾徽、双侧月桂与剑身纹样形成连续结构，承接后续赤蔷誓约与炽翼天使形态。",
+    "reference": "Rapier/+50rapier.png",
+    "name_en": "Crimson Crown",
+    "name_status": "official"
+  },
+  {
+    "id": "rapier-ruby-sovereign",
+    "branch": "rapier",
+    "min_level": 60,
+    "name": "赤蔷誓约",
+    "model": "rapier/+60rapier",
+    "size": 4.0,
+    "reference": "Rapier/+60rapier.png",
+    "tip_direction": "negative_y",
+    "design": "红宝石皇冠剑首、中央赤红星纹、银白窄刃与连贯金色镶线；双侧护手向上舒展，黑色皮柄保持宫廷佩剑的修长比例。",
+    "name_en": "Scarlet Oath",
+    "name_status": "official"
+  },
+  {
+    "id": "rapier-whitewing-sovereign",
+    "branch": "rapier",
+    "min_level": 70,
+    "name": "炽翼天使",
+    "model": "rapier/+70rapier",
+    "size": 4.15,
+    "reference": "Rapier/+70rapier.png",
+    "tip_direction": "negative_y",
+    "design": "刺剑终阶。白银羽翼沿双侧护手与剑根展开，红宝石皇冠和赤星纹章保留王权主线，细密黄金纹饰延伸至修长银白剑尖；+70～+80 保持此形态。",
+    "name_en": "Seraph's Wing",
+    "name_status": "official"
+  },
+  {
+    "id": "greatsword-10",
+    "branch": "greatsword",
+    "min_level": 10,
+    "name": "铁匠大剑",
+    "model": "GreatSword/+10GreatSword",
+    "size": 4.2,
+    "design": "朴素银钢宽刃、黑铁护手与加长皮革双手握柄，基础剑达到 +10 后主动选择巨剑路线。",
+    "tip_direction": "positive_y",
+    "name_en": "Blacksmith's Greatsword",
+    "name_status": "official"
+  },
+  {
+    "id": "greatsword-20",
+    "branch": "greatsword",
+    "min_level": 20,
+    "name": "烬炉大剑",
+    "model": "GreatSword/+20GreatSword",
+    "size": 4.5,
+    "design": "宽刃剑根出现暗红烙印，深色金属与铜色镶边承接后续熔核觉醒。",
+    "tip_direction": "positive_y",
+    "name_en": "Emberforged Greatsword",
+    "name_status": "official"
+  },
+  {
+    "id": "greatsword-30",
+    "branch": "greatsword",
+    "min_level": 30,
+    "name": "渊角龙骸",
+    "model": "GreatSword/+30GreatSword",
+    "size": 4.8,
+    "design": "加宽的厚重剑身、齿状刃缘与层叠黑铁纹饰，熔脉沿剑脊延伸。",
+    "tip_direction": "positive_y",
+    "name_en": "Abyssal Dragonbone",
+    "name_status": "official"
+  },
+  {
+    "id": "greatsword-40",
+    "branch": "greatsword",
+    "min_level": 40,
+    "name": "深渊炉心",
+    "model": "GreatSword/+40GreatSword",
+    "size": 5.1,
+    "design": "黑铁装甲与炽红熔岩裂纹覆盖剑身，展开的护手包裹明亮炉心。",
+    "tip_direction": "positive_y",
+    "name_en": "Abyssal Furnace",
+    "name_status": "official"
+  },
+  {
+    "id": "greatsword-50",
+    "branch": "greatsword",
+    "min_level": 50,
+    "name": "余烬君王",
+    "model": "GreatSword/+50GreatSword",
+    "size": 5.4,
+    "design": "终阶熔核巨剑。宽阔黑铁剑身、金色装甲与炽红熔核形成完整余烬君王形态；+50 以后保持最终外观。",
+    "tip_direction": "positive_y",
+    "name_en": "Sovereign of Ash",
+    "name_status": "official"
   }
 ]

@@ -2,6 +2,8 @@
 
 更新日期：2026-10-26。当前配置 **23 个武器阶段**：共用初始剑 1 阶、骑士剑 8 阶、刺剑 8 阶、巨剑 6 阶；实际已接入 **23 套独立剑模型 + 1 把锻造锤**。巨剑 +40“熔脉龙骸”独立模型与参考图已补齐，所有路线待补外观列表为空。
 
+`tools/Fe.png` 保留为铁材料的原始参考图；`tools/Fe-icon.png` 是去白底后的透明 UI 图标，由前端 `IronIcon.tsx` 引用，使用暗色底框并适当放大；它不属于三维模型清单，也不加载到场景。顶部余额、每日补给、锻造与强化消耗、铁块购买入口共用这张图，数量仍由后端 `materials` 记录。
+
 武器的整体故事基调、暂定传说与后续单件词条写作约定见 [世界观与武器故事](../stories/README.md)。[三条路线与 22 件武器介绍框架](../stories/weapons/README.md) 已按各阶段分别建档，记录命名含义与叙事方向。世界观和单件故事仍属暂定框架；三条路线武器名称沿用正式命名表；新增 +40“熔脉龙骸 / Moltenvein Dragonbone”中英文名称已同步，中英文与对应模型以本文件及配置表为准。
 
 [刺剑路线](../stories/weapons/rapier.md) 已补入绯翼骑士团的“庇护与传承”主线及八阶介绍草稿，分为宫廷荣光、绯冠誓约、天使守望三个阶段；当前模型和参考图保持不变。
@@ -146,7 +148,7 @@ flowchart TD
 
 ## 卡片图片对应
 
-背包与 NFT 市场共用 `frontend/src/WeaponArtwork.tsx`；当前武器图片映射在 `frontend/src/weaponImages.ts`。所有阶段的 `reference` 都指向实际参考图，包括基础剑。四视图 / 双视图通过 `reference_frame` 指定正面范围与朝向，直接在界面展示；原 PNG 不改动。开发服务与构建产物均提供 `/weapon-images/`，详见主 README“背包与 NFT 市场图片”。
+背包与 NFT 市场共用 `frontend/src/WeaponArtwork.tsx`，图片映射在 `frontend/src/weaponImages.ts`。23 个阶段均通过 `display` 对应 `assets/display/` 的透明底单件正面图；初始剑、骑士剑、巨剑、刺剑分别存放，统一剑尖朝上。原始 `reference` / `reference_frame` 保留为美术源图记录；卡片不再依赖原图裁切或模糊背景。开发与构建产物均提供 `/display/`，清单及提示词见 [展示素材说明](../display/README.md)。
 
 ## 资产投放目录
 

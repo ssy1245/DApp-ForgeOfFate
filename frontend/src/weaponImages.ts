@@ -1,6 +1,6 @@
 import catalog from '../../assets/3d/sword-tiers.json';
 import { branchTiers, swordBranches, swordTier, type SwordTier } from './swordTiers';
-export { referenceImageUrl } from './modelAssets';
+export { referenceImageUrl, displayImageUrl } from './modelAssets';
 
 export type WeaponIdentity = {
   level: number;

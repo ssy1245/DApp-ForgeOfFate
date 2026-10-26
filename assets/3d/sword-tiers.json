@@ -16,7 +16,8 @@
       "image_width": 1448,
       "image_height": 1086,
       "rotation": 180
-    }
+    },
+    "display": "BasicSword/+0BasicSword.png"
   },
   {
     "id": "forged",
@@ -36,7 +37,8 @@
       "image_width": 1448,
       "image_height": 1086,
       "rotation": 180
-    }
+    },
+    "display": "KnightSword/+10KnightSword.png"
   },
   {
     "id": "noble",
@@ -56,7 +58,8 @@
       "image_width": 1448,
       "image_height": 1086,
       "rotation": 180
-    }
+    },
+    "display": "KnightSword/+20KnightSword.png"
   },
   {
     "id": "royal-court",
@@ -68,7 +71,8 @@
     "design": "由贵族佩剑演化为王庭规格，银钢剑身、蓝宝石与翼形护手形成更鲜明的宫廷轮廓，承接后续荣耀骑士剑。",
     "reference": "KnightSword/+30KnightSword.png",
     "name_en": "Kingdom Guardian",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "KnightSword/+30KnightSword.png"
   },
   {
     "id": "oathbound",
@@ -79,7 +83,8 @@
     "size": 3.6,
     "reference": "KnightSword/+40KnightSword.png",
     "name_en": "Blade of Valor",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "KnightSword/+40KnightSword.png"
   },
   {
     "id": "gilded",
@@ -90,7 +95,8 @@
     "size": 3.85,
     "reference": "KnightSword/+50KnightSword.png",
     "name_en": "Royal Court Blade",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "KnightSword/+50KnightSword.png"
   },
   {
     "id": "radiant-oath",
@@ -102,7 +108,8 @@
     "reference": "KnightSword/+60KnightSword.png",
     "design": "银钢长刃与连贯金色镶纹，蓝宝石剑首与护手保留荣耀骑士剑体系，层叠翼形护手进一步舒展。",
     "name_en": "Royal Oathblade",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "KnightSword/+60KnightSword.png"
   },
   {
     "id": "sacred-ring",
@@ -115,7 +122,8 @@
     "tip_direction": "negative_y",
     "design": "层叠翼形护手承托中央蓝宝石，护手后的黄金圣环开始显现，银白长刃、深蓝纵纹与细密金饰延续荣耀骑士剑的轮廓。",
     "name_en": "Golden Oath",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "KnightSword/+70KnightSword.png"
   },
   {
     "id": "last-dawn",
@@ -128,7 +136,8 @@
     "tip_direction": "negative_y",
     "design": "骑士剑终阶。完整太阳圣环围绕中央深蓝宝石，银钢剑身与连贯黄金圣纹承接无名者共同誓约的暂定世界观。正式名称为“最后的黎明 / The Last Dawn”，独立故事词条待后续编写。",
     "name_en": "The Last Dawn",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "KnightSword/+80KnightSword.png"
   },
   {
     "id": "rapier-forged",
@@ -149,7 +158,8 @@
       "image_width": 1448,
       "image_height": 1086,
       "rotation": 180
-    }
+    },
+    "display": "Rapier/+5Rapier.png"
   },
   {
     "id": "rapier-silver-crest",
@@ -161,7 +171,8 @@
     "design": "冷银窄刃、黑色皮柄、鸢尾盾徽与修长切面剑首；不镶宝石，以精良工艺和家族纹章体现贵族身份。",
     "reference": "Rapier/+10rapier.png",
     "name_en": "Silverthorn",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "Rapier/+10Rapier.png"
   },
   {
     "id": "rapier-laurel",
@@ -173,7 +184,8 @@
     "design": "延续鸢尾盾徽与银白窄刃，月桂沿双弧护手舒展，少量暖金细节与剑根纹样体现宫廷授勋身份。",
     "reference": "Rapier/+20rapier.png",
     "name_en": "Courtly Rapier",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "Rapier/+20Rapier.png"
   },
   {
     "id": "rapier-regent",
@@ -185,7 +197,8 @@
     "design": "月桂与低冠形盾框整合为更庄重的权威纹章，银白主体、黑柄及局部香槟金，保持修长优雅的单手比例。",
     "reference": "Rapier/+30rapier.png",
     "name_en": "Fleur-de-Lis",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "Rapier/+30Rapier.png"
   },
   {
     "id": "rapier-coronation",
@@ -197,7 +210,8 @@
     "design": "完整冠冕托起鸢尾盾徽，金色月桂与纵向镶嵌沿剑根收束；银白窄刃、黑柄与连贯金饰形成王权礼剑。",
     "reference": "Rapier/+40rapier.png",
     "name_en": "Royal Vow",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "Rapier/+40Rapier.png"
   },
   {
     "id": "rapier-gilded-coronation",
@@ -209,7 +223,8 @@
     "design": "鎏金加冕形态。剑首的金色笼状皇冠包镶一颗完整的大红宝石，银色鸢尾盾徽、双侧月桂与剑身纹样形成连续结构，承接后续赤蔷誓约与炽翼天使形态。",
     "reference": "Rapier/+50rapier.png",
     "name_en": "Crimson Crown",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "Rapier/+50Rapier.png"
   },
   {
     "id": "rapier-ruby-sovereign",
@@ -222,7 +237,8 @@
     "tip_direction": "negative_y",
     "design": "红宝石皇冠剑首、中央赤红星纹、银白窄刃与连贯金色镶线；双侧护手向上舒展，黑色皮柄保持宫廷佩剑的修长比例。",
     "name_en": "Scarlet Oath",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "Rapier/+60Rapier.png"
   },
   {
     "id": "rapier-whitewing-sovereign",
@@ -235,7 +251,8 @@
     "tip_direction": "negative_y",
     "design": "刺剑终阶。白银羽翼沿双侧护手与剑根展开，红宝石皇冠和赤星纹章保留王权主线，细密黄金纹饰延伸至修长银白剑尖；+70～+80 保持此形态。",
     "name_en": "Seraph's Wing",
-    "name_status": "official"
+    "name_status": "official",
+    "display": "Rapier/+70Rapier.png"
   },
   {
     "id": "greatsword-10",
@@ -248,7 +265,8 @@
     "tip_direction": "positive_y",
     "name_en": "Blacksmith's Greatsword",
     "name_status": "official",
-    "reference": "Greatsword/+10Greatsword.png"
+    "reference": "Greatsword/+10Greatsword.png",
+    "display": "Greatsword/+10Greatsword.png"
   },
   {
     "id": "greatsword-20",
@@ -261,7 +279,8 @@
     "tip_direction": "positive_y",
     "name_en": "Emberforged Greatsword",
     "name_status": "official",
-    "reference": "Greatsword/+20GreatSword.png"
+    "reference": "Greatsword/+20GreatSword.png",
+    "display": "Greatsword/+20Greatsword.png"
   },
   {
     "id": "greatsword-30",
@@ -274,7 +293,8 @@
     "tip_direction": "positive_y",
     "name_en": "Abyssal Dragonbone",
     "name_status": "official",
-    "reference": "Greatsword/+30GreatSword.png"
+    "reference": "Greatsword/+30GreatSword.png",
+    "display": "Greatsword/+30Greatsword.png"
   },
   {
     "id": "greatsword-40",
@@ -287,7 +307,8 @@
     "size": 4.95,
     "design": "黑铁与龙骨鳞甲包覆宽厚剑身，赤红熔脉沿中央汇聚至护手，弯曲龙角围住尚未完全觉醒的熔核。",
     "tip_direction": "positive_y",
-    "reference": "Greatsword/+40GreatSword.png"
+    "reference": "Greatsword/+40GreatSword.png",
+    "display": "Greatsword/+40Greatsword.png"
   },
   {
     "id": "greatsword-50",
@@ -300,7 +321,8 @@
     "tip_direction": "positive_y",
     "name_en": "Abyssal Furnace",
     "name_status": "official",
-    "reference": "Greatsword/+50GreatSword.png"
+    "reference": "Greatsword/+50GreatSword.png",
+    "display": "Greatsword/+50Greatsword.png"
   },
   {
     "id": "greatsword-60",
@@ -313,6 +335,7 @@
     "tip_direction": "positive_y",
     "name_en": "Sovereign of Ash",
     "name_status": "official",
-    "reference": "Greatsword/+60GreatSword.png"
+    "reference": "Greatsword/+60GreatSword.png",
+    "display": "Greatsword/+60Greatsword.png"
   }
 ]

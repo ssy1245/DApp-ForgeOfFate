@@ -2,13 +2,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import { inflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createServer, preview } from 'vite';
-import { modelUrl, referenceImageUrl } from '../src/modelAssets.ts';
+import { modelUrl, referenceImageUrl, displayImageUrl } from '../src/modelAssets.ts';
+import { inspectRgbaPng } from './png-alpha.mjs';
 
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const assets = path.join(projectRoot, 'assets/3d');
 const referenceAssets = path.join(projectRoot, 'assets/reference_page');
+const displayAssets = path.join(projectRoot, 'assets/display');
 const catalog = JSON.parse(await fs.readFile(path.join(assets, 'sword-tiers.json'), 'utf8'));
 const branches = JSON.parse(await fs.readFile(path.join(assets, 'sword-branches.json'), 'utf8'));
 const models = [...new Set([
@@ -18,7 +21,7 @@ const models = [...new Set([
 ])];
 
 for (const mode of ['development', 'preview']) {
-  test(`${mode} serves every configured model from its current folder`, async () => {
+  test(`${mode} serves models, references, transparent weapon displays and item icons`, async () => {
     const options = {
       root: path.join(projectRoot, 'frontend'),
       configFile: path.join(projectRoot, 'frontend/vite.config.ts'),
@@ -57,10 +60,12 @@ for (const mode of ['development', 'preview']) {
             assert.equal(localizedName(stage), stage.name);
             assert.equal(localizedName(stage, 'en'), stage.name_en);
             assert.equal(artworkTier({branch: branch.id, level}).reference, stage.reference);
+            assert.equal(artworkTier({branch: branch.id, level}).display, stage.display);
           }
         }
         for (const tier of catalog) {
           assert.equal(artworkTier({level: tier.min_level, tier_id: tier.id}).reference, tier.reference);
+          assert.equal(artworkTier({level: tier.min_level, tier_id: tier.id}).display, tier.display);
         }
         assert.equal(artworkTier({level: 50, branch: 'unknown', name: 'Unrecognized relic'}), undefined);
         const details = nftWeaponDetails({name: '炽翼天使 +80', attributes: [{trait_type: 'Weapon Type', value: 'rapier'}, {trait_type: 'Demo', value: true}]});
@@ -71,6 +76,7 @@ for (const mode of ['development', 'preview']) {
         assert.equal(nftWeaponDetails({attributes: null}).demo, false);
         assert.equal(referenceImageUrl('Weathered Sword Orthographic Views.png'), '/weapon-images/Weathered%20Sword%20Orthographic%20Views.png');
         assert.equal(referenceImageUrl('Greatsword/+40GreatSword.png'), '/weapon-images/Greatsword/+40GreatSword.png');
+        assert.equal(displayImageUrl('KnightSword/+80KnightSword.png'), '/display/KnightSword/+80KnightSword.png');
         assert.equal(maxSwordLevel('longsword'), 90);
         assert.equal(maxSwordLevel('greatsword'), 70);
         assert.equal(maxSwordLevel('rapier'), 80);
@@ -132,7 +138,43 @@ for (const mode of ['development', 'preview']) {
           assert.ok(frame.width > 0 && frame.height > 0 && frame.x >= 0 && frame.y >= 0);
           assert.ok(frame.x + frame.width <= frame.image_width && frame.y + frame.height <= frame.image_height);
         }
+        assert.ok(tier.display, `Every weapon stage needs a transparent display: ${tier.id}`);
+        const displayResponse = await fetch(`http://127.0.0.1:${address.port}${displayImageUrl(tier.display)}`);
+        assert.equal(displayResponse.status, 200, tier.display);
+        assert.match(displayResponse.headers.get('content-type'), /^image\/png/);
+        const displayBytes = Buffer.from(await displayResponse.arrayBuffer());
+        assert.deepEqual(displayBytes, await fs.readFile(path.join(displayAssets, tier.display)));
+        const alpha = inspectRgbaPng(displayBytes);
+        assert.ok(alpha.transparent > alpha.width * alpha.height * .5, `Display must contain real transparent space: ${tier.id}`);
+        for (const [x,y] of [[0,0],[alpha.width-1,0],[0,alpha.height-1],[alpha.width-1,alpha.height-1]]) {
+          assert.ok(alpha.pixel(x,y)[3] <= 1, `Display corner must be transparent: ${tier.id}`);
+        }
+        assert.ok(alpha.bounds.left > 0 && alpha.bounds.right < alpha.width-1 && alpha.bounds.top > 0 && alpha.bounds.bottom < alpha.height-1, `Sword must fit without clipped opaque edges: ${tier.id}`);
+        assert.ok(alpha.bounds.bottom - alpha.bounds.top > alpha.height * .65, `Sword must be large enough to read: ${tier.id}`);
       }
+      const ironSource = path.join(assets, 'tools/Fe-icon.png');
+      let ironRoute = `/@fs${ironSource}`;
+      if (mode === 'preview') {
+        const emittedAssets = await fs.readdir(path.join(projectRoot, 'frontend/dist/assets'));
+        const ironAsset = emittedAssets.find(name => /^Fe-icon-[\w-]+\.png$/.test(name));
+        assert.ok(ironAsset, 'The build must include the iron UI icon');
+        ironRoute = `/assets/${ironAsset}`;
+      }
+      const ironResponse = await fetch(`http://127.0.0.1:${address.port}${ironRoute}`);
+      assert.equal(ironResponse.status, 200, 'Iron icon must load in both modes');
+      assert.match(ironResponse.headers.get('content-type'), /^image\/png/);
+      const iconBytes = Buffer.from(await ironResponse.arrayBuffer());
+      assert.deepEqual(iconBytes, await fs.readFile(ironSource));
+      assert.equal(iconBytes[24], 8, 'Iron cutout uses 8-bit pixels');
+      assert.equal(iconBytes[25], 6, 'Iron icon must retain its RGBA transparency');
+      const chunks = [];
+      for (let offset = 8; offset < iconBytes.length;) {
+        const length = iconBytes.readUInt32BE(offset);
+        if (iconBytes.toString('ascii', offset + 4, offset + 8) === 'IDAT') chunks.push(iconBytes.subarray(offset + 8, offset + 8 + length));
+        offset += length + 12;
+      }
+      // The first pixel has no filter neighbors, so its alpha is unfiltered.
+      assert.equal(inflateSync(Buffer.concat(chunks))[4], 0, 'The icon corner must be transparent, not a white matte');
     } finally {
       if (mode === 'development') await server.close();
       else await new Promise((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve()));

@@ -9,13 +9,25 @@ import branches from '../assets/3d/sword-branches.json';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const assets = path.resolve(root, '../assets/3d');
 const references = path.resolve(root, '../assets/reference_page');
+const displayAssets = path.resolve(root, '../assets/display');
 const configuredTiers = [...tiers, ...branches.flatMap(branch => branch.tiers ?? [])];
 const models = [...new Set(configuredTiers.map(tier => `${tier.model}.glb`)), 'hammer.glb', 'anvil.glb'];
 const portraits = [...new Set(configuredTiers.map(tier => tier.reference).filter((name): name is string => !!name))];
+const displays = [...new Set(configuredTiers.map(tier => tier.display).filter((name): name is string => !!name))];
 export default defineConfig({
   plugins: [react(), {
     name: 'local-3d-assets',
     configureServer(server) {
+      server.middlewares.use('/display', (req, res, next) => {
+        let name: string;
+        try { name = decodeURIComponent((req.url || '').split('?')[0].slice(1)); }
+        catch { res.statusCode = 400; res.end(); return; }
+        if (!displays.includes(name)) return next();
+        const file = path.join(displayAssets, name);
+        if (!fs.existsSync(file)) { res.statusCode = 404; res.end(); return; }
+        res.setHeader('Content-Type', 'image/png');
+        fs.createReadStream(file).pipe(res);
+      });
       server.middlewares.use('/models', (req, res, next) => {
         let name: string;
         try { name = decodeURIComponent((req.url || '').split('?')[0].slice(1)); }
@@ -52,6 +64,11 @@ export default defineConfig({
         const destination = path.join(root, 'dist/weapon-images', name);
         fs.mkdirSync(path.dirname(destination), { recursive: true });
         fs.copyFileSync(path.join(references, name), destination);
+      }
+      for (const name of displays) {
+        const destination = path.join(root, 'dist/display', name);
+        fs.mkdirSync(path.dirname(destination), { recursive: true });
+        fs.copyFileSync(path.join(displayAssets, name), destination);
       }
     }
   }],

@@ -2,11 +2,9 @@
   "mint_level": 50,
   "max_level": 100,
   "recycle_level": 0,
-  "daily_ap": 100,
   "daily_materials": 200,
   "daily_shields": 5,
   "forge_materials": 10,
-  "forge_ap": 2,
   "strike_materials": 2,
   "weapon_economy": {
     "longsword": {
@@ -50,7 +48,6 @@
       }
     }
   },
-  "strike_ap": 1,
   "protection_trigger": 10,
   "protection_duration": 3,
   "material_pack_size": 20,
@@ -65,6 +62,5 @@
   "destroy_cap": 0.15,
   "coin_sword_price": 20000,
   "coin_sword_level": 3,
-  "test_supply_ap": 10,
   "test_supply_materials": 20
 }

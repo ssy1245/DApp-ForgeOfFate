@@ -1,0 +1,155 @@
+/* The same collection frame is used by inventory and on-chain weapons. */
+.weapon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  align-items: start;
+  gap: 24px;
+  margin-top: 26px;
+}
+
+.weapon-card {
+  --card-accent: #c8a56b;
+  --card-metal: #7b6644;
+  --card-glow: #c8a56b18;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #514735;
+  border-radius: 4px 4px 12px 12px;
+  background: linear-gradient(145deg, #39352c, #181b18 38%, #24251f);
+  box-shadow: 0 12px 28px #0003, inset 0 0 0 3px #151713;
+  position: relative;
+  transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+
+.weapon-card[data-branch="rapier"] {
+  --card-accent: #d4a1a5;
+  --card-metal: #7e515a;
+  --card-glow: #c97c8d18;
+}
+
+.weapon-card[data-branch="greatsword"] {
+  --card-accent: #e0a06c;
+  --card-metal: #8e573b;
+  --card-glow: #e1803f1c;
+}
+
+.weapon-card:focus-within {
+  border-color: var(--card-accent);
+}
+
+@media (hover: hover) {
+  .weapon-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--card-metal);
+    box-shadow: 0 20px 36px #0005, 0 0 26px var(--card-glow), inset 0 0 0 3px #151713;
+  }
+  .weapon-card:hover .weapon-reference { scale: 1.025; }
+}
+
+.card-topline {
+  min-height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 10px 5px;
+}
+
+.card-status { display: inline-flex; align-items: center; gap: 7px; color: #b7bcaa; font-size: 10px; }
+.card-status i { width: 4px; height: 4px; background: #97a380; rotate: 45deg; }
+.card-status.sealed, .card-status.listed { color: var(--card-accent); }
+.card-status.sealed i, .card-status.listed i { background: var(--card-accent); }
+.card-status.listed i { box-shadow: 0 0 8px var(--card-accent); }
+.card-serial { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 9px ui-monospace, monospace; color: #969586; }
+
+.weapon-art {
+  height: 318px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--card-metal);
+  background: radial-gradient(ellipse at 50% 44%, var(--card-glow), transparent 65%), linear-gradient(145deg, #2d332c, #151c18 78%);
+}
+
+.weapon-art::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 1px solid #efe3c43d;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.weapon-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, #11181110, transparent 60%, #11181155);
+  z-index: 1;
+}
+
+.weapon-reference {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 24px 16px 49px;
+  filter: drop-shadow(0 5px 8px #0008);
+  transition: scale .45s ease;
+}
+
+.artwork-rule { position: absolute; top: 16px; left: 17px; right: 17px; display: flex; align-items: center; justify-content: space-between; color: #fff5d8c4; z-index: 3; pointer-events: none; }
+.artwork-rule span { font: 8px Georgia, serif; letter-spacing: 2.5px; text-shadow: 0 1px 4px #0006; }
+.artwork-rule i { font-size: 11px; font-style: normal; }
+.weapon-level { position: absolute; bottom: 16px; left: 18px; z-index: 3; color: #f7ebcf; }
+.weapon-level small { display: block; font-size: 8px; letter-spacing: 2px; color: #e8dcc0a8; margin-bottom: 2px; }
+.weapon-level>span { font: 39px/.95 Georgia, 'Times New Roman', serif; letter-spacing: -1.5px; text-shadow: 0 2px 12px #0003; }
+.artwork-caption { position: absolute; bottom: 18px; right: 17px; z-index: 3; color: #f3e6c7; text-align: right; font-size: 9px; letter-spacing: 2px; }
+.artwork-caption small { display: block; margin-top: 5px; font: 7px Georgia, serif; letter-spacing: 1.1px; color: #ddcfb29c; }
+.weapon-art-fallback { color: var(--card-accent); font-size: 64px; }
+
+.card-body { padding: 21px 16px 14px; }
+.card-route { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--card-accent); font-size: 9px; letter-spacing: 2px; }
+.card-route>span:first-child { display: flex; align-items: center; gap: 7px; }
+.card-route>span:first-child::before { content: ''; width: 14px; height: 1px; background: var(--card-metal); }
+.card-route>span:last-child { border: 1px solid var(--card-metal); padding: 2px 5px; font-size: 8px; letter-spacing: 1px; border-radius: 2px; }
+.weapon-card h3 { margin: 12px 0 5px; font-family: 'Songti SC', 'STSong', 'Noto Serif SC', serif; font-size: 23px; font-weight: 600; letter-spacing: 2px; line-height: 1.4; color: #eee5d1; overflow-wrap: anywhere; }
+.weapon-card .card-english { min-height: 15px; color: #a59c87; font: 9px/1.5 Georgia, serif; letter-spacing: 1.3px; text-transform: uppercase; overflow-wrap: anywhere; }
+.card-detail { margin-top: 15px; display: flex; justify-content: space-between; gap: 10px; color: #b8b6a5; font-size: 10px; }
+.card-detail>span:last-child { min-width: 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
+.card-detail>span:first-child { flex-shrink: 0; color: #8d9481; }
+.card-valuation { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 19px; padding: 15px 0; border-top: 1px solid #b6a07428; border-bottom: 1px solid #b6a07428; }
+.card-valuation>span { color: #a6ab97; font-size: 10px; }
+.card-valuation>div { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.card-valuation strong { font: 23px/1.2 Georgia, 'Songti SC', serif; color: #e9d4ab; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.card-valuation small { color: #b9a785; font-size: 9px; white-space: nowrap; }
+.card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 17px; }
+.card-actions>button { min-width: 0; padding: 11px 7px; font-size: 11px; border-radius: 3px; white-space: normal; }
+.card-actions>.card-main-action, .card-actions>button:only-child { grid-column: 1/-1; }
+.card-actions>.card-main-action, .weapon-card[data-nft] .card-actions>.primary, .card-actions>button.primary:only-child { background: linear-gradient(120deg, color-mix(in srgb, var(--card-metal) 75%, #d7bd8b), var(--card-metal)); color: #fff1df; border: 1px solid var(--card-accent); box-shadow: inset 0 1px #f1dcaa24; font-weight: 500; letter-spacing: 1px; }
+.card-actions>.card-main-action:not(:disabled):hover, .weapon-card[data-nft] .card-actions>.primary:not(:disabled):hover, .card-actions>button.primary:only-child:not(:disabled):hover { filter: brightness(1.15); }
+.card-actions>.primary { background: #373427; color: #dbbf8f; border: 1px solid #726044; }
+.card-actions>.quiet { background: #1c211b; border-color: #424637; color: #b0b5a1; }
+.card-actions>.quiet:not(:disabled):hover { background: #2b3025; border-color: #696d54; }
+.card-actions>button:disabled { opacity: .42; }
+.card-actions input { min-width: 0; width: 100%; padding: 11px; background: #131813; border: 1px solid #444a3a; color: #e1ddc8; font-size: 11px; border-radius: 3px; }
+.card-actions input::placeholder { color: #858c77; }
+.weapon-card[data-nft] .card-actions>* { grid-column: 1/-1; }
+
+@media (max-width: 600px) {
+  .weapon-grid { gap: 22px; margin-top: 20px; }
+  .weapon-art { height: 328px; }
+  .card-body { padding: 21px 16px 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weapon-card, .weapon-reference { transition: none; }
+  .weapon-card:hover { transform: none; }
+  .weapon-card:hover .weapon-reference { scale: none; }
+}

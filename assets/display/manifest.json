@@ -1,0 +1,167 @@
+{
+  "generator": "imagegen built-in edit",
+  "orientation": "tip-up",
+  "weapons": [
+    {
+      "id": "weathered",
+      "name": "余烬长剑",
+      "reference": "Weathered Sword Orthographic Views.png",
+      "display": "BasicSword/+0BasicSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Ember Longsword. Extract exactly ONE complete FRONT-VIEW sword from this reference. If there are multiple orthographic views, select the LEFTMOST broad front view with the complete crossguard; exclude all rear/side views and all labels. Remove the gray/white background to real alpha transparency. Keep this weapon's exact silhouette, proportions, metal details, wear, gemstones, colors, crossguard and blade engravings unchanged. Do not redesign or invent ornament. Orient the WHOLE sword vertically with its sharp blade tip UP and handle/pommel at the BOTTOM; rotate the complete sword 180 degrees if necessary. Entire tip, crossguard and pommel must be visible with 4–6% clear transparent padding. Centered, portrait 2:3 composition, intended for a dark fantasy collectible card. Preserve clean silver highlights and holes/open spaces in the guard with alpha. No ground, shadow backdrop, glow backdrop, frame, text, watermark, or baked checkerboard. Output a genuinely transparent PNG."
+    },
+    {
+      "id": "forged",
+      "name": "精铁骑士剑",
+      "reference": "KnightSword/+10KnightSword.png",
+      "display": "KnightSword/+10KnightSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Knight's Iron Sword. Extract exactly ONE complete FRONT-VIEW sword from this reference. If there are multiple orthographic views, select the LEFTMOST broad front view with the complete crossguard; exclude all rear/side views and all labels. Remove the gray/white background to real alpha transparency. Keep this weapon's exact silhouette, proportions, metal details, wear, gemstones, colors, crossguard and blade engravings unchanged. Do not redesign or invent ornament. Orient the WHOLE sword vertically with its sharp blade tip UP and handle/pommel at the BOTTOM; rotate the complete sword 180 degrees if necessary. Entire tip, crossguard and pommel must be visible with 4–6% clear transparent padding. Centered, portrait 2:3 composition, intended for a dark fantasy collectible card. Preserve clean silver highlights and holes/open spaces in the guard with alpha. No ground, shadow backdrop, glow backdrop, frame, text, watermark, or baked checkerboard. Output a genuinely transparent PNG."
+    },
+    {
+      "id": "noble",
+      "name": "银誓长剑",
+      "reference": "KnightSword/+20KnightSword.png",
+      "display": "KnightSword/+20KnightSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Silver Oath. Extract exactly ONE complete FRONT-VIEW sword from this reference. If there are multiple orthographic views, select the LEFTMOST broad front view with the complete crossguard; exclude all rear/side views and all labels. Remove the gray/white background to real alpha transparency. Keep this weapon's exact silhouette, proportions, metal details, wear, gemstones, colors, crossguard and blade engravings unchanged. Do not redesign or invent ornament. Orient the WHOLE sword vertically with its sharp blade tip UP and handle/pommel at the BOTTOM; rotate the complete sword 180 degrees if necessary. Entire tip, crossguard and pommel must be visible with 4–6% clear transparent padding. Centered, portrait 2:3 composition, intended for a dark fantasy collectible card. Preserve clean silver highlights and holes/open spaces in the guard with alpha. No ground, shadow backdrop, glow backdrop, frame, text, watermark, or baked checkerboard. Output a genuinely transparent PNG."
+    },
+    {
+      "id": "royal-court",
+      "name": "王国卫剑",
+      "reference": "KnightSword/+30KnightSword.png",
+      "display": "KnightSword/+30KnightSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Kingdom Guardian. Extract exactly ONE complete FRONT-VIEW sword from this reference. If there are multiple orthographic views, select the LEFTMOST broad front view with the complete crossguard; exclude all rear/side views and all labels. Remove the gray/white background to real alpha transparency. Keep this weapon's exact silhouette, proportions, metal details, wear, gemstones, colors, crossguard and blade engravings unchanged. Do not redesign or invent ornament. Orient the WHOLE sword vertically with its sharp blade tip UP and handle/pommel at the BOTTOM; rotate the complete sword 180 degrees if necessary. Entire tip, crossguard and pommel must be visible with 4–6% clear transparent padding. Centered, portrait 2:3 composition, intended for a dark fantasy collectible card. Preserve clean silver highlights and holes/open spaces in the guard with alpha. No ground, shadow backdrop, glow backdrop, frame, text, watermark, or baked checkerboard. Output a genuinely transparent PNG."
+    },
+    {
+      "id": "oathbound",
+      "name": "荣耀骑士剑",
+      "reference": "KnightSword/+40KnightSword.png",
+      "display": "KnightSword/+40KnightSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Blade of Valor. Extract exactly ONE complete FRONT-VIEW sword from this reference. If there are multiple orthographic views, select the LEFTMOST broad front view with the complete crossguard; exclude all rear/side views and all labels. Remove the gray/white background to real alpha transparency. Keep this weapon's exact silhouette, proportions, metal details, wear, gemstones, colors, crossguard and blade engravings unchanged. Do not redesign or invent ornament. Orient the WHOLE sword vertically with its sharp blade tip UP and handle/pommel at the BOTTOM; rotate the complete sword 180 degrees if necessary. Entire tip, crossguard and pommel must be visible with 4–6% clear transparent padding. Centered, portrait 2:3 composition, intended for a dark fantasy collectible card. Preserve clean silver highlights and holes/open spaces in the guard with alpha. No ground, shadow backdrop, glow backdrop, frame, text, watermark, or baked checkerboard. Output a genuinely transparent PNG."
+    },
+    {
+      "id": "gilded",
+      "name": "王庭圣剑",
+      "reference": "KnightSword/+50KnightSword.png",
+      "display": "KnightSword/+50KnightSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Royal Court Blade. Extract exactly ONE complete FRONT-VIEW sword from this reference. If there are multiple orthographic views, select the LEFTMOST broad front view with the complete crossguard; exclude all rear/side views and all labels. Remove the gray/white background to real alpha transparency. Keep this weapon's exact silhouette, proportions, metal details, wear, gemstones, colors, crossguard and blade engravings unchanged. Do not redesign or invent ornament. Orient the WHOLE sword vertically with its sharp blade tip UP and handle/pommel at the BOTTOM; rotate the complete sword 180 degrees if necessary. Entire tip, crossguard and pommel must be visible with 4–6% clear transparent padding. Centered, portrait 2:3 composition, intended for a dark fantasy collectible card. Preserve clean silver highlights and holes/open spaces in the guard with alpha. No ground, shadow backdrop, glow backdrop, frame, text, watermark, or baked checkerboard. Output a genuinely transparent PNG."
+    },
+    {
+      "id": "radiant-oath",
+      "name": "王庭誓约",
+      "reference": "KnightSword/+60KnightSword.png",
+      "display": "KnightSword/+60KnightSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Royal Oathblade. Extract exactly ONE complete FRONT-VIEW sword from this reference. If there are multiple orthographic views, select the LEFTMOST broad front view with the complete crossguard; exclude all rear/side views and all labels. Remove the gray/white background to real alpha transparency. Keep this weapon's exact silhouette, proportions, metal details, wear, gemstones, colors, crossguard and blade engravings unchanged. Do not redesign or invent ornament. Orient the WHOLE sword vertically with its sharp blade tip UP and handle/pommel at the BOTTOM; rotate the complete sword 180 degrees if necessary. Entire tip, crossguard and pommel must be visible with 4–6% clear transparent padding. Centered, portrait 2:3 composition, intended for a dark fantasy collectible card. Preserve clean silver highlights and holes/open spaces in the guard with alpha. No ground, shadow backdrop, glow backdrop, frame, text, watermark, or baked checkerboard. Output a genuinely transparent PNG."
+    },
+    {
+      "id": "sacred-ring",
+      "name": "黄金誓约",
+      "reference": "KnightSword/+70KnightSword.png",
+      "display": "KnightSword/+70KnightSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Golden Oath. Extract exactly ONE complete FRONT-VIEW sword from this reference. If there are multiple orthographic views, select the LEFTMOST broad front view with the complete crossguard; exclude all rear/side views and all labels. Remove the gray/white background to real alpha transparency. Keep this weapon's exact silhouette, proportions, metal details, wear, gemstones, colors, crossguard and blade engravings unchanged. Do not redesign or invent ornament. Orient the WHOLE sword vertically with its sharp blade tip UP and handle/pommel at the BOTTOM; rotate the complete sword 180 degrees if necessary. Entire tip, crossguard and pommel must be visible with 4–6% clear transparent padding. Centered, portrait 2:3 composition, intended for a dark fantasy collectible card. Preserve clean silver highlights and holes/open spaces in the guard with alpha. No ground, shadow backdrop, glow backdrop, frame, text, watermark, or baked checkerboard. Output a genuinely transparent PNG."
+    },
+    {
+      "id": "last-dawn",
+      "name": "最后的黎明",
+      "reference": "KnightSword/+80KnightSword.png",
+      "display": "KnightSword/+80KnightSword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for The Last Dawn. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "rapier-forged",
+      "name": "精铁刺剑",
+      "reference": "Rapier/+5rapier.png",
+      "display": "Rapier/+5Rapier.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Iron Rapier. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "rapier-silver-crest",
+      "name": "银锋刺剑",
+      "reference": "Rapier/+10rapier.png",
+      "display": "Rapier/+10Rapier.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Silverthorn. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "rapier-laurel",
+      "name": "宫廷细剑",
+      "reference": "Rapier/+20rapier.png",
+      "display": "Rapier/+20Rapier.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Courtly Rapier. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "rapier-regent",
+      "name": "鸢尾刺剑",
+      "reference": "Rapier/+30rapier.png",
+      "display": "Rapier/+30Rapier.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Fleur-de-Lis. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "rapier-coronation",
+      "name": "王室誓剑",
+      "reference": "Rapier/+40rapier.png",
+      "display": "Rapier/+40Rapier.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Royal Vow. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "rapier-gilded-coronation",
+      "name": "绯冠刺剑",
+      "reference": "Rapier/+50rapier.png",
+      "display": "Rapier/+50Rapier.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Crimson Crown. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "rapier-ruby-sovereign",
+      "name": "赤蔷誓约",
+      "reference": "Rapier/+60rapier.png",
+      "display": "Rapier/+60Rapier.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Scarlet Oath. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "rapier-whitewing-sovereign",
+      "name": "炽翼天使",
+      "reference": "Rapier/+70rapier.png",
+      "display": "Rapier/+70Rapier.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Seraph's Wing. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "greatsword-10",
+      "name": "铁匠大剑",
+      "reference": "Greatsword/+10Greatsword.png",
+      "display": "Greatsword/+10Greatsword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Blacksmith's Greatsword. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "greatsword-20",
+      "name": "烬炉大剑",
+      "reference": "Greatsword/+20GreatSword.png",
+      "display": "Greatsword/+20Greatsword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Emberforged Greatsword. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "greatsword-30",
+      "name": "渊角龙骸",
+      "reference": "Greatsword/+30GreatSword.png",
+      "display": "Greatsword/+30Greatsword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Abyssal Dragonbone. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "greatsword-40",
+      "name": "熔脉龙骸",
+      "reference": "Greatsword/+40GreatSword.png",
+      "display": "Greatsword/+40Greatsword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Moltenvein Dragonbone. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "greatsword-50",
+      "name": "深渊炉心",
+      "reference": "Greatsword/+50GreatSword.png",
+      "display": "Greatsword/+50Greatsword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Abyssal Furnace. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    },
+    {
+      "id": "greatsword-60",
+      "name": "余烬君王",
+      "reference": "Greatsword/+60GreatSword.png",
+      "display": "Greatsword/+60Greatsword.png",
+      "prompt": "Use case: background-extraction. Edit target: the provided weapon reference for Sovereign of Ash. Extract exactly ONE complete FRONT-VIEW sword. If the reference shows multiple orthographic views, select ONLY the LEFTMOST broad front view, excluding the other views and labels. Remove ALL gray/white background to actual alpha transparency, including gaps within the guard. Preserve this exact sword's silhouette, proportions, blade engraving, metal colors, gemstones, filigree, wear and glowing molten details. Do not redesign or add ornament. Rotate the WHOLE sword if needed so the sharp blade tip points UP, and grip/pommel is at the BOTTOM. Keep the entire blade tip, broadest guard wings and pommel, with 4–6% transparent padding. Centered, portrait 2:3 composition for a dark fantasy collectible card. No gray matte, white fringe, ground, background shadow, backdrop glow, card frame, text, watermark, or baked checkerboard. Output one genuinely transparent PNG."
+    }
+  ]
+}

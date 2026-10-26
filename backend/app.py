@@ -22,7 +22,7 @@ from .accounts import normalize_username, hash_password, verify_password
 from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
 
 ROOT = Path(__file__).resolve().parent.parent
-LOCAL = ROOT / '.local'
+LOCAL = Path(os.getenv('FORGE_LOCAL_DIR', str(ROOT / '.local')))
 TYPES = {'Voucher': [
     {'name': 'weaponId', 'type': 'bytes32'}, {'name': 'recipient', 'type': 'address'},
     {'name': 'level', 'type': 'uint256'}, {'name': 'uri', 'type': 'string'},
@@ -49,7 +49,7 @@ class Credentials(BaseModel):
     password: str = Field(min_length=8,max_length=128)
 
 class CheatResources(BaseModel):
-    resource: Literal['ap','materials','shields','coins','all']
+    resource: Literal['materials','shields','coins','all']
     amount: int = Field(ge=1,le=1_000_000,strict=True)
 
 class CheatWeapons(BaseModel):
@@ -69,7 +69,7 @@ class Store:
         with self.connection() as db:
             db.executescript('''
             PRAGMA journal_mode=WAL;
-            CREATE TABLE IF NOT EXISTS players(address TEXT PRIMARY KEY,ap INTEGER DEFAULT 0,materials INTEGER DEFAULT 0,shields INTEGER DEFAULT 0,coins INTEGER DEFAULT 0,claim_day TEXT,demo_claimed INTEGER DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS players(address TEXT PRIMARY KEY,materials INTEGER DEFAULT 0,shields INTEGER DEFAULT 0,coins INTEGER DEFAULT 0,claim_day TEXT,demo_claimed INTEGER DEFAULT 0);
             CREATE TABLE IF NOT EXISTS challenges(id TEXT PRIMARY KEY,address TEXT,message TEXT,expires INTEGER);
             CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,address TEXT,expires INTEGER);
             CREATE TABLE IF NOT EXISTS weapons(id TEXT PRIMARY KEY,owner TEXT,level INTEGER DEFAULT 0,status TEXT DEFAULT 'active',strikes INTEGER DEFAULT 0,protected_left INTEGER DEFAULT 0,demo INTEGER DEFAULT 0,created INTEGER);
@@ -83,6 +83,9 @@ class Store:
                 db.execute('ALTER TABLE players ADD COLUMN daily_swords_claimed INTEGER NOT NULL DEFAULT 0')
                 # Earlier versions delivered the entire allowance when state was read.
                 db.execute('UPDATE players SET daily_swords_claimed=? WHERE sword_day IS NOT NULL', (BALANCE['daily_swords'],))
+            # Retire the old energy resource without resetting any other progress.
+            if 'ap' in {row['name'] for row in db.execute('PRAGMA table_info(players)')}:
+                db.execute('ALTER TABLE players DROP COLUMN ap')
     @contextmanager
     def connection(self):
         db = sqlite3.connect(self.path, timeout=15, isolation_level=None)
@@ -190,8 +193,8 @@ def create_app(db_path=None, demo=None):
             raise HTTPException(409, '武器状态已变化，请刷新。')
         return dict(weapon)
 
-    def charge(db, address, ap=0, materials=0, shields=0, coins=0):
-        cursor = db.execute('UPDATE players SET ap=ap-?,materials=materials-?,shields=shields-?,coins=coins-? WHERE address=? AND ap>=? AND materials>=? AND shields>=? AND coins>=?', (ap, materials, shields, coins, address, ap, materials, shields, coins))
+    def charge(db, address, *, materials=0, shields=0, coins=0):
+        cursor = db.execute('UPDATE players SET materials=materials-?,shields=shields-?,coins=coins-? WHERE address=? AND materials>=? AND shields>=? AND coins>=?', (materials, shields, coins, address, materials, shields, coins))
         if cursor.rowcount != 1:
             raise HTTPException(409, '资源不足，请领取资源或回收武器。')
 
@@ -304,7 +307,7 @@ def create_app(db_path=None, demo=None):
                 target=db.execute('SELECT * FROM players WHERE address=?',(row['address'],)).fetchone()
                 sword_day=max(guest['sword_day'] or '',target['sword_day'] or '')
                 claimed=min(BALANCE['daily_swords'],sum(p['daily_swords_claimed'] for p in [guest,target] if p['sword_day']==sword_day))
-                db.execute("UPDATE players SET ap=ap+?,materials=materials+?,shields=shields+?,coins=coins+?,sword_day=?,daily_swords_claimed=?,claim_day=MAX(COALESCE(claim_day,''),COALESCE(?,'')) WHERE address=?",(guest['ap'],guest['materials'],guest['shields'],guest['coins'],sword_day or None,claimed,guest['claim_day'],row['address']))
+                db.execute("UPDATE players SET materials=materials+?,shields=shields+?,coins=coins+?,sword_day=?,daily_swords_claimed=?,claim_day=MAX(COALESCE(claim_day,''),COALESCE(?,'')) WHERE address=?",(guest['materials'],guest['shields'],guest['coins'],sword_day or None,claimed,guest['claim_day'],row['address']))
                 db.execute('DELETE FROM sessions WHERE address=?',(row['guest_owner'],))
                 db.execute('DELETE FROM players WHERE address=?',(row['guest_owner'],))
             token = secrets.token_urlsafe(32)
@@ -366,7 +369,7 @@ def create_app(db_path=None, demo=None):
             row = db.execute('SELECT claim_day FROM players WHERE address=?', (address,)).fetchone()
             if row['claim_day'] == day:
                 raise HTTPException(409, '今天已领取，资源按 UTC 零点重置。')
-            db.execute('UPDATE players SET ap=ap+?,materials=materials+?,shields=shields+?,claim_day=? WHERE address=?', (BALANCE['daily_ap'], BALANCE['daily_materials'], BALANCE['daily_shields'], day, address))
+            db.execute('UPDATE players SET materials=materials+?,shields=shields+?,claim_day=? WHERE address=?', (BALANCE['daily_materials'], BALANCE['daily_shields'], day, address))
             return {'message': '每日资源已领取。'}
         return mutate(address, idempotency_key, 'claim', {}, run)
 
@@ -374,7 +377,7 @@ def create_app(db_path=None, demo=None):
     def forge(authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
         address = authenticated(authorization)
         def run(db):
-            charge(db, address, BALANCE['forge_ap'], BALANCE['forge_materials'])
+            charge(db, address, materials=BALANCE['forge_materials'])
             return {'weapon_id': new_weapon(db, address), 'message': '余烬长剑锻造完成。'}
         return mutate(address, idempotency_key, 'forge', {}, run)
 
@@ -394,7 +397,7 @@ def create_app(db_path=None, demo=None):
             for _ in range(BALANCE['daily_swords']):
                 wid=new_weapon(db,address,demo_flag=1);ids.append(wid)
                 db.execute("UPDATE weapons SET source='cheat' WHERE id=?",(wid,))
-            db.execute('UPDATE players SET ap=MIN(ap+?,1000000000),materials=MIN(materials+?,1000000000),shields=MIN(shields+?,1000000000) WHERE address=?',(BALANCE['daily_ap'],BALANCE['daily_materials'],BALANCE['daily_shields'],address))
+            db.execute('UPDATE players SET materials=MIN(materials+?,1000000000),shields=MIN(shields+?,1000000000) WHERE address=?',(BALANCE['daily_materials'],BALANCE['daily_shields'],address))
             return {'weapon_id':ids[0],'message':f"测试补给：已添加 {len(ids)} 把基础剑和一份每日资源，可重复领取。"}
         with store.connection() as db:require_tester(db,address)
         return mutate(address,idempotency_key,'cheat_daily',{},run)
@@ -404,7 +407,7 @@ def create_app(db_path=None, demo=None):
         address=authenticated(authorization)
         def run(db):
             require_tester(db,address)
-            fields=['ap','materials','shields','coins'] if body.resource=='all' else [body.resource]
+            fields=['materials','shields','coins'] if body.resource=='all' else [body.resource]
             for field in fields:
                 db.execute(f'UPDATE players SET {field}=MIN({field}+?,1000000000) WHERE address=?',(body.amount,address))
             return {'message':f'测试资源已添加：+{body.amount}。'}
@@ -456,7 +459,7 @@ def create_app(db_path=None, demo=None):
                 raise HTTPException(409,'背包仍有可强化的剑，请先使用已有武器。')
             wid=new_weapon(db,address,demo_flag=1)
             db.execute("UPDATE weapons SET source='test_supply' WHERE id=?",(wid,))
-            db.execute('UPDATE players SET ap=MAX(ap,?),materials=MAX(materials,?) WHERE address=?',(BALANCE['test_supply_ap'],BALANCE['test_supply_materials'],address))
+            db.execute('UPDATE players SET materials=MAX(materials,?) WHERE address=?',(BALANCE['test_supply_materials'],address))
             return {'weapon_id':wid,'message':'已领取一把 +0 普通测试剑，并补足基础锻造资源。'}
         return mutate(address,idempotency_key,'test_supply',{},run)
 
@@ -529,7 +532,7 @@ def create_app(db_path=None, demo=None):
             if materials < cost:
                 raise HTTPException(409, f'强化需要 {cost} 铁块，当前剩余 {materials}。')
             result = strike(w, secrets.randbelow(1_000_000) / 1_000_000, body.shield)
-            charge(db, address, BALANCE['strike_ap'], cost, int(result['shield_used']))
+            charge(db, address, materials=cost, shields=int(result['shield_used']))
             db.execute('UPDATE weapons SET level=?,strikes=?,protected_left=?,status=?,heat_charges=heat_charges-1 WHERE id=?', (result['level'], result['strikes'], result['protected_left'], result['status'], wid))
             result['heat_charges'] = w['heat_charges']-1
             return result
@@ -592,7 +595,7 @@ def create_app(db_path=None, demo=None):
             require_tester(db,address)
             if db.execute('SELECT demo_claimed FROM players WHERE address=?', (address,)).fetchone()[0]:
                 raise HTTPException(409, '此账号已领取演示数据。')
-            db.execute('UPDATE players SET demo_claimed=1,ap=ap+100,materials=materials+200 WHERE address=?', (address,))
+            db.execute('UPDATE players SET demo_claimed=1,materials=materials+200 WHERE address=?', (address,))
             return {'weapon_id': new_weapon(db, address, BALANCE['mint_level'], 1), 'message': '已添加标记为 DEMO 的达标武器。'}
         return mutate(address, idempotency_key, 'demo', {}, run)
 

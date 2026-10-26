@@ -98,7 +98,7 @@ def test_daily_sword_retry_and_account_restore(tmp_path):
     assert all(r.status_code==200 and r.json()==results[0].json() for r in results)
     state=c.get('/api/state').json()
     assert len(state['weapons'])==1 and state['player']['daily_swords_remaining']==2
-    assert all(state['player'][field]==0 for field in ['ap','materials','shields','coins'])
+    assert all(state['player'][field]==0 for field in ['materials','shields','coins'])
     data=credentials();assert c.post('/api/account/register',json=data).status_code==200
     c.post('/api/account/logout');c.post('/api/session')
     assert c.post('/api/account/login',json=data).status_code==200
@@ -142,7 +142,7 @@ def test_test_supply_only_when_no_usable_sword_and_retry(tmp_path):
     assert len(state['weapons'])==1
     w=state['weapons'][0]
     assert w['level']==0 and w['demo']==1 and w['source']=='test_supply'
-    assert state['player']['ap']==BALANCE['test_supply_ap']
+    assert 'ap' not in state['player']
     assert state['player']['materials']==BALANCE['test_supply_materials']
     # Sealed collectibles cannot be hammered; a new supply remains available.
     with c.app.state.store.connection() as db:

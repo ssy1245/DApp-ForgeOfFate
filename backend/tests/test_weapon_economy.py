@@ -39,7 +39,7 @@ def test_each_outcome_charges_route_cost_once(client,monkeypatch,branch,cost,out
     assert post(client,f'/weapons/{wid}/strike',h,body,key).json()==response.json()
     after=client.get('/api/state',headers=h).json()['player']
     assert after['materials']==before['player']['materials']-cost
-    assert after['ap']==before['player']['ap']-BALANCE['strike_ap']
+    assert 'ap' not in after
     assert after['shields']==before['player']['shields']-int(outcome=='saved')
 
 

@@ -58,7 +58,9 @@ def test_unlimited_daily_grants_and_idempotency(tester):
     state=c.get('/api/state').json()
     assert len(state['weapons'])==BALANCE['daily_swords']*2
     assert state['player']['daily_swords_remaining']==before['player']['daily_swords_remaining']==3
-    assert state['player']['ap']==2*BALANCE['daily_ap']
+    assert 'ap' not in state['player']
+    assert state['player']['materials']==2*BALANCE['daily_materials']
+    assert state['player']['shields']==2*BALANCE['daily_shields']
     assert state['player']['sword_day']==before['player']['sword_day']
     assert state['player']['claim_day']==before['player']['claim_day']
     assert state['player']['can_claim']
@@ -72,7 +74,7 @@ def test_resources_atomic_add_and_cap(tester):
     assert r.status_code==200
     assert post(c,'/cheats/resources',{},body,key).json()==r.json()
     state=c.get('/api/state').json()
-    assert all(state['player'][field]==1000 for field in ['ap','materials','shields','coins'])
+    assert all(state['player'][field]==1000 for field in ['materials','shields','coins'])
     with ThreadPoolExecutor(max_workers=2) as pool:
         codes=list(pool.map(lambda _:post(c,'/cheats/resources',{}, {'resource':'coins','amount':10}).status_code,range(2)))
     assert codes==[200,200]
@@ -115,7 +117,7 @@ def test_invalid_spawn_rejected(tester,body):
 
 def test_invalid_resource_fields_and_empty_edit(tester):
     c,_,_=tester
-    for body in [{'resource':'role','amount':1},{'resource':'coins','amount':-1},{'resource':'all','amount':1000001}]:
+    for body in [{'resource':'ap','amount':1},{'resource':'role','amount':1},{'resource':'coins','amount':-1},{'resource':'all','amount':1000001}]:
         assert post(c,'/cheats/resources',{},body).status_code==422
     assert post(c,'/supply/sword',{}).status_code==200
     wid=c.get('/api/state').json()['weapons'][0]['id']

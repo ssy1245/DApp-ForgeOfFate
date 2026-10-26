@@ -13,6 +13,7 @@ import { ANVIL_POSITION, CABINETS, CABINET_SCALE, CABINET_FRAME, CABINET_INTERIO
 import { IMPACT_MS, SWING_MS, IMPACT_GRIP, IMPACT_ROTATION, WINDUP_GRIP, WINDUP_ROTATION, smooth } from './forgeMotion';
 import { swordTiers, swordTier, nextSwordTier, branchTiers, pendingSwordLevels, type SwordTier } from './swordTiers';
 import { modelUrl } from './modelAssets';
+import { IronAmount } from './IronIcon';
 const UpgradeContext=createContext<SwordTier[]>(swordTiers);
 const assetCache = new Map<string, Group>();
 
@@ -182,12 +183,12 @@ function World({level,hit,place,heat,result,hammerEquipped,onStation,roomView,di
   <mesh position={[...CRATE_POSITION]} castShadow><boxGeometry args={[1,0.8,0.75]}/><meshStandardMaterial color="#594330" roughness={0.9}/></mesh><group position={[ANVIL_POSITION[0],0,ANVIL_POSITION[2]+1]}><Embers/></group>
 </>;}
 class Fallback extends Component<{children:ReactNode},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return{failed:true};}render(){return this.state.failed?<div className="scene-fallback">⚒<span>命运锻造台 · 3D 暂不可用，游戏操作仍可继续</span></div>:this.props.children;}}
-export default function ForgeScene({level,hit,weapon,weapons,onSelectWeapon,supplyRemaining,supplyTotal,onClaimSword,result,busy,probabilities,shield,shields,onShield,onPlacement,onHeat,onStrike,visualTiers=swordTiers,maxLevel,heatSeconds,heatStrikes,strikeMaterials,strikeAP,heatWarning='',strikeWarning='',feedback=''}: {
+export default function ForgeScene({level,hit,weapon,weapons,onSelectWeapon,supplyRemaining,supplyTotal,onClaimSword,result,busy,probabilities,shield,shields,onShield,onPlacement,onHeat,onStrike,visualTiers=swordTiers,maxLevel,heatSeconds,heatStrikes,strikeMaterials,heatWarning='',strikeWarning='',feedback=''}: {
   level:number;hit:number;weapon?:SceneWeapon;weapons:SceneWeapon[];onSelectWeapon:(id:string)=>void;result:string;busy:boolean;probabilities:Record<string,number>;
   onPlacement:(place:string)=>void;
   supplyRemaining:number|null;supplyTotal:number;onClaimSword:()=>void;
   shield:boolean;shields:number;onShield:(value:boolean)=>void;onHeat:()=>void;onStrike:()=>void;visualTiers?:SwordTier[];maxLevel:number;heatSeconds:number;heatStrikes:number;
-  strikeMaterials:number;strikeAP:number;heatWarning?:string;strikeWarning?:string;feedback?:string;
+  strikeMaterials:number;heatWarning?:string;strikeWarning?:string;feedback?:string;
 }){
   const appearanceTiers=branchTiers(weapon?.branch,visualTiers);
   const nextAppearance=nextSwordTier(level,appearanceTiers);
@@ -286,7 +287,7 @@ export default function ForgeScene({level,hit,weapon,weapons,onSelectWeapon,supp
       <p>{nextAppearance?`下一形态：+${nextAppearance.min_level} · ${nextAppearance.name}`:pendingAppearances.length?`骑士剑 ${pendingAppearances.map(n=>`+${n}`).join('、')} 外观待补，暂沿用 +${swordTier(level,appearanceTiers).min_level} 外观。`:'当前路线已达最终外观'}</p><div className="hud-transitions">{[['up','升级',`+${Math.min(maxLevel,level+1)}`],['double','大成功',`+${Math.min(maxLevel,level+2)}`],['down','降级',`+${Math.max(0,level-1)}`],['destroy','损毁','永久消失'],...(probabilities.saved?[['saved','保护生效',`维持 +${level}`]]:[])].map(([key,label,next])=><div key={key}><span>{label} → {next}</span><b>{weapon&&level<maxLevel?`${((probabilities[key]||0)*100).toFixed(1)}%`:'—'}</b></div>)}</div>
       <label className="hud-shield"><input type="checkbox" checked={shield} disabled={busy||!weapon||weapon.status!=='active'||weapon.protected_left>0||shields<1} onChange={e=>onShield(e.target.checked)}/>单锤保护符 · {shields} 张</label>
       {weapon?.protected_left? <p>免损毁阶段 · 剩余 {weapon.protected_left} 锤</p>:null}
-      <p>每锤消耗 {strikeMaterials} 铁块 · {strikeAP} AP</p><div className="hud-buttons"><button disabled={busy||!weapon||weapon.status!=='active'||level>=maxLevel||weapon.heat_charges>0} onClick={startHeating}>送入熔炉</button>{place==='furnace'?<button disabled={busy||warming} onClick={()=>{setPlace('anvil');setHint('已将烧红的武器放回铁砧。');}}>取回铁砧</button>:<button disabled={!ready} onClick={onStrike}>敲击 · 空格 / 左键</button>}</div>
+      <p className="hud-cost">每锤消耗 <IronAmount amount={strikeMaterials}/></p><div className="hud-buttons"><button disabled={busy||!weapon||weapon.status!=='active'||level>=maxLevel||weapon.heat_charges>0} onClick={startHeating}>送入熔炉</button>{place==='furnace'?<button disabled={busy||warming} onClick={()=>{setPlace('anvil');setHint('已将烧红的武器放回铁砧。');}}>取回铁砧</button>:<button disabled={!ready} onClick={onStrike}>敲击 · 空格 / 左键</button>}</div>
       {hit>0&&impactResult&&<div className={`hud-result ${impactResult}`} role="status">{({up:'强化成功 +1',double:'大成功 +2',down:'强化降级 −1',destroy:'武器损毁，已失去',saved:'保护生效，等级不变'} as Record<string,string>)[impactResult]}</div>}
     </>}
     </aside>

@@ -1,0 +1,39 @@
+.iron-icon {
+  --icon-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  flex: 0 0 var(--icon-size);
+  overflow: hidden;
+  vertical-align: middle;
+  border: 1px solid #70644a;
+  border-radius: 4px;
+  background: radial-gradient(ellipse at 50% 35%, #3c4236, #1b211c);
+  box-shadow: inset 0 1px #c9ad6e16, 0 2px 5px #0005;
+  isolation: isolate;
+  font-style: normal;
+}
+
+.iron-icon img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 2px #0008); }
+.iron-icon--large { --icon-size: 48px; border-radius: 7px; padding: 2px; }
+.material-amount { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.resource-iron { gap: 11px; }
+.resource-iron .resource-icon { display: inline-flex; }
+.claim small .material-amount { gap: 4px; }
+.claim small .iron-icon { --icon-size: 20px; }
+.secondary small .material-amount { color: inherit; }
+.strike .material-amount { display: inline-flex; margin: 0; color: inherit; font-size: inherit; }
+.strike .material-amount .iron-icon { --icon-size: 20px; border-color: #806d49; }
+.forge-hud .hud-cost { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.hud-cost .iron-icon { --icon-size: 20px; }
+.material-pack-button { display: flex; align-items: center; justify-content: center; gap: 11px; text-align: left; }
+.material-pack-copy { display: block; line-height: 1.5; }
+.material-pack-copy small { display: block; color: #b9a47c; margin-top: 3px; font-size: 10px; }
+
+@media (max-width: 600px) {
+  .resource-iron { gap: 5px; padding-inline: 6px; }
+  .resource-iron .iron-icon--large { --icon-size: 34px; border-radius: 5px; padding: 1px; }
+  .claim small .material-amount { margin-left: 0; }
+}

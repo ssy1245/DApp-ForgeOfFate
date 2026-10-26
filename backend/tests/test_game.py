@@ -58,7 +58,7 @@ def test_claim_and_idempotency(client):
     assert a.status_code == 200
     assert post(client, '/claim', h, key=key).json() == a.json()
     assert post(client, '/claim', h).status_code == 409
-    assert client.get('/api/state', headers=h).json()['player']['ap'] == BALANCE['daily_ap']
+    assert client.get('/api/state', headers=h).json()['player']['materials'] == BALANCE['daily_materials']
     assert post(client, '/forge', h, key=key).status_code == 409
 
 def test_forge_resource_cost_and_foreign_access(client):
@@ -220,7 +220,7 @@ def test_guest_progress_persists_and_binds_at_mint(tmp_path):
     assert c.post('/api/session').json()['address']==wallet.address
     state=c.get('/api/state').json()
     assert next(w for w in state['weapons'] if w['id']==wid)['level']==BALANCE['mint_level']
-    assert state['player']['ap']==BALANCE['daily_ap']-BALANCE['forge_ap']
+    assert 'ap' not in state['player']
     assert c.get('/api/state',headers={'Authorization':'Bearer '+old_token}).status_code==401
 
 def test_legacy_database_migration(tmp_path):

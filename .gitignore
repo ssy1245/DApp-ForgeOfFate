@@ -55,6 +55,9 @@ blob-report/
 /screenshots/
 /previews/
 /*-preview.png
+/*-preview.jpg
+/*-preview.jpeg
+/*-preview.webp
 
 # Runtime data, local credentials, deployment state and logs
 .local/
@@ -89,4 +92,5 @@ backend/data/
 
 # Keep source, README files, dependency locks and .env.example.
 # Keep assets/stories/**/*.md, assets/3d/**/*.glb and assets/reference_page/**/*.png.
+# Keep assets/display/ transparent PNGs, manifest.json and README.md, plus item icons.
 # Never ignore all *.json, *.sql, *.png or *.glb: these can be project sources.

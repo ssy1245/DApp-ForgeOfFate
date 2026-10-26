@@ -1,3 +1,4 @@
+import { useI18n } from './i18n';
 import type { ReactNode } from 'react';
 
 // Vite includes this UI image in development and emits a cached asset at build time.
@@ -8,5 +9,6 @@ export default function IronIcon({ size = 'small' }: { size?: 'small' | 'large' 
 }
 
 export function IronAmount({ amount }: { amount: ReactNode }) {
-  return <span className="material-amount"><IronIcon/>{amount} 铁块</span>;
+ const {t} = useI18n();
+  return <span className="material-amount"><IronIcon/>{amount} {t(" 铁块")}</span>;
 }

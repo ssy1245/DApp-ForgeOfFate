@@ -1,4 +1,4 @@
-.iron-icon {
+.iron-icon, .gold-icon, .ward-icon {
   --icon-size: 22px;
   display: inline-flex;
   align-items: center;
@@ -16,8 +16,14 @@
   font-style: normal;
 }
 
-.iron-icon img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 2px #0008); }
-.iron-icon--large { --icon-size: 48px; border-radius: 7px; padding: 2px; }
+.iron-icon img, .gold-icon img, .ward-icon img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 2px #0008); }
+.iron-icon--large, .gold-icon--large, .ward-icon--large { --icon-size: 48px; border-radius: 7px; padding: 2px; }
+.ward-icon--medium { --icon-size: 32px; border-radius: 6px; padding: 1px; }
+.ward-icon { border-color: #807249; background: radial-gradient(ellipse at 50% 35%, #42412f, #1b211c); }
+.ward-amount { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.resource-ward { gap: 11px; }
+.resource-ward .resource-icon { display: inline-flex; }
+.claim small .ward-icon { --icon-size: 20px; }
 .material-amount { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .resource-iron { gap: 11px; }
 .resource-iron .resource-icon { display: inline-flex; }
@@ -33,7 +39,15 @@
 .material-pack-copy small { display: block; color: #b9a47c; margin-top: 3px; font-size: 10px; }
 
 @media (max-width: 600px) {
-  .resource-iron { gap: 5px; padding-inline: 6px; }
-  .resource-iron .iron-icon--large { --icon-size: 34px; border-radius: 5px; padding: 1px; }
+  .resource-iron, .resource-ward { gap: 5px; padding-inline: 6px; }
+  .resource-iron .iron-icon--large, .resource-gold .gold-icon--large, .resource-ward .ward-icon--large { --icon-size: 34px; border-radius: 5px; padding: 1px; }
   .claim small .material-amount { margin-left: 0; }
 }
+
+.gold-icon{border-color:#806d42;background:radial-gradient(ellipse at 50% 35%,#51432a,#221e15)}
+.gold-amount{display:inline-flex;align-items:center;gap:5px;vertical-align:middle;white-space:nowrap;font-variant-numeric:tabular-nums}
+.gold-amount small{font:inherit;color:inherit}.gold-amount .gold-icon{--icon-size:20px}
+.resource-gold{gap:11px}.resource-gold .resource-icon{display:inline-flex}
+.card-valuation .gold-amount .gold-icon{--icon-size:22px}
+@media(max-width:600px){.resource-gold{gap:5px;padding-inline:6px}}
+.card-valuation .gold-amount small{font:9px/1.2 sans-serif;color:#b9a785}

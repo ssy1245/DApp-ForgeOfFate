@@ -1,3 +1,4 @@
+import { useI18n } from './i18n';
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Euler, Vector3 } from 'three';
@@ -22,6 +23,7 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, on
   onNear: (station: Station) => void; onInteract: () => void;
   onActiveChange: (active: boolean) => void; onError: (message: string) => void;
 }) {
+ const {t} = useI18n();
   const {camera, gl, size} = useThree();
   const orbit = useRef<OrbitControls | null>(null);
   const keys = useRef(new Set<string>());
@@ -35,12 +37,15 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, on
   const forward = useRef(new Vector3()), right = useRef(new Vector3());
 
   useEffect(() => {
+    gl.domElement.setAttribute('aria-label', t('工坊三维视图：点击进入，鼠标移动转头，WASD 移动，E 交互，Esc 暂停'));
+  }, [gl, t]);
+
+  useEffect(() => {
     const canvas = gl.domElement;
     const viewKey = `${mode}:${reset}`;
     const preserveWalk = mode === 'walk' && previousView.current === viewKey;
     previousView.current = viewKey;
     canvas.tabIndex = 0;
-    canvas.setAttribute('aria-label', '工坊三维视图：点击进入，鼠标移动转头，WASD 移动，E 交互，Esc 暂停');
     canvas.style.touchAction = 'none';
     near.current = null; onNear(null); keys.current.clear();movement.clear();
     active.current=false;onActiveChange(false);

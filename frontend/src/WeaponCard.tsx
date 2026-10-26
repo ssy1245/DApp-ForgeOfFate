@@ -1,3 +1,4 @@
+import { useI18n } from './i18n';
 import { type ReactNode } from 'react';
 import WeaponArtwork from './WeaponArtwork';
 import { artworkTier, type WeaponIdentity } from './weaponImages';
@@ -20,9 +21,10 @@ type Props = {
 const cleanName = (name = '') => name.replace(/^\[DEMO\]\s*/i, '').replace(/\s*\+\d+\s*$/, '').trim();
 
 export default function WeaponCard({ weapon, serial, status, statusTone = 'active', nft = false, detail, valueLabel, value, valueUnit, children }: Props) {
+  const {t, name, locale} = useI18n();
   const tier = artworkTier(weapon);
   const route = swordBranches.find(item => item.id === (weapon.branch || tier?.branch));
-  const name = cleanName(weapon.name) || tier?.name || '未知武器';
+  const displayName = name(weapon);
   const englishName = cleanName(weapon.name_en) || tier?.name_en;
 
   return <article className="weapon-card" data-branch={route?.id || 'unknown'} data-nft={nft || undefined}>
@@ -32,9 +34,9 @@ export default function WeaponCard({ weapon, serial, status, statusTone = 'activ
     </div>
     <WeaponArtwork weapon={weapon} nft={nft}/>
     <div className="card-body">
-      <div className="card-route"><span>{route?.name || '武器藏品'}</span><span>{weapon.quality || (nft ? 'NFT' : '锻造武器')}{weapon.demo ? ' · DEMO' : ''}</span></div>
-      <h3>{name}</h3>
-      {englishName && <p className="card-english" lang="en">{englishName}</p>}
+      <div className="card-route"><span>{route ? name(route) : t('武器藏品')}</span><span>{weapon.quality ? t(weapon.quality) : (nft ? 'NFT' : t('锻造武器'))}{weapon.demo ? ' · DEMO' : ''}</span></div>
+      <h3>{displayName}</h3>
+      {locale === 'zh' && englishName && <p className="card-english" lang="en">{englishName}</p>}
       {detail && <div className="card-detail">{detail}</div>}
       <div className="card-valuation"><span>{valueLabel}</span><div><strong>{value}</strong>{valueUnit && <small>{valueUnit}</small>}</div></div>
       <div className="card-actions">{children}</div>

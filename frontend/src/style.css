@@ -41,3 +41,33 @@ body.forge-mouse-captured,body.forge-mouse-captured *{cursor:none!important}
 .forge-hud .hud-warning,.workshop-interactions .workshop-warning{color:#ffd09a;line-height:1.6}.forge-hud .hud-warning{padding:8px 9px;background:#51352270;border:1px solid #976443;border-radius:6px;margin-bottom:0}
 
 .sword-supply-hud{position:absolute;left:14px;top:104px;z-index:3;width:180px;padding:12px;border:1px solid #8a754b;border-radius:9px;background:#18231feb;color:#c7d0b8}.sword-supply-hud>span{display:block;font-size:10px;color:#b9ba9d}.sword-supply-hud strong{display:block;font-size:16px;color:#f3d59d;margin:9px 0}.sword-supply-hud button{width:100%;padding:8px;border:1px solid #9e8050;border-radius:5px;background:#51422c;color:#f1dbb5;font-size:11px}.sword-supply-hud small{display:block;font-size:9px;line-height:1.8;color:#a7b89e;margin-top:8px}@media(max-width:600px){.sword-supply-hud{top:100px;left:10px;width:126px;padding:9px}.sword-supply-hud strong{font-size:12px}.sword-supply-hud small{font-size:8px}.workshop-view:has(.forge-hud.hud-open) .sword-supply-hud{display:none}}
+
+/* Language controls stay available while account dialogs and requests are open. */
+.language-switch{display:inline-flex;align-items:center;gap:3px;padding:3px;border:1px solid #57513e;border-radius:7px;background:#10140f;flex-shrink:0}
+.language-switch button{padding:7px 10px;border:1px solid transparent;border-radius:4px;background:transparent;color:#aeb19d;font-size:11px;line-height:1.2;white-space:nowrap}
+.language-switch button[aria-pressed=true]{background:#433b29;border-color:#88704a;color:#f1d6a4}
+.language-switch button:hover{color:#f1d6a4}
+.topbar{height:auto;min-height:79px;gap:14px;padding-top:14px;padding-bottom:14px;flex-wrap:wrap}
+.breadcrumb{flex-shrink:0}.header-actions{justify-content:flex-end;gap:10px;min-width:0}
+.app-shell[lang=en] h1{font-size:clamp(23px,2.2vw,29px);line-height:1.35;letter-spacing:0}
+.app-shell[lang=en] .page-heading>div{min-width:0}
+.app-shell[lang=en] .nav-label{font-size:9px;letter-spacing:1.2px}
+.app-shell[lang=en] .panel-top{gap:10px;letter-spacing:1px}
+.app-shell[lang=en] .panel-top span{min-width:0;white-space:normal}
+.app-shell[lang=en] .primary,.app-shell[lang=en] .secondary,.app-shell[lang=en] .claim{white-space:normal;line-height:1.5;overflow-wrap:break-word}
+.app-shell[lang=en] .level-line{gap:6px}.app-shell[lang=en] .level-line>span{font-size:10px}
+.app-shell[lang=en] .forge-hud{width:268px}.app-shell[lang=en] .hud-heading-label{letter-spacing:0}
+.app-shell[lang=en] .hud-weapon>span{min-width:0;line-height:1.4}
+.app-shell[lang=en] .hud-shield{flex-wrap:wrap}.app-shell[lang=en] .hud-transitions>div{gap:10px;line-height:1.6;margin:5px 0}
+.app-shell[lang=en] .hud-transitions b{flex-shrink:0}.app-shell[lang=en] .hud-buttons button{white-space:normal;line-height:1.5}
+.app-shell[lang=en] .workshop-entry span{white-space:normal;line-height:1.9}
+.app-shell[lang=en] .workshop-interactions>div{flex-wrap:wrap}
+.app-shell[lang=en] .card-route{gap:8px;flex-wrap:wrap}.app-shell[lang=en] .card-route>span{max-width:100%;overflow-wrap:break-word}
+.app-shell[lang=en] .card-body h3{line-height:1.3;min-height:1.3em}
+@media(max-width:700px){.header-actions{justify-content:flex-start}.app-shell[lang=en] .page-heading{align-items:flex-start}.app-shell[lang=en] .page-heading>.quiet{flex-shrink:0}.app-shell[lang=en] .forge-hud{width:218px}.app-shell[lang=en] .forge-hud.hud-compact{width:180px}.app-shell[lang=en] .workshop-toolbar button{font-size:9px;padding:8px}.app-shell[lang=en] .sword-supply-hud strong{line-height:1.4}}
+@media(max-width:600px){.app-shell[lang=en] .sword-supply-hud{top:190px;width:150px}.app-shell[lang=en] .workshop-toolbar{gap:5px}.app-shell[lang=en] .workshop-toolbar>div{gap:4px}}
+.app-shell[lang=en] .weapon-level small{letter-spacing:.5px}.app-shell[lang=en] .artwork-caption{font-size:8px;letter-spacing:.6px;max-width:55%}.app-shell[lang=en] .card-route{letter-spacing:.7px}
+@media(max-width:600px){.resources{grid-template-columns:repeat(3,minmax(0,1fr))}.resources .resource{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:34px auto;gap:5px;min-width:0;padding:12px 8px}.resources .resource>div{display:contents}.resources .resource>div>span{grid-column:1;grid-row:1}.resources .resource-icon{grid-column:2;grid-row:1}.resources .resource strong{grid-column:1/-1;grid-row:2;min-width:0;font-size:clamp(15px,4.5vw,21px);line-height:1.2;white-space:nowrap}}
+.account-dialog-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.account-dialog-heading h2{flex:1 1 180px;margin:0}.account-dialog-heading .language-switch{margin-left:auto}
+
+.confirmation-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}.confirmation-actions button{min-width:90px}

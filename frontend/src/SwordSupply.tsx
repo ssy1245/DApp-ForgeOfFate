@@ -1,21 +1,24 @@
+import { useI18n } from './i18n';
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { CanvasTexture, SRGBColorSpace } from 'three';
 import { SWORD_SUPPLY_POSITION } from './workshopLayout';
 
 export default function SwordSupply({remaining,total,onInteract,renderSword}:{remaining:number|null;total:number;onInteract:()=>void;renderSword:()=>ReactNode}){
+ const {t, locale} = useI18n();
  const texture=useMemo(()=>{
   const canvas=document.createElement('canvas');canvas.width=768;canvas.height=320;
   const ctx=canvas.getContext('2d')!;
   ctx.fillStyle='#182321';ctx.fillRect(0,0,768,320);
   ctx.strokeStyle='#b28d52';ctx.lineWidth=8;ctx.strokeRect(5,5,758,310);
   ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillStyle='#e1c791';ctx.font='bold 48px sans-serif';ctx.fillText('领 剑 处',384,62);
+  ctx.fillStyle='#e1c791';ctx.font='bold 48px sans-serif';ctx.fillText(t('领 剑 处'),384,62,700);
   ctx.fillStyle=remaining===0?'#adae9b':'#fff0cb';ctx.font='bold 66px sans-serif';
-  ctx.fillText(remaining===null?'正在清点…':`今日可领 ${remaining} / ${total} 把`,384,157);
+  ctx.font=`bold ${locale==='en'?48:66}px sans-serif`;
+  ctx.fillText(remaining===null?t('正在清点…'):t`今日可领 ${remaining} / ${total} 把`,384,157,700);
   ctx.fillStyle='#b9c6b1';ctx.font='30px sans-serif';
-  ctx.fillText(remaining===0?'今日已领完 · UTC 零点刷新':'免费普通剑 · 每次领取一把',384,252);
+  ctx.fillText(remaining===0?t('今日已领完 · UTC 零点刷新'):t('免费普通剑 · 每次领取一把'),384,252,700);
   const map=new CanvasTexture(canvas);map.colorSpace=SRGBColorSpace;return map;
- },[remaining,total]);
+ },[remaining,total,t,locale]);
  useEffect(()=>()=>texture.dispose(),[texture]);
  return <group name="sword-supply" position={[...SWORD_SUPPLY_POSITION]} onClick={e=>{if(e.delta>4)return;e.stopPropagation();onInteract();}}>
   <group rotation={[0,Math.PI/2,0]}>

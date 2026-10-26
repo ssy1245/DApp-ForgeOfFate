@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { inflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createServer, preview } from 'vite';
 import { modelUrl, referenceImageUrl, displayImageUrl } from '../src/modelAssets.ts';
@@ -152,29 +151,29 @@ for (const mode of ['development', 'preview']) {
         assert.ok(alpha.bounds.left > 0 && alpha.bounds.right < alpha.width-1 && alpha.bounds.top > 0 && alpha.bounds.bottom < alpha.height-1, `Sword must fit without clipped opaque edges: ${tier.id}`);
         assert.ok(alpha.bounds.bottom - alpha.bounds.top > alpha.height * .65, `Sword must be large enough to read: ${tier.id}`);
       }
-      const ironSource = path.join(assets, 'tools/Fe-icon.png');
-      let ironRoute = `/@fs${ironSource}`;
-      if (mode === 'preview') {
-        const emittedAssets = await fs.readdir(path.join(projectRoot, 'frontend/dist/assets'));
-        const ironAsset = emittedAssets.find(name => /^Fe-icon-[\w-]+\.png$/.test(name));
-        assert.ok(ironAsset, 'The build must include the iron UI icon');
-        ironRoute = `/assets/${ironAsset}`;
+      for (const basename of ['Fe-icon', 'Gold-icon', 'protect']) {
+        const source = path.join(assets, 'tools', basename + '.png');
+        let route = '/@fs' + source;
+        if (mode === 'preview') {
+          const emittedAssets = await fs.readdir(path.join(projectRoot, 'frontend/dist/assets'));
+          const asset = emittedAssets.find(name => name.startsWith(basename + '-') && name.endsWith('.png'));
+          assert.ok(asset, 'The build must include ' + basename);
+          route = '/assets/' + asset;
+        }
+        const response = await fetch('http://127.0.0.1:' + address.port + route);
+        assert.equal(response.status, 200, basename + ' must load in both modes');
+        assert.match(response.headers.get('content-type'), /^image\/png/);
+        const bytes = Buffer.from(await response.arrayBuffer());
+        assert.deepEqual(bytes, await fs.readFile(source));
+        const alpha = inspectRgbaPng(bytes);
+        assert.ok(alpha.transparent > alpha.width * alpha.height * .2, basename + ' needs real transparency');
+        // The supplied ward keeps its faint top-edge glow; the source is used unchanged.
+        assert.ok(alpha.edgeMax <= (basename === 'protect' ? 16 : 1), basename + ' must not have an opaque background');
+        for (const [x,y] of [[0,0],[alpha.width-1,0],[0,alpha.height-1],[alpha.width-1,alpha.height-1]]) {
+          assert.equal(alpha.pixel(x,y)[3], 0, basename + ' corner must be transparent');
+        }
+        assert.ok(alpha.bounds.left > 0 && alpha.bounds.right < alpha.width-1 && alpha.bounds.top > 0 && alpha.bounds.bottom < alpha.height-1, basename + ' must not be clipped');
       }
-      const ironResponse = await fetch(`http://127.0.0.1:${address.port}${ironRoute}`);
-      assert.equal(ironResponse.status, 200, 'Iron icon must load in both modes');
-      assert.match(ironResponse.headers.get('content-type'), /^image\/png/);
-      const iconBytes = Buffer.from(await ironResponse.arrayBuffer());
-      assert.deepEqual(iconBytes, await fs.readFile(ironSource));
-      assert.equal(iconBytes[24], 8, 'Iron cutout uses 8-bit pixels');
-      assert.equal(iconBytes[25], 6, 'Iron icon must retain its RGBA transparency');
-      const chunks = [];
-      for (let offset = 8; offset < iconBytes.length;) {
-        const length = iconBytes.readUInt32BE(offset);
-        if (iconBytes.toString('ascii', offset + 4, offset + 8) === 'IDAT') chunks.push(iconBytes.subarray(offset + 8, offset + 8 + length));
-        offset += length + 12;
-      }
-      // The first pixel has no filter neighbors, so its alpha is unfiltered.
-      assert.equal(inflateSync(Buffer.concat(chunks))[4], 0, 'The icon corner must be transparent, not a white matte');
     } finally {
       if (mode === 'development') await server.close();
       else await new Promise((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve()));

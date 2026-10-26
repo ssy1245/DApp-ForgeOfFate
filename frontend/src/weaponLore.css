@@ -1,0 +1,72 @@
+.weapon-lore-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 11px 12px;
+  border: 1px solid #75613c70;
+  border-radius: 4px;
+  background: #a98a5110;
+  color: #d4bc90;
+  font-size: 12px;
+  text-align: left;
+}
+.weapon-lore-trigger:hover { background: #a98a5124; border-color: #a98a51; }
+.lore-trigger-arrow { margin-left: auto; color: #a79572; }
+.forge-card>.weapon-lore-trigger { width: calc(100% - 40px); margin: 0 20px 20px; }
+
+.weapon-lore-dialog {
+  width: min(920px, calc(100vw - 40px));
+  max-width: none;
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #78613d;
+  border-radius: 8px;
+  background: #1c1e18;
+  color: #e5ddca;
+  box-shadow: 0 28px 100px #000b;
+}
+.weapon-lore-dialog::backdrop { background: #070a08d9; backdrop-filter: blur(5px); }
+.lore-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 24px 28px;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  border-bottom: 1px solid #76613e4a;
+  background: #1c1e18;
+}
+.lore-heading .lore-kicker { color: #b69b6c; font-size: 10px; letter-spacing: 2px; line-height: 1.5; }
+.lore-heading h2 { margin: 8px 0 0; font-family: 'Songti SC', 'STSong', 'Noto Serif SC', serif; font-size: 26px; font-weight: 500; letter-spacing: 1px; line-height: 1.4; overflow-wrap: anywhere; }
+.lore-heading h2>span { display: inline-block; color: #cfac71; font-family: Georgia, serif; font-size: 21px; white-space: nowrap; }
+.lore-close { display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding: 7px 9px; border: 1px solid #6b614c; border-radius: 4px; background: #272920; color: #d4ccb8; font-size: 12px; }
+.lore-close>span { font-size: 20px; line-height: 1; }
+.lore-close:hover { background: #393a2b; }
+.lore-layout { display: grid; grid-template-columns: minmax(190px, .85fr) minmax(0, 1.6fr); align-items: start; gap: 28px; padding: 26px 28px 30px; }
+.lore-art { min-width: 0; }
+.lore-art .weapon-art { --card-metal: #685739; --card-glow: #c8a56b18; height: 420px; }
+.lore-art .weapon-reference { scale: 1; transition: none; }
+.lore-copy { min-width: 0; }
+.lore-copy h4 { display: flex; align-items: center; gap: 10px; margin: 0 0 13px; color: #c5aa78; font-size: 12px; font-weight: 500; letter-spacing: 2px; }
+.lore-copy h4::before { content: ''; width: 14px; height: 1px; background: #9a7e4e; }
+.lore-copy p { margin: 0; color: #c9c7b9; font-size: 14px; line-height: 2; letter-spacing: .025em; overflow-wrap: anywhere; }
+.lore-story { margin-top: 25px; padding-top: 24px; border-top: 1px solid #76613e4a; }
+.lore-story p { font-family: 'Songti SC', 'STSong', 'Noto Serif SC', serif; color: #e1dbc9; font-size: 15px; }
+.lore-story p+p { margin-top: 15px; }
+
+@media (max-width: 600px) {
+  .weapon-lore-dialog { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
+  .lore-heading { padding: 18px; gap: 12px; }
+  .lore-heading h2 { font-size: 23px; }
+  .lore-heading h2>span { font-size: 18px; }
+  .lore-layout { grid-template-columns: minmax(0, 1fr); padding: 18px; gap: 24px; }
+  .lore-art .weapon-art { height: 220px; }
+  .lore-copy p { line-height: 1.95; }
+}

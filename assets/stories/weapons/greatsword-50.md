@@ -12,7 +12,7 @@
 | 路线 ID | `greatsword` |
 | 阶段 ID | `greatsword-50` |
 | 形态起始等级 | +50 |
-| 当前形态适用等级 | +50～+49 |
+| 当前形态适用等级 | +50～+59 |
 | 中文名称 | 深渊炉心 |
 | 英文名称 | Abyssal Furnace |
 | 模型 | [GreatSword/+50GreatSword.glb](../../3d/GreatSword/+50GreatSword.glb) |

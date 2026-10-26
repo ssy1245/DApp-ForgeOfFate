@@ -1,6 +1,7 @@
 import { useI18n } from './i18n';
 import { type ReactNode } from 'react';
 import WeaponArtwork from './WeaponArtwork';
+import WeaponLore from './WeaponLore';
 import { artworkTier, type WeaponIdentity } from './weaponImages';
 import { swordBranches } from './swordTiers';
 
@@ -37,6 +38,7 @@ export default function WeaponCard({ weapon, serial, status, statusTone = 'activ
       <div className="card-route"><span>{route ? name(route) : t('武器藏品')}</span><span>{weapon.quality ? t(weapon.quality) : (nft ? 'NFT' : t('锻造武器'))}{weapon.demo ? ' · DEMO' : ''}</span></div>
       <h3>{displayName}</h3>
       {locale === 'zh' && englishName && <p className="card-english" lang="en">{englishName}</p>}
+      <WeaponLore weapon={weapon}/>
       {detail && <div className="card-detail">{detail}</div>}
       <div className="card-valuation"><span>{valueLabel}</span><div><strong>{value}</strong>{valueUnit && <small>{valueUnit}</small>}</div></div>
       <div className="card-actions">{children}</div>

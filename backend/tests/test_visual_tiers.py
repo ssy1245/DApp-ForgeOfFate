@@ -15,7 +15,7 @@ from backend.app import metadata
     (40,'KnightSword/+40KnightSword'),(49,'KnightSword/+40KnightSword'),
     (50,'KnightSword/+50KnightSword'),(59,'KnightSword/+50KnightSword'),
     (60,'KnightSword/+60KnightSword'),(69,'KnightSword/+60KnightSword'),
-    (70,'KnightSword/+70KnightSword'),(79,'KnightSword/+70KnightSword'),(80,'KnightSword/+80KnightSword')])
+    (70,'KnightSword/+70KnightSword'),(79,'KnightSword/+70KnightSword'),(80,'KnightSword/+80KnightSword'),(89,'KnightSword/+80KnightSword'),(90,'KnightSword/+80KnightSword')])
 def test_appearance_boundaries(level, model):
     assert weapon_tier(level)['model'] == model
 
@@ -23,7 +23,7 @@ def test_appearance_boundaries(level, model):
 @pytest.mark.parametrize('branch,nodes',[
     ('longsword',[0,10,20,30,40,50,60,70,80]),
     ('rapier',[0,5,10,20,30,40,50,60,70]),
-    ('greatsword',[0,10,20,30,40,50])])
+    ('greatsword',[0,10,20,30,40,50,60])])
 def test_route_nodes_and_final_appearance(branch,nodes):
     assert sorted({weapon_tier(level,branch)['min_level'] for level in range(weapon_max_level(branch)+1)}) == nodes
     final=weapon_tier(weapon_max_level(branch),branch)
@@ -52,7 +52,7 @@ def test_catalog_assets_and_mint_metadata():
         asset=Path(__file__).resolve().parents[2]/'assets/3d'/f"{tier['model']}.glb"
         assert asset.read_bytes()[:4]==b'glTF'
         if tier.get('reference'):
-            reference=asset.parents[2]/'reference_page'/tier['reference']
+            reference=Path(__file__).resolve().parents[2]/'assets/reference_page'/tier['reference']
             assert reference.read_bytes()[:8]==b'\x89PNG\r\n\x1a\n'
     level=BALANCE['mint_level']
     uri=metadata({'level':level,'demo':0})
@@ -65,7 +65,8 @@ def test_every_supplied_sword_is_connected():
     supplied={path.relative_to(assets).as_posix() for path in assets.rglob('*.glb')} - {'hammer.glb','anvil.glb'}
     configured={f"{tier['model']}.glb" for tier in SWORD_CATALOG}
     assert configured==supplied
-    assert all(tier.get('model_status')!='placeholder' for tier in SWORD_CATALOG)
+    assert not any(tier.get('model_status')=='placeholder' for tier in SWORD_CATALOG)
+    assert len(configured)==len(SWORD_CATALOG)
 
 
 def test_knight_final_model_and_official_name():
@@ -74,3 +75,8 @@ def test_knight_final_model_and_official_name():
     assert weapon_name(80)=='最后的黎明'
     assert weapon_tier(80)['model']=='KnightSword/+80KnightSword'
     assert weapon_tier(80)['name_status']=='official'
+
+
+def test_greatsword_stage_ids_follow_current_unlock_levels():
+    for level in [10,20,30,40,50,60]:
+        assert weapon_tier(level,'greatsword')['id']==f'greatsword-{level}'

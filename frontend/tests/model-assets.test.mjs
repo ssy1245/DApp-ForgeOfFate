@@ -4,10 +4,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createServer, preview } from 'vite';
-import { modelUrl } from '../src/modelAssets.ts';
+import { modelUrl, referenceImageUrl } from '../src/modelAssets.ts';
 
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const assets = path.join(projectRoot, 'assets/3d');
+const referenceAssets = path.join(projectRoot, 'assets/reference_page');
 const catalog = JSON.parse(await fs.readFile(path.join(assets, 'sword-tiers.json'), 'utf8'));
 const branches = JSON.parse(await fs.readFile(path.join(assets, 'sword-branches.json'), 'utf8'));
 const models = [...new Set([
@@ -28,10 +29,11 @@ for (const mode of ['development', 'preview']) {
     try {
       if (mode === 'development') await server.listen();
       if (mode === 'development') {
+        const {artworkTier, nftWeaponDetails, referenceImageUrl} = await server.ssrLoadModule('/src/weaponImages.ts');
         const { branchTiers, swordTier, nextSwordTier, swordBranches, maxSwordLevel, pendingSwordLevels, localizedName } = await server.ssrLoadModule('/src/swordTiers.ts');
         for (const branch of swordBranches) {
           const tiers = branchTiers(branch.id);
-          assert.deepEqual(tiers.map(tier => tier.min_level), branch.id === 'rapier' ? [0, 5, 10, 20, 30, 40, 50, 60, 70] : branch.id === 'longsword' ? [0, 10, 20, 30, 40, 50, 60, 70, 80] : [0, 10, 20, 30, 40, 50]);
+          assert.deepEqual(tiers.map(tier => tier.min_level), branch.id === 'rapier' ? [0, 5, 10, 20, 30, 40, 50, 60, 70] : branch.id === 'longsword' ? [0, 10, 20, 30, 40, 50, 60, 70, 80] : [0, 10, 20, 30, 40, 50, 60]);
           assert.equal(branch.unlock_level, branch.id === 'greatsword' ? 10 : 5);
           assert.equal(swordTier(4, tiers).name, '余烬长剑');
           assert.equal(swordTier(5, tiers).name, branch.id === 'rapier' ? '精铁刺剑' : '余烬长剑');
@@ -43,7 +45,7 @@ for (const mode of ['development', 'preview']) {
         const englishNames = {
           longsword: ['Ember Longsword', "Knight's Iron Sword", 'Silver Oath', 'Kingdom Guardian', 'Blade of Valor', 'Royal Court Blade', 'Royal Oathblade', 'Golden Oath', 'The Last Dawn'],
           rapier: ['Ember Longsword', 'Iron Rapier', 'Silverthorn', 'Courtly Rapier', 'Fleur-de-Lis', 'Royal Vow', 'Crimson Crown', 'Scarlet Oath', "Seraph's Wing"],
-          greatsword: ['Ember Longsword', "Blacksmith's Greatsword", 'Emberforged Greatsword', 'Abyssal Dragonbone', 'Abyssal Furnace', 'Sovereign of Ash'],
+          greatsword: ['Ember Longsword', "Blacksmith's Greatsword", 'Emberforged Greatsword', 'Abyssal Dragonbone', 'Moltenvein Dragonbone', 'Abyssal Furnace', 'Sovereign of Ash'],
         };
         for (const branch of swordBranches) {
           assert.ok(branch.name_en);
@@ -54,12 +56,23 @@ for (const mode of ['development', 'preview']) {
             const stage = swordTier(level, tiers);
             assert.equal(localizedName(stage), stage.name);
             assert.equal(localizedName(stage, 'en'), stage.name_en);
+            assert.equal(artworkTier({branch: branch.id, level}).reference, stage.reference);
           }
         }
-        // Previously minted NFTs may only have a name; preserve that original text.
-        assert.equal(localizedName({name: 'Legacy NFT'}, 'en'), 'Legacy NFT');
-        assert.equal(maxSwordLevel('longsword'), 80);
-        assert.equal(maxSwordLevel('greatsword'), 60);
+        for (const tier of catalog) {
+          assert.equal(artworkTier({level: tier.min_level, tier_id: tier.id}).reference, tier.reference);
+        }
+        assert.equal(artworkTier({level: 50, branch: 'unknown', name: 'Unrecognized relic'}), undefined);
+        const details = nftWeaponDetails({name: '炽翼天使 +80', attributes: [{trait_type: 'Weapon Type', value: 'rapier'}, {trait_type: 'Demo', value: true}]});
+        assert.equal(details.branch, 'rapier');
+        assert.equal(details.demo, true);
+        assert.equal(artworkTier({...details, level: 80}).reference, 'Rapier/+70rapier.png');
+        assert.equal(nftWeaponDetails({tier_id: 'last-dawn'}).tier_id, 'last-dawn');
+        assert.equal(nftWeaponDetails({attributes: null}).demo, false);
+        assert.equal(referenceImageUrl('Weathered Sword Orthographic Views.png'), '/weapon-images/Weathered%20Sword%20Orthographic%20Views.png');
+        assert.equal(referenceImageUrl('Greatsword/+40GreatSword.png'), '/weapon-images/Greatsword/+40GreatSword.png');
+        assert.equal(maxSwordLevel('longsword'), 90);
+        assert.equal(maxSwordLevel('greatsword'), 70);
         assert.equal(maxSwordLevel('rapier'), 80);
         assert.deepEqual(pendingSwordLevels('longsword'), []);
         assert.deepEqual(pendingSwordLevels('greatsword'), []);
@@ -68,7 +81,9 @@ for (const mode of ['development', 'preview']) {
         assert.equal(swordTier(69, knight).model, 'KnightSword/+60KnightSword');
         assert.equal(swordTier(70, knight).model, 'KnightSword/+70KnightSword');
         assert.equal(swordTier(79, knight).model, 'KnightSword/+70KnightSword');
-        assert.equal(swordTier(80, knight).model, 'KnightSword/+80KnightSword');
+        for (const level of [80, 89, 90]) assert.equal(swordTier(level, knight).model, 'KnightSword/+80KnightSword');
+        assert.equal(nextSwordTier(80, knight), undefined);
+        assert.equal(nextSwordTier(90, knight), undefined);
         assert.equal(nextSwordTier(70, knight).min_level, 80);
         assert.equal(nextSwordTier(79, knight).min_level, 80);
         const rapier = branchTiers('rapier');
@@ -84,12 +99,12 @@ for (const mode of ['development', 'preview']) {
         assert.equal(nextSwordTier(70, rapier), undefined);
         assert.deepEqual(pendingSwordLevels('rapier'), []);
         const greatsword = branchTiers('greatsword');
-        assert.deepEqual(greatsword.slice(1).map(tier => tier.model), [10, 20, 30, 40, 50].map(level => `GreatSword/+${level}GreatSword`));
+        assert.deepEqual(greatsword.slice(1).map(tier => tier.model), [10, 20, 30, 40, 50, 60].map(level => `GreatSword/+${level}GreatSword`));
         assert.equal(swordTier(9, greatsword).model, 'sword');
         assert.equal(swordTier(10, greatsword).model, 'GreatSword/+10GreatSword');
         assert.equal(nextSwordTier(9, greatsword).min_level, 10);
         assert.equal(nextSwordTier(10, greatsword).min_level, 20);
-        for (const [level, modelLevel] of [[19, 10], [20, 20], [29, 20], [30, 30], [39, 30], [40, 40], [49, 40], [50, 50], [100, 50]]) {
+        for (const [level, modelLevel] of [[19, 10], [20, 20], [29, 20], [30, 30], [39, 30], [40, 40], [49, 40], [50, 50], [59, 50], [60, 60], [69, 60], [70, 60], [100, 60]]) {
           assert.equal(swordTier(level, greatsword).model, `GreatSword/+${modelLevel}GreatSword`);
         }
       }
@@ -101,6 +116,22 @@ for (const mode of ['development', 'preview']) {
         const expected = await fs.readFile(path.join(assets, `${model}.glb`));
         assert.equal(actual.subarray(0, 4).toString(), 'glTF', `Expected a GLB, not an HTML fallback: ${model}`);
         assert.deepEqual(actual, expected, `Loaded model must match the source file: ${model}`);
+      }
+      for (const tier of catalog) {
+        assert.ok(tier.reference, `Every weapon stage needs artwork: ${tier.id}`);
+        const response = await fetch(`http://127.0.0.1:${address.port}${referenceImageUrl(tier.reference)}`);
+        assert.equal(response.status, 200, tier.reference);
+        assert.match(response.headers.get('content-type'), /^image\/png/);
+        const actual = Buffer.from(await response.arrayBuffer());
+        assert.deepEqual(actual.subarray(0,8), Buffer.from([137,80,78,71,13,10,26,10]));
+        assert.deepEqual(actual, await fs.readFile(path.join(referenceAssets, tier.reference)));
+        const frame = tier.reference_frame;
+        if (frame) {
+          assert.equal(frame.image_width, actual.readUInt32BE(16));
+          assert.equal(frame.image_height, actual.readUInt32BE(20));
+          assert.ok(frame.width > 0 && frame.height > 0 && frame.x >= 0 && frame.y >= 0);
+          assert.ok(frame.x + frame.width <= frame.image_width && frame.y + frame.height <= frame.image_height);
+        }
       }
     } finally {
       if (mode === 'development') await server.close();

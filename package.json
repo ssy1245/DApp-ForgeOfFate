@@ -13,7 +13,7 @@
     "deploy": "npm run deploy -w contracts",
     "test:contracts": "npm test -w contracts",
     "test:backend": ".venv/bin/python -m pytest backend/tests -q",
-    "backend": ".venv/bin/python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir backend",
+    "backend": ".venv/bin/python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir backend --reload-dir assets/3d --reload-include balance.json --reload-include sword-tiers.json --reload-include sword-branches.json",
     "demo": "node scripts/demo.cjs",
     "start": "node scripts/start.cjs",
     "start:demo": "node scripts/start.cjs --demo",

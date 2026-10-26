@@ -31,8 +31,8 @@ def test_branch_selection_persistence_and_retry(client):
     assert weapon(client,h)['name']=='余烬长剑'
     set_level(client,wid,5)
     assert weapon(client,h)['name']=='精铁刺剑'
-    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==200
-    assert weapon(client,h)['name']=='余烬长剑'
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==409
+    assert weapon(client,h)['name']=='精铁刺剑'
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'rapier'}).status_code==200
     set_level(client,wid,10)
     assert weapon(client,h)['name']=='银锋刺剑'
@@ -42,8 +42,8 @@ def test_branch_selection_persistence_and_retry(client):
     data=json.loads(base64.b64decode(metadata(w).split(',')[1]))
     assert '绯冠刺剑' in data['name']
     assert {'trait_type':'Weapon Type','value':'rapier'} in data['attributes']
-    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==200
-    assert weapon(client,h)['name']=='王庭圣剑'
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==409
+    assert weapon(client,h)['name']=='绯冠刺剑'
 
 
 def test_branch_authorization_and_sealing(client):
@@ -79,7 +79,7 @@ def test_new_models_heat_after_materials_are_replenished(client,branch,level,mat
         db.execute('UPDATE players SET materials=?',(materials,))
     response=post(client,f'/weapons/{wid}/heat',h)
     assert response.status_code==409
-    assert f"加热需要 {BALANCE['heat_materials']} 材料，当前剩余 {materials}" in response.json()['detail']
+    assert f"加热需要 {BALANCE['heat_materials']} 铁块，当前剩余 {materials}" in response.json()['detail']
     assert weapon(client,h)['heat_charges']==0
     with client.app.state.store.connection() as db:
         db.execute('UPDATE players SET materials=?',(BALANCE['heat_materials'],))
@@ -95,8 +95,9 @@ def test_new_models_heat_after_materials_are_replenished(client,branch,level,mat
     (10,'铁匠大剑','GreatSword/+10GreatSword'),(19,'铁匠大剑','GreatSword/+10GreatSword'),
     (20,'烬炉大剑','GreatSword/+20GreatSword'),(29,'烬炉大剑','GreatSword/+20GreatSword'),
     (30,'渊角龙骸','GreatSword/+30GreatSword'),(39,'渊角龙骸','GreatSword/+30GreatSword'),
-    (40,'深渊炉心','GreatSword/+40GreatSword'),(49,'深渊炉心','GreatSword/+40GreatSword'),
-    (50,'余烬君王','GreatSword/+50GreatSword'),(100,'余烬君王','GreatSword/+50GreatSword'),
+    (40,'熔脉龙骸','GreatSword/+40GreatSword'),(49,'熔脉龙骸','GreatSword/+40GreatSword'),
+    (50,'深渊炉心','GreatSword/+50GreatSword'),(59,'深渊炉心','GreatSword/+50GreatSword'),
+    (60,'余烬君王','GreatSword/+60GreatSword'),(69,'余烬君王','GreatSword/+60GreatSword'),(70,'余烬君王','GreatSword/+60GreatSword'),(100,'余烬君王','GreatSword/+60GreatSword'),
 ])
 def test_greatsword_uses_its_own_stage_model(level,name,model):
     assert weapon_tier(level,'greatsword')['model']==model
@@ -119,9 +120,9 @@ def test_greatsword_unlocks_at_ten_and_preserves_progress(client):
     after=client.get('/api/state',headers=h).json()
     assert after['player']==before['player']
     w=weapon(client,h)
-    assert w['name']=='铁匠大剑' and w['max_level']==60
-    assert before['weapons'][0]['max_level']==80
-    assert {k:v for k,v in w.items() if k not in ['branch','name','name_en','tier_id','max_level']}=={k:v for k,v in before['weapons'][0].items() if k not in ['branch','name','name_en','tier_id','max_level']}
+    assert w['name']=='铁匠大剑' and w['max_level']==70
+    assert before['weapons'][0]['max_level']==90
+    assert {k:v for k,v in w.items() if k not in ['branch','name','name_en','tier_id','max_level','strike_materials','recycle_price','branch_locked']}=={k:v for k,v in before['weapons'][0].items() if k not in ['branch','name','name_en','tier_id','max_level','strike_materials','recycle_price','branch_locked']}
     restored=TestClient(create_app(client.app.state.store.path,demo=False))
     assert next(w for w in restored.get('/api/state',headers=h).json()['weapons'] if w['id']==wid)['branch']=='greatsword'
     set_level(client,wid,9)
@@ -129,12 +130,13 @@ def test_greatsword_unlocks_at_ten_and_preserves_progress(client):
     set_level(client,wid,10)
     assert weapon(client,h)['name']=='铁匠大剑'
     set_level(client,wid,9)
-    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==200
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==409
+    assert weapon(client,h)['branch']=='greatsword'
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'}).status_code==409
 
 
 def test_greatsword_authorization_sealing_and_metadata(client):
-    h,*_=login(client);wid=forge(client,h);set_level(client,wid,50)
+    h,*_=login(client);wid=forge(client,h);set_level(client,wid,60)
     other,*_=login(client)
     assert post(client,f'/weapons/{wid}/branch',other,{'branch':'greatsword'}).status_code==404
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'}).status_code==200

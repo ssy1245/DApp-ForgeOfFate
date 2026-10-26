@@ -7,7 +7,7 @@ from backend.game import probabilities, strike, weapon_max_level
 from backend.tests.test_game import client, login, forge, post, weapon
 
 
-@pytest.mark.parametrize('branch,limit',[('longsword',80),('greatsword',60),('rapier',80)])
+@pytest.mark.parametrize('branch,limit',[('longsword',90),('greatsword',70),('rapier',80)])
 @pytest.mark.parametrize('outcome',['up','double'])
 def test_reinforcement_stops_at_route_cap(client,monkeypatch,branch,limit,outcome):
     h,*_=login(client);wid=forge(client,h)
@@ -33,7 +33,7 @@ def test_reinforcement_stops_at_route_cap(client,monkeypatch,branch,limit,outcom
 
 
 @pytest.mark.parametrize('source,level,target',[
-    ('longsword',61,'greatsword'),('longsword',80,'greatsword'),('rapier',81,'longsword'),
+    ('longsword',71,'greatsword'),('longsword',80,'greatsword'),('longsword',81,'rapier'),
 ])
 def test_switching_to_lower_cap_does_not_erase_levels(client,source,level,target):
     h,*_=login(client);wid=forge(client,h)
@@ -47,15 +47,32 @@ def test_switching_to_lower_cap_does_not_erase_levels(client,source,level,target
 
 def test_switching_at_target_cap_is_allowed(client):
     h,*_=login(client);wid=forge(client,h)
-    with client.app.state.store.connection() as db:db.execute('UPDATE weapons SET level=60 WHERE id=?',(wid,))
+    with client.app.state.store.connection() as db:db.execute('UPDATE weapons SET level=70 WHERE id=?',(wid,))
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'}).status_code==200
-    assert weapon(client,h)['max_level']==60
-    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==200
-    assert weapon(client,h)['level']==60 and weapon(client,h)['max_level']==80
+    assert weapon(client,h)['max_level']==70
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==409
+    assert weapon(client,h)['level']==70 and weapon(client,h)['max_level']==70
 
 
 def test_pure_strikes_retain_the_route_between_turns():
-    w={'branch':'greatsword','level':59,'strikes':0,'protected_left':0}
+    w={'branch':'greatsword','level':69,'strikes':0,'protected_left':0}
     result=strike(w,0,False)
-    assert result['level']==60 and result['branch']=='greatsword'
-    assert strike(result,0,False)['level']==60
+    assert result['level']==70 and result['branch']=='greatsword'
+    assert strike(result,0,False)['level']==70
+
+
+@pytest.mark.parametrize('level,outcome,target', [(80,'up',81),(88,'double',90)])
+def test_last_dawn_keeps_its_model_while_strengthening_to_ninety(client,monkeypatch,level,outcome,target):
+    h,*_=login(client);wid=forge(client,h)
+    with client.app.state.store.connection() as db:
+        db.execute("UPDATE weapons SET branch='longsword',level=?,heat_ready_at=0,heat_charges=5 WHERE id=?",(level,wid))
+    before=client.get('/api/state',headers=h).json()
+    roll=0 if outcome=='up' else int((probabilities(level)['up']+0.06)*1_000_000)
+    monkeypatch.setattr('backend.app.secrets.randbelow',lambda _:roll)
+    response=post(client,f'/weapons/{wid}/strike',h,{'expected_level':level,'expected_strikes':0,'expected_protected_left':0})
+    assert response.status_code==200 and response.json()['level']==target
+    w=weapon(client,h)
+    assert w['name']=='最后的黎明' and w['tier_id']=='last-dawn' and w['max_level']==90
+    assert w['recycle_price']==(100000000 if target==90 else 64000000)
+    after=client.get('/api/state',headers=h).json()
+    assert after['player']['materials']==before['player']['materials']-4

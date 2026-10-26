@@ -234,3 +234,8 @@ def test_legacy_database_migration(tmp_path):
     with c.app.state.store.connection() as db:
         row=db.execute("SELECT * FROM weapons WHERE id='old'").fetchone()
         assert row['level']==7 and row['heat_charges']==0
+
+
+def test_current_schema_has_no_retired_practice_field(client):
+    with client.app.state.store.connection() as db:
+        assert 'practice' not in {row['name'] for row in db.execute('PRAGMA table_info(players)')}

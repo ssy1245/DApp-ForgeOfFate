@@ -30,8 +30,9 @@ OFFICIAL_NAMES = [
     ('greatsword', 10, '铁匠大剑', "Blacksmith's Greatsword"),
     ('greatsword', 20, '烬炉大剑', 'Emberforged Greatsword'),
     ('greatsword', 30, '渊角龙骸', 'Abyssal Dragonbone'),
-    ('greatsword', 40, '深渊炉心', 'Abyssal Furnace'),
-    ('greatsword', 50, '余烬君王', 'Sovereign of Ash'),
+    ('greatsword', 40, '熔脉龙骸', 'Moltenvein Dragonbone'),
+    ('greatsword', 50, '深渊炉心', 'Abyssal Furnace'),
+    ('greatsword', 60, '余烬君王', 'Sovereign of Ash'),
 ]
 
 

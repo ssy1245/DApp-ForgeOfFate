@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from web3 import Web3
 
 from .accounts import normalize_username, hash_password, verify_password
-from .game import BALANCE, probabilities, recycle_price, strike, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
+from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCAL = ROOT / '.local'
@@ -76,7 +76,7 @@ class Store:
             CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,game_address TEXT UNIQUE NOT NULL,created INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS operations(address TEXT,key TEXT,fingerprint TEXT,response TEXT,PRIMARY KEY(address,key));
             ''')
-            for table,column,definition in [('accounts','role',"TEXT NOT NULL DEFAULT 'player'"),('weapons','heat_ready_at','REAL DEFAULT 0'),('weapons','heat_charges','INTEGER DEFAULT 0'),('players','practice','INTEGER DEFAULT 0'),('players','guest','INTEGER DEFAULT 0'),('challenges','guest_owner','TEXT'),('players','sword_day','TEXT'),('weapons','quality',"TEXT DEFAULT '普通'"),('weapons','source',"TEXT DEFAULT 'forge'"),('weapons','branch',"TEXT NOT NULL DEFAULT 'longsword'")]:
+            for table,column,definition in [('accounts','role',"TEXT NOT NULL DEFAULT 'player'"),('weapons','heat_ready_at','REAL DEFAULT 0'),('weapons','heat_charges','INTEGER DEFAULT 0'),('players','guest','INTEGER DEFAULT 0'),('challenges','guest_owner','TEXT'),('players','sword_day','TEXT'),('weapons','quality',"TEXT DEFAULT '普通'"),('weapons','source',"TEXT DEFAULT 'forge'"),('weapons','branch',"TEXT NOT NULL DEFAULT 'longsword'")]:
                 if column not in {row['name'] for row in db.execute(f'PRAGMA table_info({table})')}:
                     db.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
             if 'daily_swords_claimed' not in {row['name'] for row in db.execute('PRAGMA table_info(players)')}:
@@ -337,7 +337,9 @@ def create_app(db_path=None, demo=None):
             w['tier_id'] = weapon_tier(w['level'], w['branch'])['id']
             w['max_level'] = weapon_max_level(w['branch'])
             w['probabilities'] = probabilities(w['level'], w['protected_left'] > 0)
-            w['recycle_price'] = recycle_price(w['level'])
+            w['recycle_price'] = recycle_price(w['level'], w['branch'])
+            w['strike_materials'] = strike_material_cost(w['level'], w['branch'])
+            w['branch_locked'] = w['branch'] != 'longsword'
         return {'player': player, 'weapons': weapons,'can_rescue':demo_enabled and player['daily_swords_remaining']==0 and not any(w['status']=='active' for w in weapons)}
 
     @app.post('/api/supply/sword')
@@ -474,7 +476,7 @@ def create_app(db_path=None, demo=None):
         def run(db):
             charge(db, address, coins=BALANCE['material_pack_price'])
             db.execute('UPDATE players SET materials=materials+? WHERE address=?', (BALANCE['material_pack_size'], address))
-            return {'message': '材料已补充。'}
+            return {'message': f"已补充 {BALANCE['material_pack_size']} 铁块。"}
         return mutate(address, idempotency_key, 'materials', {}, run)
 
     @app.post('/api/weapons/{wid}/branch')
@@ -483,12 +485,14 @@ def create_app(db_path=None, demo=None):
         def run(db):
             w = owned(db, address, wid)
             branch = next(b for b in SWORD_BRANCHES if b['id'] == body.branch)
+            if w['branch'] != 'longsword' and body.branch != w['branch']:
+                raise HTTPException(409, '已选定刺剑或巨剑路线，无法再更换；降级不会解除路线锁定。')
             if w['level'] < branch['unlock_level']:
                 raise HTTPException(409, f"强化至 +{branch['unlock_level']} 后可选择突变路线。")
             if w['level']>weapon_max_level(body.branch):
                 raise HTTPException(409,f"{branch['name']}路线最高 +{weapon_max_level(body.branch)}，当前等级过高，无法切换。")
             db.execute('UPDATE weapons SET branch=? WHERE id=?', (body.branch, wid))
-            return {'weapon_id': wid, 'branch': body.branch, 'message': f"已选择{branch['name']}路线。"}
+            return {'weapon_id': wid, 'branch': body.branch, 'message': f"已选择{branch['name']}路线。" + ('该路线已固定，无法再更换。' if body.branch != 'longsword' else '')}
         return mutate(address, idempotency_key, 'branch/' + wid, body.model_dump(), run)
 
     @app.post('/api/weapons/{wid}/heat')
@@ -502,7 +506,7 @@ def create_app(db_path=None, demo=None):
                 raise HTTPException(409, '武器正在加热或尚有热量，请先完成本轮敲击。')
             materials = db.execute('SELECT materials FROM players WHERE address=?', (address,)).fetchone()['materials']
             if materials < BALANCE['heat_materials']:
-                raise HTTPException(409, f"加热需要 {BALANCE['heat_materials']} 材料，当前剩余 {materials}。请领取每日补给或补充材料。")
+                raise HTTPException(409, f"加热需要 {BALANCE['heat_materials']} 铁块，当前剩余 {materials}。请领取每日补给或补充铁块。")
             charge(db,address,materials=BALANCE['heat_materials'])
             ready = time.time()+BALANCE['heat_seconds']
             db.execute('UPDATE weapons SET heat_ready_at=?,heat_charges=? WHERE id=?',(ready,BALANCE['heat_strikes'],wid))
@@ -520,8 +524,12 @@ def create_app(db_path=None, demo=None):
                 raise HTTPException(409, f"已达到当前路线最高等级 +{weapon_max_level(w['branch'])}。")
             if w['heat_charges'] <= 0 or w['heat_ready_at'] > time.time():
                 raise HTTPException(409, '请先在熔炉完成加热，再进行敲击。')
+            cost = strike_material_cost(w['level'], w['branch'])
+            materials = db.execute('SELECT materials FROM players WHERE address=?', (address,)).fetchone()['materials']
+            if materials < cost:
+                raise HTTPException(409, f'强化需要 {cost} 铁块，当前剩余 {materials}。')
             result = strike(w, secrets.randbelow(1_000_000) / 1_000_000, body.shield)
-            charge(db, address, BALANCE['strike_ap'], BALANCE['strike_materials'], int(result['shield_used']))
+            charge(db, address, BALANCE['strike_ap'], cost, int(result['shield_used']))
             db.execute('UPDATE weapons SET level=?,strikes=?,protected_left=?,status=?,heat_charges=heat_charges-1 WHERE id=?', (result['level'], result['strikes'], result['protected_left'], result['status'], wid))
             result['heat_charges'] = w['heat_charges']-1
             return result
@@ -534,7 +542,7 @@ def create_app(db_path=None, demo=None):
             w = owned(db, address, wid)
             if w['level'] < BALANCE['recycle_level']:
                 raise HTTPException(409, '尚未达到回收等级。')
-            value = recycle_price(w['level'])
+            value = recycle_price(w['level'], w['branch'])
             db.execute("UPDATE weapons SET status='recycled' WHERE id=?", (wid,))
             db.execute('UPDATE players SET coins=coins+? WHERE address=?', (value, address))
             return {'message': f'武器已回收，获得 {value} 金币。'}

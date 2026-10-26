@@ -8,13 +8,54 @@
   "forge_materials": 10,
   "forge_ap": 2,
   "strike_materials": 2,
+  "weapon_economy": {
+    "longsword": {
+      "strike_materials": 4,
+      "recycle_by_level": {
+        "10": 5000,
+        "20": 20000,
+        "30": 100000,
+        "40": 500000,
+        "50": 2000000,
+        "60": 6000000,
+        "70": 30000000,
+        "80": 60000000,
+        "90": 100000000
+      }
+    },
+    "greatsword": {
+      "strike_materials": 7,
+      "recycle_by_level": {
+        "10": 5000,
+        "20": 100000,
+        "30": 2000000,
+        "40": 11000000,
+        "50": 20000000,
+        "60": 100000000,
+        "70": 300000000
+      }
+    },
+    "rapier": {
+      "strike_materials": 3,
+      "recycle_by_level": {
+        "5": 3000,
+        "10": 4500,
+        "20": 16000,
+        "30": 80000,
+        "40": 400000,
+        "50": 1500000,
+        "60": 5000000,
+        "70": 25000000,
+        "80": 80000000
+      }
+    }
+  },
   "strike_ap": 1,
   "protection_trigger": 10,
   "protection_duration": 3,
   "material_pack_size": 20,
-  "material_pack_price": 50,
-  "recycle_base": 10,
-  "recycle_per_level": 15,
+  "material_pack_price": 5000,
+  "recycle_base": 1000,
   "heat_seconds": 3,
   "heat_strikes": 5,
   "heat_materials": 2,
@@ -22,7 +63,7 @@
   "destroy_base": 0.01,
   "destroy_per_level": 0.002,
   "destroy_cap": 0.15,
-  "coin_sword_price": 200,
+  "coin_sword_price": 20000,
   "coin_sword_level": 3,
   "test_supply_ap": 10,
   "test_supply_materials": 20

@@ -6,7 +6,17 @@
     "name": "余烬长剑",
     "model": "sword",
     "size": 3.5,
-    "name_en": "Ember Longsword"
+    "name_en": "Ember Longsword",
+    "reference": "Weathered Sword Orthographic Views.png",
+    "reference_frame": {
+      "x": 110,
+      "y": 0,
+      "width": 320,
+      "height": 1010,
+      "image_width": 1448,
+      "image_height": 1086,
+      "rotation": 180
+    }
   },
   {
     "id": "forged",
@@ -17,7 +27,16 @@
     "size": 3.5,
     "reference": "KnightSword/+10KnightSword.png",
     "name_en": "Knight's Iron Sword",
-    "name_status": "official"
+    "name_status": "official",
+    "reference_frame": {
+      "x": 40,
+      "y": 0,
+      "width": 360,
+      "height": 1010,
+      "image_width": 1448,
+      "image_height": 1086,
+      "rotation": 180
+    }
   },
   {
     "id": "noble",
@@ -28,7 +47,16 @@
     "size": 3.5,
     "reference": "KnightSword/+20KnightSword.png",
     "name_en": "Silver Oath",
-    "name_status": "official"
+    "name_status": "official",
+    "reference_frame": {
+      "x": 320,
+      "y": 0,
+      "width": 400,
+      "height": 1086,
+      "image_width": 1448,
+      "image_height": 1086,
+      "rotation": 180
+    }
   },
   {
     "id": "royal-court",
@@ -112,7 +140,16 @@
     "design": "初始剑达到 +5 后可主动突变为基础刺剑。朴素银钢窄刃、深棕皮柄与开放式弧形护手，作为刺剑路线的起点。",
     "reference": "Rapier/+5rapier.png",
     "name_en": "Iron Rapier",
-    "name_status": "official"
+    "name_status": "official",
+    "reference_frame": {
+      "x": 50,
+      "y": 0,
+      "width": 370,
+      "height": 1010,
+      "image_width": 1448,
+      "image_height": 1086,
+      "rotation": 180
+    }
   },
   {
     "id": "rapier-silver-crest",
@@ -210,7 +247,8 @@
     "design": "朴素银钢宽刃、黑铁护手与加长皮革双手握柄，基础剑达到 +10 后主动选择巨剑路线。",
     "tip_direction": "positive_y",
     "name_en": "Blacksmith's Greatsword",
-    "name_status": "official"
+    "name_status": "official",
+    "reference": "Greatsword/+10Greatsword.png"
   },
   {
     "id": "greatsword-20",
@@ -222,7 +260,8 @@
     "design": "宽刃剑根出现暗红烙印，深色金属与铜色镶边承接后续熔核觉醒。",
     "tip_direction": "positive_y",
     "name_en": "Emberforged Greatsword",
-    "name_status": "official"
+    "name_status": "official",
+    "reference": "Greatsword/+20GreatSword.png"
   },
   {
     "id": "greatsword-30",
@@ -234,30 +273,46 @@
     "design": "加宽的厚重剑身、齿状刃缘与层叠黑铁纹饰，熔脉沿剑脊延伸。",
     "tip_direction": "positive_y",
     "name_en": "Abyssal Dragonbone",
-    "name_status": "official"
+    "name_status": "official",
+    "reference": "Greatsword/+30GreatSword.png"
   },
   {
     "id": "greatsword-40",
     "branch": "greatsword",
     "min_level": 40,
-    "name": "深渊炉心",
+    "name": "熔脉龙骸",
+    "name_en": "Moltenvein Dragonbone",
+    "name_status": "official",
     "model": "GreatSword/+40GreatSword",
-    "size": 5.1,
-    "design": "黑铁装甲与炽红熔岩裂纹覆盖剑身，展开的护手包裹明亮炉心。",
+    "size": 4.95,
+    "design": "黑铁与龙骨鳞甲包覆宽厚剑身，赤红熔脉沿中央汇聚至护手，弯曲龙角围住尚未完全觉醒的熔核。",
     "tip_direction": "positive_y",
-    "name_en": "Abyssal Furnace",
-    "name_status": "official"
+    "reference": "Greatsword/+40GreatSword.png"
   },
   {
     "id": "greatsword-50",
     "branch": "greatsword",
     "min_level": 50,
-    "name": "余烬君王",
+    "name": "深渊炉心",
     "model": "GreatSword/+50GreatSword",
+    "size": 5.1,
+    "design": "黑铁装甲与炽红熔岩裂纹覆盖剑身，展开的护手包裹明亮炉心。",
+    "tip_direction": "positive_y",
+    "name_en": "Abyssal Furnace",
+    "name_status": "official",
+    "reference": "Greatsword/+50GreatSword.png"
+  },
+  {
+    "id": "greatsword-60",
+    "branch": "greatsword",
+    "min_level": 60,
+    "name": "余烬君王",
+    "model": "GreatSword/+60GreatSword",
     "size": 5.4,
-    "design": "终阶熔核巨剑。宽阔黑铁剑身、金色装甲与炽红熔核形成完整余烬君王形态；+50 以后保持最终外观。",
+    "design": "终阶熔核巨剑。宽阔黑铁剑身、金色装甲与炽红熔核形成完整余烬君王形态；+60 以后保持最终外观。",
     "tip_direction": "positive_y",
     "name_en": "Sovereign of Ash",
-    "name_status": "official"
+    "name_status": "official",
+    "reference": "Greatsword/+60GreatSword.png"
   }
 ]

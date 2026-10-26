@@ -51,12 +51,20 @@ htmlcov/
 playwright-report/
 test-results/
 blob-report/
+# Local UI captures kept outside .local; weapon reference images stay tracked.
+/screenshots/
+/previews/
+/*-preview.png
 
 # Runtime data, local credentials, deployment state and logs
 .local/
-# Known local credential exports, if copied into the project root.
-/test-accounts.md
-/mint-key
+# Known local credential exports, including copies in subdirectories.
+test-accounts.md
+mint-key
+# Local deployment and cleanup exports, if copied into the project root.
+/deployment.json
+/nft-inventory.json
+/cleanup-summary.json
 backend/data/
 *.sqlite
 *.sqlite-*

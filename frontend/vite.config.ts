@@ -8,7 +8,10 @@ import branches from '../assets/3d/sword-branches.json';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const assets = path.resolve(root, '../assets/3d');
-const models = [...new Set([...tiers, ...branches.flatMap(branch => branch.tiers ?? [])].map(tier => `${tier.model}.glb`)), 'hammer.glb', 'anvil.glb'];
+const references = path.resolve(root, '../assets/reference_page');
+const configuredTiers = [...tiers, ...branches.flatMap(branch => branch.tiers ?? [])];
+const models = [...new Set(configuredTiers.map(tier => `${tier.model}.glb`)), 'hammer.glb', 'anvil.glb'];
+const portraits = [...new Set(configuredTiers.map(tier => tier.reference).filter((name): name is string => !!name))];
 export default defineConfig({
   plugins: [react(), {
     name: 'local-3d-assets',
@@ -23,6 +26,16 @@ export default defineConfig({
         res.setHeader('Content-Type', 'model/gltf-binary');
         fs.createReadStream(file).pipe(res);
       });
+      server.middlewares.use('/weapon-images', (req, res, next) => {
+        let name: string;
+        try { name = decodeURIComponent((req.url || '').split('?')[0].slice(1)); }
+        catch { res.statusCode = 400; res.end(); return; }
+        if (!portraits.includes(name)) return next();
+        const file = path.join(references, name);
+        if (!fs.existsSync(file)) { res.statusCode = 404; res.end(); return; }
+        res.setHeader('Content-Type', 'image/png');
+        fs.createReadStream(file).pipe(res);
+      });
     },
     closeBundle() {
       const target = path.join(root, 'dist/models');
@@ -34,6 +47,11 @@ export default defineConfig({
           fs.mkdirSync(path.dirname(destination), { recursive: true });
           fs.copyFileSync(file, destination);
         }
+      }
+      for (const name of portraits) {
+        const destination = path.join(root, 'dist/weapon-images', name);
+        fs.mkdirSync(path.dirname(destination), { recursive: true });
+        fs.copyFileSync(path.join(references, name), destination);
       }
     }
   }],

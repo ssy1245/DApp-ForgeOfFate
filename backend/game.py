@@ -50,15 +50,37 @@ def strike(weapon, roll, shield):
             'status': 'destroyed' if result == 'destroy' else 'active',
             'result': result, 'shield_used': bool(shield and not stage)}
 
-def recycle_price(level):
-    return BALANCE['recycle_base'] + level * BALANCE['recycle_per_level']
+def weapon_economy(level, branch='longsword'):
+    # Below a route's first model, the weapon is still the shared basic sword.
+    if weapon_tier(level, branch)['min_level'] == 0:
+        return {}
+    return BALANCE['weapon_economy'][branch]
+
+
+def strike_material_cost(level, branch='longsword'):
+    return weapon_economy(level, branch).get('strike_materials', BALANCE['strike_materials'])
+
+
+def recycle_price(level, branch='longsword'):
+    prices = BALANCE['weapon_economy'][branch]['recycle_by_level']
+    points = sorted({0: BALANCE['recycle_base'], **{int(key): price for key, price in prices.items()}}.items())
+    if level <= points[0][0]:
+        return points[0][1]
+    for (start, start_price), (end, end_price) in zip(points, points[1:]):
+        if level <= end:
+            # Keep integer coin arithmetic and hit every configured anchor exactly.
+            return start_price + (end_price - start_price) * (level - start) // (end - start)
+    return points[-1][1]
+
+
+def weapon_route_tiers(branch='longsword'):
+    route = next((b for b in SWORD_BRANCHES if b['id'] == branch), SWORD_BRANCHES[0])
+    branch_tiers = route['tiers'] or [tier for tier in SWORD_CATALOG if tier.get('branch', 'longsword') == route['id']]
+    return [SWORD_TIERS[0], *branch_tiers] if route['id'] != 'longsword' else branch_tiers
 
 
 def weapon_tier(level, branch='longsword'):
-    route = next((b for b in SWORD_BRANCHES if b['id'] == branch), SWORD_BRANCHES[0])
-    branch_tiers = route['tiers'] or [tier for tier in SWORD_CATALOG if tier.get('branch', 'longsword') == route['id']]
-    tiers = [SWORD_TIERS[0], *branch_tiers] if route['id'] != 'longsword' else branch_tiers
-    return next(tier for tier in reversed(tiers) if level >= tier['min_level'])
+    return next(tier for tier in reversed(weapon_route_tiers(branch)) if level >= tier['min_level'])
 
 
 def weapon_name(level, branch='longsword', locale='zh'):

@@ -4,7 +4,7 @@
     "name": "骑士剑",
     "unlock_level": 5,
     "tiers": null,
-    "max_level": 80,
+    "max_level": 90,
     "pending_visual_levels": [],
     "name_en": "Knight Sword"
   },
@@ -22,7 +22,7 @@
     "name": "巨剑",
     "unlock_level": 10,
     "tiers": null,
-    "max_level": 60,
+    "max_level": 70,
     "pending_visual_levels": [],
     "name_en": "Greatsword"
   }

@@ -71,3 +71,14 @@ body.forge-mouse-captured,body.forge-mouse-captured *{cursor:none!important}
 .account-dialog-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.account-dialog-heading h2{flex:1 1 180px;margin:0}.account-dialog-heading .language-switch{margin-left:auto}
 
 .confirmation-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}.confirmation-actions button{min-width:90px}
+
+/* Current workshop selection is persisted by the server; storage actions stay visible beside the scene. */
+.workshop-storage{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;background:rgba(190,149,79,.055);border-block:1px solid var(--border,#454132)}
+.workshop-storage-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
+.workshop-storage-copy>span{font-size:11px;letter-spacing:.12em;color:#b5ab8b}
+.workshop-storage-copy>strong{font-size:17px;color:#e6d8b7;overflow-wrap:anywhere}
+.workshop-storage-copy>small{font-size:11px;color:#a5a793;line-height:1.5}
+.workshop-storage-actions{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0}
+.workshop-storage-actions button{padding:10px 14px;font-size:12px}
+.warehouse-summary{color:#a5a793;font-size:13px;line-height:1.7;margin:0 0 20px}
+@media(max-width:700px){.workshop-storage{align-items:stretch;flex-direction:column;padding:16px}.workshop-storage-actions{display:grid;grid-template-columns:1fr 1fr}.workshop-storage-actions button{padding:11px 8px}.warehouse-summary{font-size:12px}}

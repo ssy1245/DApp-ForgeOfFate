@@ -4,20 +4,21 @@
 
 本文件集中说明第一次怎样部署合约、平时怎样启动和关闭本地服务器、停机后如何补扫，以及哪些数据必须保留。业务与账本规则见[链上功能与开发计划](链上功能与开发计划.md)，文档目录见[链上文档导航](README.md)。
 
-**目标已经确定为 Ethereum Sepolia + MetaMask；当前源码仍仅接通本地 Hardhat。** 本文件大部分是待实现的操作流程，最后的命令表明确列出现阶段真正可用的命令，不能把本文当作已经完成 Sepolia 部署的记录。
+**目标已经确定为 Ethereum Sepolia + MetaMask；已完成网络适配和隔离后端入口，完整交易仍仅在本地 Hardhat 验收。** 本文件大部分是待实现的操作流程，最后的命令表明确列出现阶段真正可用的命令，不能把本文当作已经完成 Sepolia 部署的记录。
 
-开始准备时先看[开发前填写清单](开发前填写清单.md)。项目根目录 `.env.sepolia` 是实际填写位置，公开模板为 [`.env.sepolia.example`](../.env.sepolia.example)。已经提供只读配置检查器，游戏和部署程序的接入仍待开发。
+开始准备时先看[开发前填写清单](开发前填写清单.md)。项目根目录 `.env.sepolia` 是实际填写位置，公开模板为 [`.env.sepolia.example`](../.env.sepolia.example)。已提供只读检查器和 `npm run backend:sepolia` 后端入口；通用 Sepolia 部署入口已实现，见[合约部署工作台](合约部署工作台.md)，实际交易仍需人工钱包确认。开发和验收优先采用[本地测试流程](本地测试与页面数据一致性.md)。
 
 | 要做的事情 | 阅读位置 | 当前状态 |
 |---|---|---|
 | 填写项目钱包与节点信息 | [开发前填写清单](开发前填写清单.md) | 配置模板与只读检查器已实现 |
-| 首次准备并部署 | [第一次准备与部署](#2-第一次准备与部署建议流程) | Sepolia 部署入口待实现 |
-| 之后每次打开项目 | [每次启动](#4-每次启动建议流程) | 补扫与监听进程待实现 |
+| 使用部署工作台 | [合约部署工作台](合约部署工作台.md) | 使用 Sepolia 测试 ETH；NFT、充值暂缓 |
+| 首次准备并部署 | [第一次准备与部署](#2-第一次准备与部署建议流程) | 通用入口已实现，业务合约部署待实现 |
+| 之后每次打开项目 | [每次启动](#4-每次启动建议流程) | NFT 独立监听与补扫已实现，资金结算待实现 |
 | 结束演示并保存 | [每次关闭](#5-每次关闭建议流程) | 完整关闭与备份流程待实现 |
 | 处理数据丢失或环境变化 | [数据恢复边界](#6-数据恢复边界) | 需保留原始账本，不能删库重发 |
 | 现在运行本地项目 | [当前可以使用的命令](#7-当前可以使用的命令) | 已有本地开发命令 |
 
-Sepolia 用于合约和应用测试，网络资料与区块浏览器入口见[以太坊官方网络说明](https://ethereum.org/developers/docs/networks/#sepolia)。项目选用 Sepolia 是已确定的目标；RPC 服务、确认策略和具体合约地址仍需在实施时配置。
+Sepolia 用于合约和应用测试，网络资料与区块浏览器入口见[以太坊官方网络说明](https://ethereum.org/developers/docs/networks/#sepolia)。项目选用 Sepolia 是已确定的目标；RPC 已填写并验证 finalized 能力；具体合约地址仍需实际部署。
 
 ## 1. 两种环境
 
@@ -50,7 +51,9 @@ Sepolia 模式只要求本机能连接节点，不要求我们的后端有公网
 | 私密配置 | 服务器签名密钥及部署所需凭据 | 本机受限文件或钱包，遵循 `.gitignore`，不进入源码、前端、日志或视频 |
 | 运行数据 | 数据库、订单、流水、扫描进度、收益结算边界 | 按环境保存并备份，不因正常启停清空 |
 
-准备配置已经采用根目录 `.env.sepolia`，由检查器读取，不把带凭据的 RPC 地址暴露给前端。建议后续以统一部署清单向前端提供公开合约信息，取消前端硬编码单一合约与 `31337` 的做法。部署清单格式和游戏运行时配置加载仍待实现；当前填好文件不会自动切换游戏网络。
+实际配置使用根目录 `.env.sepolia`。检查器与 `npm run backend:sepolia` 会读取它；后者将节点地址传给后端，并固定选择 `.local/sepolia/`，不与 `.local/game.sqlite3` 混用。数据库通过 `runtime_environment` 记录所属网络，跨网络启动会拒绝；原本地旧库首次升级归为 local。前端从 `/api/config` 读取公开网络与合约信息，从 `/api/chain/nfts` 和 `/api/chain/receipts/{hash}` 查询 NFT 与回执，不接收私密 RPC。
+
+当前部署清单沿用 `address`、`chainId`、`deploymentId`、`mintSigner`、`abi` 的单合约格式，保存为对应环境的 `deployment.json`；授权密钥在同目录 `mint-key`。后端会核对链 ID、合约代码是否存在、部署标识与授权地址，签发凭证前检查本机密钥匹配。没有清单或校验失败时，只读合约接口和铸造授权不可用，不会偷偷部署或生成新密钥。清单版本 2 已增加创建交易、部署区块、创世与代码哈希，监听会核对并保存 NFT 事件和补扫进度。多合约与资金恢复仍待实现，详见[链上监听与恢复](链上监听与恢复.md)。
 
 ## 4. 每次启动：建议流程
 
@@ -83,18 +86,22 @@ Sepolia 模式只要求本机能连接节点，不要求我们的后端有公网
 
 ## 7. 当前可以使用的命令
 
-下列命令仅说明**已有本地开发流程**，不是未来 Sepolia 环境的启动说明。依赖准备和完整说明见[项目 README](../README.md#快速启动)。
+下列命令说明**当前可用能力**，其中 Sepolia 后端入口仅用于开发准备，不代表完整部署 / 监听流程已经完成。依赖准备和完整说明见[项目 README](../README.md#快速启动)。
 
 | 命令 | 当前作用 |
 |---|---|
-| `npm run check:sepolia` | 读取 `.env.sepolia`，检查地址格式并只读核验节点链 ID；不发送交易 |
+| `npm run check:sepolia` | 读取 `.env.sepolia`，检查地址格式、节点链 ID 和 finalized 能力；不发送交易 |
+| `npm run deploy:console` | 启动 Sepolia MetaMask 部署页面；固定保存部署计划，实际交易由钱包确认 |
+| `npm run test:deploy` | 真实独立本地链 + 浏览器钱包适配器验证部署入口，不操作真实扩展 |
 | `npm run check:sepolia -- --offline` | 只检查填写格式，不访问节点 |
-| `npm start` | 启动/复用本地链、部署检查、后端与前端；不包含新的充值或质押监听 |
-| `npm run start:demo` | 在本地演示模式启动；已有后台可能被复用，具体设置以当前进程为准 |
-| `npm run chain` | 单独启动本地 Hardhat |
-| `npm run deploy` | 向本地链部署当前单个 `ForgeOfFate`，不是 Sepolia 部署入口 |
+| `npm run backend:sepolia` | 读取 `.env.sepolia`，在端口 8000 启动使用 `.local/sepolia/` 的独立后端；不部署合约。先停止占用端口的其他后端 |
+| `npm run test:browser` | 独立 Chrome / FastAPI / SQLite 一致性回归，不访问 Sepolia |
+| `npm start` | 启动 Sepolia 后端与前端；已有 NFT 清单时才启动监听，不自动部署 |
+| `npm run start:demo` | 连接 Sepolia，开启链下测试菜单；拒绝复用占用端口的旧服务 |
+| `npm run chain` | 只读检查 Sepolia 节点 |
+| `npm run deploy` | 同 deploy:console，启动 Sepolia 工作台，不自动发送交易 |
 | `npm run test:contracts` | 运行现有合约测试 |
 | `npm run test:backend` | 运行现有后端测试 |
 | `npm run verify:game` | 在隔离环境验证当前游戏/NFT 闭环；目前不覆盖未来充值和质押功能 |
 
-Sepolia 部署、独立监听和恢复命令目前尚未实现，待对应阶段完成后在这里补充实际可执行命令。
+独立监听命令 `npm run indexer`、`npm run indexer:sepolia` 已实现，追加 `-- --once` 可补查后退出；旧本地清单可用 `npm run chain:record` 只读补全。具体配置与恢复限制见[链上监听与恢复](链上监听与恢复.md)。通用 Sepolia 首次部署入口已实现；业务合约部署和资金恢复仍待实现。

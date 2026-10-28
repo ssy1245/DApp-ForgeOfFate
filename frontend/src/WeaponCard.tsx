@@ -5,7 +5,7 @@ import WeaponLore from './WeaponLore';
 import { artworkTier, type WeaponIdentity } from './weaponImages';
 import { swordBranches } from './swordTiers';
 
-type CardWeapon = WeaponIdentity & { demo?: boolean | number; quality?: string };
+type CardWeapon = WeaponIdentity & { id?: string; demo?: boolean | number; quality?: string };
 type Props = {
   weapon: CardWeapon;
   serial: string;
@@ -28,7 +28,7 @@ export default function WeaponCard({ weapon, serial, status, statusTone = 'activ
   const displayName = name(weapon);
   const englishName = cleanName(weapon.name_en) || tier?.name_en;
 
-  return <article className="weapon-card" data-branch={route?.id || 'unknown'} data-nft={nft || undefined}>
+  return <article className="weapon-card" data-weapon-id={weapon.id} data-branch={route?.id || 'unknown'} data-nft={nft || undefined}>
     <div className="card-topline">
       <span className={`card-status ${statusTone}`}><i aria-hidden="true"/>{status}</span>
       <span className="card-serial" title={serial}>{serial}</span>

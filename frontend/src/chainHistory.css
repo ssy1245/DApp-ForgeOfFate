@@ -1,0 +1,7 @@
+.chain-history{margin:20px 0;padding:20px;border:1px solid #474d3a;border-radius:6px;background:#1c241b;color:#c9ccb9}
+.chain-history header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.chain-history h3{margin:0;color:#e6d5ac;font-size:16px}.chain-history header>span{font-size:12px;color:#cfb77d}
+.chain-history p{font-size:12px;line-height:1.7;color:#aeb89f}.chain-history [role=alert]{color:#e7ae83}.chain-history-contract{overflow-wrap:anywhere}
+.chain-history a{color:#e4c489;text-decoration:underline;text-underline-offset:3px}.chain-history code{font-size:11px}
+.chain-history dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}.chain-history dt{font-size:11px;color:#94a187}.chain-history dd{margin:6px 0;font-variant-numeric:tabular-nums;font-size:17px;color:#e0d9bf;overflow-wrap:anywhere}
+.chain-history ol{list-style:none;padding:0;margin:16px 0 0}.chain-history li{display:flex;justify-content:space-between;gap:14px;border-top:1px solid #3b4434;padding:10px 0;font-size:12px}.chain-history li small{color:#89967b;margin-left:8px}.chain-history>small{display:block;color:#9ba88d;font-size:11px;line-height:1.6;margin-top:12px}
+@media(max-width:600px){.chain-history{padding:15px}.chain-history dl{grid-template-columns:repeat(2,minmax(0,1fr))}.chain-history li{flex-wrap:wrap}}

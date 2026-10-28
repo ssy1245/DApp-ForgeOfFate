@@ -19,6 +19,8 @@ export function isCabinet(station:string|null):station is CabinetId {
  return CABINETS.some(cabinet=>cabinet.id===station);
 }
 export const CRATE_POSITION = [-9.25, -0.35, 1] as const;
+export const WAREHOUSE_POSITION = [-6, -0.75, 1.5] as const;
+export const WAREHOUSE_FOOTPRINT = {halfDepth:0.78,halfWidth:1.36,clearance:0.3};
 export const SWORD_SUPPLY_POSITION = [-8.9, -0.75, 5] as const;
 export const SWORD_SUPPLY_FOOTPRINT = {halfDepth:0.65,halfWidth:1.6,clearance:0.3};
 export const FURNACE_POSITION = [-7.1, -0.75, -5.2] as const;
@@ -36,6 +38,8 @@ export function canStand(x:number,z:number){
  const fx=x-FURNACE_POSITION[0],fz=z-FURNACE_POSITION[2],f=FURNACE_FOOTPRINT;
  if(Math.abs(fx)<f.halfWidth+f.clearance&&fz> -f.back-f.clearance&&fz<f.front+f.clearance)return false;
  if(Math.abs(x-CRATE_POSITION[0])<0.8&&Math.abs(z-CRATE_POSITION[2])<0.8)return false;
+ const warehouse=WAREHOUSE_FOOTPRINT;
+ if(Math.abs(x-WAREHOUSE_POSITION[0])<warehouse.halfDepth+warehouse.clearance&&Math.abs(z-WAREHOUSE_POSITION[2])<warehouse.halfWidth+warehouse.clearance)return false;
  const supply=SWORD_SUPPLY_FOOTPRINT;
  if(Math.abs(x-SWORD_SUPPLY_POSITION[0])<supply.halfDepth+supply.clearance&&Math.abs(z-SWORD_SUPPLY_POSITION[2])<supply.halfWidth+supply.clearance)return false;
  return true;

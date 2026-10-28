@@ -67,8 +67,16 @@ blob-report/
 # Known local credential exports, including copies in subdirectories.
 test-accounts.md
 mint-key
+quote-key
 # Local deployment and cleanup exports, if copied into the project root.
 /deployment.json
+/local-deployment-*.json
+/sepolia-deployment-*.json
+# Console runtime/build exports: originals live under .local/sepolia/.
+# Only ignore root-level copies; keep source manifests and empty templates.
+/plan.json
+/state.json
+/build-info.json
 /nft-inventory.json
 /cleanup-summary.json
 backend/data/
@@ -96,4 +104,10 @@ backend/data/
 # Keep source, README files, dependency locks and empty .env*.example templates.
 # Keep assets/stories/**/*.md, assets/3d/**/*.glb and assets/reference_page/**/*.png.
 # Keep assets/display/ transparent PNGs, manifest.json and README.md, plus item icons.
+# NFT artwork is a project source asset and should be included in GitHub submissions.
+# Allow only image formats here, so secrets placed in this folder remain ignored.
+!/assets/NFT_Pic/**/*.png
+!/assets/NFT_Pic/**/*.jpg
+!/assets/NFT_Pic/**/*.jpeg
+!/assets/NFT_Pic/**/*.webp
 # Never ignore all *.json, *.sql, *.png or *.glb: these can be project sources.

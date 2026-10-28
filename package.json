@@ -7,18 +7,37 @@
     "contracts"
   ],
   "scripts": {
+    "indexer": "node scripts/indexer-sepolia.cjs",
+    "indexer:sepolia": "node scripts/indexer-sepolia.cjs",
+    "chain:record": ".venv/bin/python -m backend.indexer --record-deployment",
     "dev": "npm run dev -w frontend",
     "build": "npm run build -w frontend",
-    "chain": "npm run node -w contracts",
-    "deploy": "npm run deploy -w contracts",
+    "chain": "node scripts/check-sepolia.cjs",
+    "deploy": "node scripts/deploy-console.cjs",
     "test:contracts": "npm test -w contracts",
     "test:backend": ".venv/bin/python -m pytest backend/tests -q",
     "verify:game": "node scripts/verify-game.cjs",
-    "backend": ".venv/bin/python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir backend --reload-dir assets/3d --reload-include balance.json --reload-include sword-tiers.json --reload-include sword-branches.json",
-    "demo": "node scripts/demo.cjs",
+    "backend": "node scripts/backend-sepolia.cjs",
+    "demo": "node scripts/start.cjs --demo",
     "start": "node scripts/start.cjs",
     "start:demo": "node scripts/start.cjs --demo",
     "check:sepolia": "node scripts/check-sepolia.cjs",
-    "accounts:setup": ".venv/bin/python scripts/create_dev_accounts.py"
+    "accounts:setup": ".venv/bin/python scripts/create_dev_accounts.py --network sepolia",
+    "backend:sepolia": "node scripts/backend-sepolia.cjs",
+    "test:browser": "playwright test",
+    "test:browser:report": "playwright show-report",
+    "deploy:console": "node scripts/deploy-console.cjs",
+    "test:deploy": "playwright test tests/browser/deployment.spec.cjs",
+    "deploy:local": "npm run deploy -w contracts",
+    "start:local": "node scripts/start-local.cjs",
+    "backend:local": ".venv/bin/python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir backend --reload-dir assets/3d --reload-include balance.json --reload-include sword-tiers.json --reload-include sword-branches.json",
+    "indexer:local": ".venv/bin/python -m backend.indexer",
+    "accounts:setup:local": ".venv/bin/python scripts/create_dev_accounts.py",
+    "test:deploy:service": "node --test tests/deployment-service.test.cjs",
+    "chain:local": "npm run node -w contracts",
+    "demo:local": "node scripts/demo.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
   }
 }

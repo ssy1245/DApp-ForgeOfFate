@@ -108,10 +108,14 @@ test('Chinese and English UI, runtime messages, weapon identities and saved pref
       const zh = text(page('zh', React.createElement(App)));
       assert.match(en, /Workshop/);
       assert.match(en, /Claim daily supplies/);
-      assert.match(en, /Click to enter the workshop/);
+      assert.match(en, /Workshop empty · take a weapon from storage/);
+      assert.match(en, /Store weapon/);
+      assert.match(en, /Open warehouse/);
       assert.doesNotMatch(en.replace('中文', ''), /\p{Script=Han}/u);
       assert.match(zh, /锻造工坊/);
       assert.match(zh, /领取每日补给/);
+      assert.match(zh, /工坊空闲/);
+      assert.match(zh, /存入仓库/);
     });
   } finally {
     if (previousWindow === undefined) delete globalThis.window;

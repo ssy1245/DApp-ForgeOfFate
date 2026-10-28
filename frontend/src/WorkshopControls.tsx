@@ -4,21 +4,24 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Euler, Vector3 } from 'three';
 import { ANVIL_POSITION, CABINETS, CABINET_SCALE, FURNACE_POSITION, FURNACE_FOOTPRINT, SWORD_SUPPLY_POSITION, SWORD_SUPPLY_FOOTPRINT, canStand, type CabinetId } from './workshopLayout';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { WAREHOUSE_POSITION, WAREHOUSE_FOOTPRINT } from './workshopLayout';
 
 export type ViewMode = 'orbit' | 'walk';
-export type Station = 'anvil' | CabinetId | 'furnace' | 'supply' | null;
+export type Station = 'anvil' | CabinetId | 'furnace' | 'supply' | 'warehouse' | null;
 export type MoveKey = 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD';
 export const STATIONS:Record<Exclude<Station,null>,Vector3> = {
  anvil:new Vector3(ANVIL_POSITION[0],0,ANVIL_POSITION[2]),
  ...Object.fromEntries(CABINETS.map(({id,position})=>[id,new Vector3(position[0]-0.45*CABINET_SCALE[2]-0.35,0,position[2])])) as Record<CabinetId,Vector3>,
  furnace:new Vector3(FURNACE_POSITION[0],0,FURNACE_POSITION[2]+FURNACE_FOOTPRINT.front),
  supply:new Vector3(SWORD_SUPPLY_POSITION[0]+SWORD_SUPPLY_FOOTPRINT.halfDepth+0.4,0,SWORD_SUPPLY_POSITION[2]),
+ warehouse:new Vector3(WAREHOUSE_POSITION[0]+WAREHOUSE_FOOTPRINT.halfDepth+0.4,0,WAREHOUSE_POSITION[2]),
 };
 
 export { canStand } from './workshopLayout';
 
-export default function WorkshopControls({mode, reset, movement, sensitivity, onNear, onInteract, onActiveChange, onError, onPrimary}: {
+export default function WorkshopControls({mode, reset, movement, sensitivity, suspended=false, onNear, onInteract, onActiveChange, onError, onPrimary}: {
   mode: ViewMode; reset: number; movement: Set<MoveKey>; sensitivity: number;
+  suspended?: boolean;
   onPrimary: () => void;
   onNear: (station: Station) => void; onInteract: () => void;
   onActiveChange: (active: boolean) => void; onError: (message: string) => void;
@@ -31,6 +34,7 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, on
   const sensitivityRef = useRef(sensitivity); sensitivityRef.current = sensitivity;
   const near = useRef<Station>(null);
   const previousView = useRef('');
+  const wasSuspended = useRef(false);
   const interact = useRef(onInteract); interact.current = onInteract;
   const primary=useRef(onPrimary);primary.current=onPrimary;
   const yaw = useRef(0), pitch = useRef(-0.15);
@@ -43,15 +47,18 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, on
   useEffect(() => {
     const canvas = gl.domElement;
     const viewKey = `${mode}:${reset}`;
+    const resumeOrbit = wasSuspended.current && !suspended && previousView.current === viewKey;
+    wasSuspended.current = suspended;
     const preserveWalk = mode === 'walk' && previousView.current === viewKey;
     previousView.current = viewKey;
     canvas.tabIndex = 0;
     canvas.style.touchAction = 'none';
     near.current = null; onNear(null); keys.current.clear();movement.clear();
     active.current=false;onActiveChange(false);
+    if (suspended) return;
     if (mode === 'orbit') {
       const fit = Math.max(1, 1.2 / (size.width / size.height));
-      camera.position.set(-18,13,23).sub(new Vector3(0,1.6,1)).multiplyScalar(fit).add(new Vector3(0,1.6,1));
+      if (!resumeOrbit) camera.position.set(-18,13,23).sub(new Vector3(0,1.6,1)).multiplyScalar(fit).add(new Vector3(0,1.6,1));
       const control = new OrbitControls(camera, canvas);
       control.target.set(0,1.6,1);
       control.enableDamping = true; control.enablePan = false;
@@ -159,7 +166,7 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, on
       window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',pause);
       pause();
     };
-  }, [mode,reset,camera,gl,onNear,onActiveChange,onError,movement,size.width,size.height]);
+  }, [mode,reset,suspended,camera,gl,onNear,onActiveChange,onError,movement,size.width,size.height]);
 
   useFrame((_,dt) => {
     if(orbit.current){orbit.current.rotateSpeed=sensitivityRef.current;orbit.current.update();}

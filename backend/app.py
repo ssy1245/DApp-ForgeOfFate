@@ -6,23 +6,26 @@ import secrets
 import sqlite3
 import time
 import uuid
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
 from eth_account import Account
 from eth_account.messages import encode_defunct, encode_typed_data
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from web3 import Web3
 
+from .storage import Store
+from .chain_store import index_status, event_history
 from .accounts import normalize_username, hash_password, verify_password
+from .chain import ChainSettings, ChainReader
 from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
 
 ROOT = Path(__file__).resolve().parent.parent
-LOCAL = Path(os.getenv('FORGE_LOCAL_DIR', str(ROOT / '.local')))
+LOCAL = ChainSettings.from_env().directory
 TYPES = {'Voucher': [
     {'name': 'weaponId', 'type': 'bytes32'}, {'name': 'recipient', 'type': 'address'},
     {'name': 'level', 'type': 'uint256'}, {'name': 'uri', 'type': 'string'},
@@ -44,6 +47,10 @@ class StrikeBody(BaseModel):
 class BranchChoice(BaseModel):
     branch: Literal['longsword','rapier','greatsword']
 
+class WorkshopChoice(BaseModel):
+    weapon_id: str = Field(min_length=1, max_length=128)
+    expected_revision: int = Field(ge=0, strict=True)
+
 class Credentials(BaseModel):
     username: str = Field(min_length=3,max_length=24)
     password: str = Field(min_length=8,max_length=128)
@@ -62,59 +69,10 @@ class CheatWeaponEdit(BaseModel):
     heated: bool | None = None
     protected_left: int | None = Field(default=None,ge=0,le=100,strict=True)
 
-class Store:
-    def __init__(self, path):
-        self.path = path
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with self.connection() as db:
-            db.executescript('''
-            PRAGMA journal_mode=WAL;
-            CREATE TABLE IF NOT EXISTS players(address TEXT PRIMARY KEY,materials INTEGER DEFAULT 0,shields INTEGER DEFAULT 0,coins INTEGER DEFAULT 0,claim_day TEXT,demo_claimed INTEGER DEFAULT 0);
-            CREATE TABLE IF NOT EXISTS challenges(id TEXT PRIMARY KEY,address TEXT,message TEXT,expires INTEGER);
-            CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,address TEXT,expires INTEGER);
-            CREATE TABLE IF NOT EXISTS weapons(id TEXT PRIMARY KEY,owner TEXT,level INTEGER DEFAULT 0,status TEXT DEFAULT 'active',strikes INTEGER DEFAULT 0,protected_left INTEGER DEFAULT 0,demo INTEGER DEFAULT 0,created INTEGER);
-            CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,game_address TEXT UNIQUE NOT NULL,created INTEGER NOT NULL);
-            CREATE TABLE IF NOT EXISTS operations(address TEXT,key TEXT,fingerprint TEXT,response TEXT,PRIMARY KEY(address,key));
-            ''')
-            for table,column,definition in [('accounts','role',"TEXT NOT NULL DEFAULT 'player'"),('weapons','heat_ready_at','REAL DEFAULT 0'),('weapons','heat_charges','INTEGER DEFAULT 0'),('players','guest','INTEGER DEFAULT 0'),('challenges','guest_owner','TEXT'),('players','sword_day','TEXT'),('weapons','quality',"TEXT DEFAULT '普通'"),('weapons','source',"TEXT DEFAULT 'forge'"),('weapons','branch',"TEXT NOT NULL DEFAULT 'longsword'")]:
-                if column not in {row['name'] for row in db.execute(f'PRAGMA table_info({table})')}:
-                    db.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
-            if 'daily_swords_claimed' not in {row['name'] for row in db.execute('PRAGMA table_info(players)')}:
-                db.execute('ALTER TABLE players ADD COLUMN daily_swords_claimed INTEGER NOT NULL DEFAULT 0')
-                # Earlier versions delivered the entire allowance when state was read.
-                db.execute('UPDATE players SET daily_swords_claimed=? WHERE sword_day IS NOT NULL', (BALANCE['daily_swords'],))
-            # Retire the old energy resource without resetting any other progress.
-            if 'ap' in {row['name'] for row in db.execute('PRAGMA table_info(players)')}:
-                db.execute('ALTER TABLE players DROP COLUMN ap')
-    @contextmanager
-    def connection(self):
-        db = sqlite3.connect(self.path, timeout=15, isolation_level=None)
-        db.row_factory = sqlite3.Row
-        db.execute('PRAGMA busy_timeout=15000')
-        try:
-            db.execute('BEGIN IMMEDIATE')
-            yield db
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
 
 
 def chain():
-    file = LOCAL / 'deployment.json'
-    if not file.exists():
-        raise HTTPException(503, '本地合约尚未部署，请先启动测试链并部署。')
-    info = json.loads(file.read_text())
-    w3 = Web3(Web3.HTTPProvider(os.getenv('LOCAL_RPC_URL', 'http://127.0.0.1:8545'), request_kwargs={'timeout': 3}))
-    try:
-        contract = w3.eth.contract(address=info['address'], abi=info['abi'])
-        if w3.eth.chain_id != info['chainId'] or Web3.to_hex(contract.functions.deploymentId().call()) != info['deploymentId']:
-            raise ValueError('deployment mismatch')
-    except Exception:
-        raise HTTPException(503, '本地链不可用或已重置，请重新部署并刷新页面。')
-    return info, w3, contract
+    return ChainReader(ChainSettings.from_env()).connect()
 
 
 def metadata(weapon):
@@ -133,16 +91,28 @@ def metadata(weapon):
 
 def create_app(db_path=None, demo=None):
     app = FastAPI(title='Forge of Fate', version='0.1.0')
-    store = Store(db_path or str(LOCAL / 'game.sqlite3'))
+    settings = ChainSettings.from_env()
+    reader = ChainReader(settings)
+    chain = reader.connect
+    store = Store(db_path or str(settings.directory / 'game.sqlite3'), network=settings.network)
     demo_enabled = os.getenv('DEMO_MODE', '0') == '1' if demo is None else demo
     app.state.store = store
-    app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'], allow_methods=['GET', 'POST'], allow_headers=['Authorization', 'Content-Type', 'Idempotency-Key'])
+    app.state.chain_reader = reader
+    app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'], allow_methods=['GET', 'POST'], allow_headers=['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Forge-Player', 'X-Forge-Workshop-Revision'])
 
     @app.middleware('http')
     async def cookie_session(request: Request, call_next):
         token = request.cookies.get('forge_session')
         if token and not request.headers.get('authorization'):
             request.scope['headers'].append((b'authorization', ('Bearer '+token).encode('ascii',errors='ignore')))
+        expected_player = request.headers.get('x-forge-player')
+        if request.method == 'POST' and expected_player:
+            try:
+                actual_player = authenticated(request.headers.get('authorization'))
+            except HTTPException as error:
+                return JSONResponse({'detail': error.detail}, status_code=error.status_code)
+            if actual_player.lower() != expected_player.lower():
+                return JSONResponse({'detail': '当前登录账号已变化，请刷新后重新操作。'}, status_code=409)
         return await call_next(request)
 
     @app.post('/api/session')
@@ -193,6 +163,22 @@ def create_app(db_path=None, demo=None):
             raise HTTPException(409, '武器状态已变化，请刷新。')
         return dict(weapon)
 
+    def workshop(db, address):
+        row = db.execute('SELECT workshop_weapon_id,workshop_revision FROM players WHERE address=?', (address,)).fetchone()
+        wid = row['workshop_weapon_id']
+        if wid and not db.execute("SELECT 1 FROM weapons WHERE id=? AND owner=? AND status='active'", (wid, address)).fetchone():
+            clear_workshop(db, address, wid)
+            row = db.execute('SELECT workshop_weapon_id,workshop_revision FROM players WHERE address=?', (address,)).fetchone()
+        return dict(row)
+
+    def clear_workshop(db, address, wid):
+        db.execute('UPDATE players SET workshop_weapon_id=NULL,workshop_revision=workshop_revision+1 WHERE address=? AND workshop_weapon_id=?', (address, wid))
+
+    def require_in_workshop(db, address, wid, expected_revision=None):
+        current = workshop(db, address)
+        if current['workshop_weapon_id'] != wid or (expected_revision is not None and current['workshop_revision'] != expected_revision):
+            raise HTTPException(409, '工坊武器已变化，请从仓库取出这把武器后再操作。')
+
     def charge(db, address, *, materials=0, shields=0, coins=0):
         cursor = db.execute('UPDATE players SET materials=materials-?,shields=shields-?,coins=coins-? WHERE address=? AND materials>=? AND shields>=? AND coins>=?', (materials, shields, coins, address, materials, shields, coins))
         if cursor.rowcount != 1:
@@ -201,6 +187,8 @@ def create_app(db_path=None, demo=None):
     def new_weapon(db, address, level=0, demo_flag=0):
         wid = '0x' + secrets.token_hex(32)
         db.execute('INSERT INTO weapons(id,owner,level,demo,created) VALUES(?,?,?,?,?)', (wid, address, level, demo_flag, time.time_ns()))
+        if workshop(db, address)['workshop_weapon_id'] is None:
+            db.execute('UPDATE players SET workshop_weapon_id=?,workshop_revision=workshop_revision+1 WHERE address=?', (wid, address))
         return wid
 
     @app.post('/api/account/register')
@@ -254,13 +242,35 @@ def create_app(db_path=None, demo=None):
 
     @app.get('/api/config')
     def config():
-        result = {'balance': BALANCE, 'demo_mode': demo_enabled, 'chain': None, 'chain_error': None}
+        result = {'balance': BALANCE, 'demo_mode': demo_enabled, 'network': settings.public(), 'chain': None, 'chain_error': None}
         try:
             info, _, _ = chain()
             result['chain'] = {k: info[k] for k in ['address', 'chainId', 'deploymentId', 'abi']}
         except HTTPException as e:
             result['chain_error'] = e.detail
         return result
+
+    @app.get('/api/chain/nfts')
+    def nfts(account: str | None = None, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100), block: int | None = Query(None, ge=0)):
+        return reader.nfts(account, offset, limit, block)
+
+    @app.get('/api/chain/status')
+    def chain_status():
+        return index_status(store)
+
+    @app.get('/api/chain/events')
+    def chain_events(offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100)):
+        return {'items': event_history(store, offset, limit), 'status': index_status(store)}
+
+    @app.get('/api/chain/indexed-nfts')
+    def indexed_nfts(offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
+        with store.connection() as db:
+            items = [dict(row) for row in db.execute('SELECT * FROM chain_nfts ORDER BY updated_block DESC,token_id LIMIT ? OFFSET ?', (limit, offset))]
+        return {'items': items, 'status': index_status(store)}
+
+    @app.get('/api/chain/receipts/{tx_hash}')
+    def receipt(tx_hash: str):
+        return reader.receipt(tx_hash)
 
     @app.post('/api/auth/challenge')
     def challenge(body: AddressBody, authorization: str | None = Header(default=None)):
@@ -304,6 +314,8 @@ def create_app(db_path=None, demo=None):
                     raise HTTPException(409,'此钱包已绑定其他账号，请使用该账号登录。')
                 db.execute('UPDATE accounts SET game_address=? WHERE game_address=?',(row['address'],row['guest_owner']))
                 db.execute('UPDATE weapons SET owner=? WHERE owner=?',(row['address'],row['guest_owner']))
+                if guest['workshop_weapon_id']:
+                    db.execute('UPDATE players SET workshop_weapon_id=?,workshop_revision=workshop_revision+1 WHERE address=?', (guest['workshop_weapon_id'], row['address']))
                 target=db.execute('SELECT * FROM players WHERE address=?',(row['address'],)).fetchone()
                 sword_day=max(guest['sword_day'] or '',target['sword_day'] or '')
                 claimed=min(BALANCE['daily_swords'],sum(p['daily_swords_claimed'] for p in [guest,target] if p['sword_day']==sword_day))
@@ -320,6 +332,7 @@ def create_app(db_path=None, demo=None):
     def state(authorization: str | None = Header(default=None)):
         address = authenticated(authorization)
         with store.connection() as db:
+            workshop(db, address)
             player = dict(db.execute('SELECT * FROM players WHERE address=?', (address,)).fetchone())
             now=datetime.now(timezone.utc)
             day=now.date().isoformat()
@@ -332,7 +345,7 @@ def create_app(db_path=None, demo=None):
             player['registered_at']=account['created'] if account else None
             player['role']=account['role'] if account else 'player'
             player['can_cheat']=demo_enabled and player['role']=='tester'
-            weapons = [dict(w) for w in db.execute("SELECT * FROM weapons WHERE owner=? AND status NOT IN ('destroyed','recycled') ORDER BY created DESC", (address,)).fetchall()]
+            weapons = [dict(w) for w in db.execute("SELECT * FROM weapons WHERE owner=? AND status IN ('active','sealed') ORDER BY created DESC", (address,)).fetchall()]
         player['can_claim'] = player['claim_day'] != datetime.now(timezone.utc).date().isoformat()
         for w in weapons:
             w['name'] = weapon_name(w['level'], w['branch'])
@@ -344,6 +357,30 @@ def create_app(db_path=None, demo=None):
             w['strike_materials'] = strike_material_cost(w['level'], w['branch'])
             w['branch_locked'] = w['branch'] != 'longsword'
         return {'player': player, 'weapons': weapons,'can_rescue':demo_enabled and player['daily_swords_remaining']==0 and not any(w['status']=='active' for w in weapons)}
+
+    @app.post('/api/workshop/equip')
+    def equip_weapon(body: WorkshopChoice, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address = authenticated(authorization)
+        def run(db):
+            owned(db, address, body.weapon_id)
+            current = workshop(db, address)
+            if current['workshop_revision'] != body.expected_revision:
+                raise HTTPException(409, '工坊选择已被其他操作改变，请查看最新状态后重试。')
+            if current['workshop_weapon_id'] != body.weapon_id:
+                db.execute('UPDATE players SET workshop_weapon_id=?,workshop_revision=workshop_revision+1 WHERE address=?', (body.weapon_id, address))
+            return {'message': '已取出武器，原工坊武器已自动存回仓库。'}
+        return mutate(address, idempotency_key, 'workshop/equip', body.model_dump(), run)
+
+    @app.post('/api/workshop/store')
+    def store_weapon(body: WorkshopChoice, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address = authenticated(authorization)
+        def run(db):
+            current = workshop(db, address)
+            if current['workshop_revision'] != body.expected_revision or current['workshop_weapon_id'] != body.weapon_id:
+                raise HTTPException(409, '工坊选择已被其他操作改变，请查看最新状态后重试。')
+            clear_workshop(db, address, body.weapon_id)
+            return {'message': '武器已存入仓库，等级、热量和保护进度已保留。'}
+        return mutate(address, idempotency_key, 'workshop/store', body.model_dump(), run)
 
     @app.post('/api/supply/sword')
     def claim_sword(authorization: str | None = Header(default=None),idempotency_key: str | None = Header(default=None)):
@@ -499,10 +536,11 @@ def create_app(db_path=None, demo=None):
         return mutate(address, idempotency_key, 'branch/' + wid, body.model_dump(), run)
 
     @app.post('/api/weapons/{wid}/heat')
-    def heat(wid: str, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+    def heat(wid: str, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None), x_forge_workshop_revision: int | None = Header(default=None, ge=0)):
         address = authenticated(authorization)
         def run(db):
             w = owned(db,address,wid)
+            require_in_workshop(db, address, wid, x_forge_workshop_revision)
             if w['level']>=weapon_max_level(w['branch']):
                 raise HTTPException(409,f"已达到当前路线最高等级 +{weapon_max_level(w['branch'])}，无需继续加热。")
             if w['heat_charges'] > 0:
@@ -517,10 +555,11 @@ def create_app(db_path=None, demo=None):
         return mutate(address,idempotency_key,'heat/'+wid,{},run)
 
     @app.post('/api/weapons/{wid}/strike')
-    def hit(wid: str, body: StrikeBody, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+    def hit(wid: str, body: StrikeBody, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None), x_forge_workshop_revision: int | None = Header(default=None, ge=0)):
         address = authenticated(authorization)
         def run(db):
             w = owned(db, address, wid)
+            require_in_workshop(db, address, wid, x_forge_workshop_revision)
             if (w['level'], w['strikes'], w['protected_left']) != (body.expected_level, body.expected_strikes, body.expected_protected_left):
                 raise HTTPException(409, '武器已被其他操作改变，请刷新后查看当前概率。')
             if w['level'] >= weapon_max_level(w['branch']):
@@ -534,6 +573,8 @@ def create_app(db_path=None, demo=None):
             result = strike(w, secrets.randbelow(1_000_000) / 1_000_000, body.shield)
             charge(db, address, materials=cost, shields=int(result['shield_used']))
             db.execute('UPDATE weapons SET level=?,strikes=?,protected_left=?,status=?,heat_charges=heat_charges-1 WHERE id=?', (result['level'], result['strikes'], result['protected_left'], result['status'], wid))
+            if result['status'] == 'destroyed':
+                clear_workshop(db, address, wid)
             result['heat_charges'] = w['heat_charges']-1
             return result
         return mutate(address, idempotency_key, 'strike/' + wid, body.model_dump(), run)
@@ -547,6 +588,7 @@ def create_app(db_path=None, demo=None):
                 raise HTTPException(409, '尚未达到回收等级。')
             value = recycle_price(w['level'], w['branch'])
             db.execute("UPDATE weapons SET status='recycled' WHERE id=?", (wid,))
+            clear_workshop(db, address, wid)
             db.execute('UPDATE players SET coins=coins+? WHERE address=?', (value, address))
             return {'message': f'武器已回收，获得 {value} 金币。'}
         return mutate(address, idempotency_key, 'recycle/' + wid, {}, run)
@@ -559,6 +601,7 @@ def create_app(db_path=None, demo=None):
             if w['level'] < BALANCE['mint_level']:
                 raise HTTPException(409, '尚未达到上链门槛。')
             db.execute("UPDATE weapons SET status='sealed' WHERE id=?", (wid,))
+            clear_workshop(db, address, wid)
             return {'message': '武器已永久封存，可以铸造 NFT。'}
         return mutate(address, idempotency_key, 'seal/' + wid, {}, run)
 
@@ -574,12 +617,18 @@ def create_app(db_path=None, demo=None):
         info, _, contract = chain()
         if contract.functions.exists(int(wid, 16)).call():
             raise HTTPException(409, '这把武器已铸造，请刷新链上收藏。')
-        keyfile = LOCAL / 'mint-key'
+        keyfile = settings.directory / 'mint-key'
         if not keyfile.exists():
-            raise HTTPException(503, '缺少本地铸造授权配置，请重新部署。')
+            raise HTTPException(503, '缺少当前环境的铸造授权密钥，请恢复原配置。')
+        try:
+            signing_key = keyfile.read_text().strip()
+            if Account.from_key(signing_key).address.lower() != info['mintSigner'].lower():
+                raise ValueError('wrong authority')
+        except Exception:
+            raise HTTPException(503, '铸造授权配置与当前合约不匹配。') from None
         data = {'weaponId': wid, 'recipient': address, 'level': w['level'], 'uri': metadata(w), 'deadline': int(time.time()) + 600, 'deploymentId': info['deploymentId']}
         domain = {'name': 'ForgeOfFate', 'version': '1', 'chainId': info['chainId'], 'verifyingContract': info['address']}
-        signed = Account.sign_message(encode_typed_data(domain, TYPES, data), keyfile.read_text().strip())
+        signed = Account.sign_message(encode_typed_data(domain, TYPES, data), signing_key)
         return {'voucher': data, 'signature': Web3.to_hex(signed.signature)}
 
     @app.post('/api/demo/seed')

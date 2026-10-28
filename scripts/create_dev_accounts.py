@@ -10,7 +10,8 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from eth_account import Account
 from web3 import Web3
-from backend.app import Store, LOCAL
+from backend.storage import Store
+from backend.chain import ChainSettings
 from backend.accounts import hash_password
 
 
@@ -34,8 +35,13 @@ def provision(store, username, password, role, address=None):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--demo-wallet',help='Create an ephemeral tester fixture for the local two-wallet demo')
+    parser.add_argument('--network', choices=['local', 'sepolia'], help='Choose the account data environment')
     args=parser.parse_args()
-    store=Store(str(LOCAL/'game.sqlite3'))
+    if args.network:
+        os.environ['FORGE_NETWORK'] = args.network
+    settings = ChainSettings.from_env()
+    LOCAL = settings.directory
+    store=Store(str(LOCAL/'game.sqlite3'), network=settings.network)
     if args.demo_wallet:
         if not Web3.is_address(args.demo_wallet):raise ValueError('Invalid wallet address')
         provision(store,'demo_'+uuid.uuid4().hex[:12],secrets.token_urlsafe(24),'tester',args.demo_wallet)
@@ -54,6 +60,6 @@ def main():
                 shown=password if name in created else '沿用已有密码（未重置）'
                 f.write(f"| {'测试（作弊菜单）' if role=='tester' else '普通玩家'} | {name} | {shown} |\n")
     print('Created: '+(', '.join(created) or 'none; existing accounts preserved'))
-    print('Local credentials: .local/test-accounts.md')
+    print('Local credentials: '+str(path))
 
 if __name__=='__main__':main()

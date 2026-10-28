@@ -88,7 +88,7 @@ async function main() {
   let apiPort = await freePort();
   while (apiPort === chainPort) apiPort = await freePort();
   const rpcUrl = `http://127.0.0.1:${chainPort}`, apiUrl = `http://127.0.0.1:${apiPort}`;
-  const env = { FORGE_LOCAL_DIR: directory, LOCAL_RPC_URL: rpcUrl, DEMO_MODE: '1' };
+  const env = { FORGE_NETWORK: 'local', FORGE_RPC_URL: '', FORGE_LOCAL_DIR: directory, LOCAL_RPC_URL: rpcUrl, DEMO_MODE: '1' };
   report.chainPort = chainPort; report.apiPort = apiPort;
   await run('npm', ['run', 'compile', '-w', 'contracts'], 'compile');
   const chain = launch(process.execPath, [require.resolve('hardhat/internal/cli/cli'), 'node', '--config', path.join(root, 'contracts/hardhat.config.cjs'), '--hostname', '127.0.0.1', '--port', String(chainPort)], 'chain');
@@ -133,6 +133,7 @@ async function main() {
     check('Registration, daily supply, three free swords and retry limits');
 
     const forged = await player.request('/forge', {}), wid = forged.weapon_id;
+    await player.request('/workshop/equip', { weapon_id: wid, expected_revision: (await player.state()).player.workshop_revision });
     const beforeHeat = await player.state();
     assert.equal(beforeHeat.player.materials, balance.daily_materials - balance.forge_materials);
     await player.request(`/weapons/${wid}/heat`, {});
@@ -183,9 +184,15 @@ async function main() {
       routes.push({ branch, id: spawned.weapon_id });
     }
     const routeBefore = await tester.state();
-    for (const route of routes) await tester.request(`/weapons/${route.id}/heat`, {});
+    for (const route of routes) {
+      await tester.request('/workshop/equip', { weapon_id: route.id, expected_revision: (await tester.state()).player.workshop_revision });
+      await tester.request(`/weapons/${route.id}/heat`, {});
+    }
     await delay((balance.heat_seconds + 0.2) * 1000);
-    for (const route of routes) await tester.request(`/weapons/${route.id}/strike`, { shield: true, expected_level: 20, expected_strikes: 0, expected_protected_left: 0 });
+    for (const route of routes) {
+      await tester.request('/workshop/equip', { weapon_id: route.id, expected_revision: (await tester.state()).player.workshop_revision });
+      await tester.request(`/weapons/${route.id}/strike`, { shield: true, expected_level: 20, expected_strikes: 0, expected_protected_left: 0 });
+    }
     const routeCost = routes.reduce((sum, route) => sum + balance.weapon_economy[route.branch].strike_materials, 0);
     assert.equal((await tester.state()).player.materials, routeBefore.player.materials - routes.length * balance.heat_materials - routeCost);
     check('All three weapon routes charge their configured iron cost without energy');
@@ -208,7 +215,13 @@ async function main() {
     const sellerContract = new Contract(cfg.chain.address, cfg.chain.abi, new NonceManager(wa));
     const buyerContract = sellerContract.connect(new NonceManager(wb));
     const id = BigInt(seeded.weapon_id), price = parseEther('0.01');
-    await (await sellerContract.mint(authorization.voucher, authorization.signature)).wait();
+    const mintedReceipt = await (await sellerContract.mint(authorization.voucher, authorization.signature)).wait();
+    const mintStatus = await tester.request('/chain/receipts/' + mintedReceipt.hash);
+    assert.equal(mintStatus.receipt.status, 1);
+    const mintedSnapshot = await tester.request('/chain/nfts?account=' + wa.address);
+    assert.equal(mintedSnapshot.items[0].id, id.toString());
+    assert.equal(mintedSnapshot.items[0].owner, wa.address);
+    assert.equal(mintedSnapshot.chainId, 31337);
     assert.equal(await sellerContract.ownerOf(id), wa.address);
     await tester.request(`/weapons/${seeded.weapon_id}/voucher`, {}, { expected: 409 });
     await (await sellerContract.list(id, price)).wait();
@@ -220,13 +233,47 @@ async function main() {
     await (await buyerContract.list(id, price)).wait();
     await (await buyerContract['safeTransferFrom(address,address,uint256)'](wb.address, wa.address, id)).wait();
     assert.equal((await sellerContract.listings(id)).price, 0n);
+    const finalSnapshot = await tester.request('/chain/nfts?account=' + wa.address);
+    assert.equal(finalSnapshot.items[0].owner, wa.address);
+    assert.equal(finalSnapshot.items[0].price, '0');
+    assert.equal(finalSnapshot.proceeds, '0');
+    check('Read-only NFT and receipt API matches contract state without exposing RPC credentials');
     check('Seal, signed NFT mint, list, buy, withdraw and transfer run on the isolated chain');
 
+    const python=path.join(root,'.venv/bin/python');
+    // Upgrade the legacy fixture by discovering its real creation receipt. No deployment or signing.
+    await run(python,['-m','backend.indexer','--record-deployment'],'index-record',env);
+    const catchUp=()=>run(python,['-m','backend.indexer','--once'],'index-once',env);
+    await catchUp();
+    const indexedBefore=await tester.request('/chain/indexed-nfts');
+    assert.equal(indexedBefore.items[0].owner,wa.address);
+    assert.equal(indexedBefore.items[0].price_wei,'0');
+    assert.equal(indexedBefore.status.pendingEvents,0);
+    assert.equal(indexedBefore.status.fundingReady,false);
+    await catchUp();
+    assert.equal((await tester.request('/chain/status')).eventCount,indexedBefore.status.eventCount);
+    check('Persistent NFT history indexes real logs and repeated scans do not duplicate events');
+
     const beforeRestart = await restored.state();
-    await stop(backend); backend = startBackend(); await ready();
+    const beforeOffline=await provider.send('evm_snapshot',[]);
+    await stop(backend);
+    await (await sellerContract['safeTransferFrom(address,address,uint256)'](wa.address,wb.address,id)).wait();
+    backend = startBackend(); await ready();
     assert.deepEqual(await restored.state(), beforeRestart);
     assert.equal((await tester.state()).weapons.find(item => item.id === seeded.weapon_id).status, 'sealed');
     check('Backend restart preserves accounts, weapons, resources and authenticated sessions');
+    assert.equal((await tester.request('/chain/indexed-nfts')).items[0].owner,wa.address);
+    await catchUp();
+    const recovered=await tester.request('/chain/indexed-nfts');
+    assert.equal(recovered.items[0].owner,wb.address);
+    assert.equal(recovered.status.eventCount,indexedBefore.status.eventCount+1);
+    check('A transfer while backend and listener are stopped is recovered from the saved cursor');
+    await provider.send('evm_revert',[beforeOffline]);await provider.send('evm_mine',[]);
+    await assert.rejects(catchUp());
+    const halted=await tester.request('/chain/status');
+    assert.equal(halted.state,'halted');assert.equal(halted.eventCount,recovered.status.eventCount);
+    assert.deepEqual(await restored.state(),beforeRestart);
+    check('Changed saved block halts indexing and preserves event evidence and game balances');
     report.passed = true;
   } finally { provider.destroy(); }
 }

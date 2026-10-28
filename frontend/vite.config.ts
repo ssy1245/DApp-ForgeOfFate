@@ -14,6 +14,8 @@ const configuredTiers = [...tiers, ...branches.flatMap(branch => branch.tiers ??
 const models = [...new Set(configuredTiers.map(tier => `${tier.model}.glb`)), 'hammer.glb', 'anvil.glb'];
 const portraits = [...new Set(configuredTiers.map(tier => tier.reference).filter((name): name is string => !!name))];
 const displays = [...new Set(configuredTiers.map(tier => tier.display).filter((name): name is string => !!name))];
+// Allows isolated browser tests to use their own API without touching a running game.
+const apiTarget = process.env.FORGE_API_TARGET || 'http://127.0.0.1:8000';
 export default defineConfig({
   plugins: [react(), {
     name: 'local-3d-assets',
@@ -72,6 +74,6 @@ export default defineConfig({
       }
     }
   }],
-  server: { strictPort: true, proxy: { '/api': 'http://127.0.0.1:8000' } },
-  preview: { proxy: { '/api': 'http://127.0.0.1:8000' } }
+  server: { strictPort: true, proxy: { '/api': apiTarget } },
+  preview: { proxy: { '/api': apiTarget } }
 });

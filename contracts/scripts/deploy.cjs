@@ -7,7 +7,10 @@ async function main(){
  const epoch=hre.ethers.hexlify(hre.ethers.randomBytes(32));
  const contract=await (await hre.ethers.getContractFactory('ForgeOfFate')).deploy(authority.address,epoch); await contract.waitForDeployment();
  const artifact=await hre.artifacts.readArtifact('ForgeOfFate');
- const info={address:await contract.getAddress(),chainId:31337,deploymentId:epoch,mintSigner:authority.address,abi:artifact.abi};
+ const receipt=await contract.deploymentTransaction().wait();
+ const info={manifestVersion:2,address:await contract.getAddress(),chainId:31337,deploymentId:epoch,mintSigner:authority.address,abi:artifact.abi,
+  deploymentTransaction:receipt.hash,deploymentBlock:receipt.blockNumber,deploymentBlockHash:receipt.blockHash,
+  genesisHash:(await hre.ethers.provider.getBlock(0)).hash,runtimeCodeHash:hre.ethers.keccak256(await hre.ethers.provider.getCode(await contract.getAddress()))};
  fs.writeFileSync(path.join(dir,'deployment.json'),JSON.stringify(info,null,2));
  console.log('Forge of Fate deployed:',info.address,'— local configuration saved. Restart backend after redeployment.');
 }

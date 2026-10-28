@@ -1,0 +1,26 @@
+.scene-warehouse{position:fixed;inset:0;margin:auto;width:min(760px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 40px);padding:0;border:1px solid #8c7548;border-radius:10px;background:#172019;color:#ddd9c6;box-shadow:0 24px 100px #0009;overflow:auto}
+.scene-warehouse::backdrop{background:#070d0bb8;backdrop-filter:blur(4px)}
+.scene-warehouse-panel{padding:24px}
+.scene-warehouse header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.scene-warehouse header small{font-size:10px;letter-spacing:.16em;color:#a8ac91}
+.scene-warehouse h2{margin:6px 0 0;font-size:25px;color:#eed8a8}
+.scene-warehouse header button{flex-shrink:0}
+.scene-warehouse button{font:inherit;font-size:12px;line-height:1.5;white-space:normal}
+.scene-warehouse button:focus-visible{outline:2px solid #f4cf80;outline-offset:3px}
+.scene-warehouse button:disabled{opacity:.45;cursor:not-allowed}
+.scene-warehouse-description{font-size:12px;line-height:1.7;color:#b4b99f;margin:14px 0 18px}
+.scene-warehouse-current{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #5d6346;background:#253024;padding:14px 16px;border-radius:6px}
+.scene-warehouse-current>div{display:grid;gap:5px;min-width:0}.scene-warehouse-current span{font-size:10px;color:#b0b99b}.scene-warehouse-current strong{font-size:15px;overflow-wrap:anywhere}.scene-warehouse-current button{flex-shrink:0}
+.scene-warehouse-feedback{font-size:12px;line-height:1.65;color:#d2be87;min-height:20px;margin:12px 0;overflow-wrap:anywhere}
+.scene-warehouse-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.scene-warehouse-item{display:grid;grid-template-columns:94px minmax(0,1fr);gap:12px;border:1px solid #414c3b;background:#111a15;border-radius:6px;overflow:hidden;min-width:0}
+.scene-warehouse-item.is-current{border-color:#bd9753;background:#232a1b}
+.scene-warehouse-item .weapon-art{height:100%;min-height:172px;margin:0;border:0;border-radius:0;background:radial-gradient(ellipse,#404d34 0%,#101b16 74%);overflow:hidden}
+.scene-warehouse-item .weapon-reference{width:100%;height:100%;max-height:194px;padding:10px;object-fit:contain}
+.scene-warehouse-item .artwork-rule,.scene-warehouse-item .artwork-caption,.scene-warehouse-item .weapon-level{display:none}
+.scene-warehouse-item-info{padding:14px 12px 14px 0;min-width:0;display:flex;align-items:flex-start;flex-direction:column}
+.scene-warehouse-status{font-size:10px;color:#c1b783}.scene-warehouse h3{font-size:14px;line-height:1.5;margin:6px 0;overflow-wrap:anywhere}.scene-warehouse h3 em{font-style:normal;color:#e8bd72;white-space:nowrap}
+.scene-warehouse code{font-size:10px;color:#82917e}.scene-warehouse-item p{font-size:11px;line-height:1.6;color:#a3b299;margin:10px 0 12px}.scene-warehouse-item button{margin-top:auto;width:100%;padding:8px}
+.scene-warehouse-empty{grid-column:1/-1;padding:40px 16px;text-align:center;font-size:13px;line-height:1.7;color:#b5bea5;border:1px dashed #4e5d43;border-radius:6px}
+.scene-warehouse footer{margin-top:18px;font-size:11px;line-height:1.6;color:#8f9c85}
+@media(max-width:600px){.scene-warehouse{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}.scene-warehouse-panel{padding:16px}.scene-warehouse h2{font-size:21px}.scene-warehouse-list{grid-template-columns:minmax(0,1fr)}.scene-warehouse-item{grid-template-columns:90px minmax(0,1fr)}.scene-warehouse-item .weapon-art{min-height:154px}.scene-warehouse-item .weapon-reference{max-height:178px}.scene-warehouse header small{font-size:8px;letter-spacing:.1em}}

@@ -91,7 +91,17 @@ async function main() {
       return;
     }
     console.log('节点检查通过：Ethereum Sepolia（11155111）。');
-    console.log('仅验证了配置格式与节点网络，未检查钱包控制权、余额或合约部署。未发送任何交易。');
+    const finalityResponse=await fetch(rpc,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({jsonrpc:'2.0',id:2,method:'eth_getBlockByNumber',params:['finalized',false]}),
+      signal:AbortSignal.timeout(10000),redirect:'error'
+    });
+    const finality=await finalityResponse.json();
+    if(!finalityResponse.ok||finality.error||finality.id!==2||!/^0x[0-9a-fA-F]+$/.test(finality.result?.number||'')||!/^0x[0-9a-fA-F]{64}$/.test(finality.result?.hash||'')){
+      console.error('链 ID 正确，但无法读取 finalized 确认边界。监听不会降级为最新区块，请检查节点服务。');process.exitCode=1;return;
+    }
+    console.log('节点可读取 finalized 确认边界。');
+    console.log('已验证配置格式、节点网络与最终确认查询，未检查钱包控制权、余额或合约部署。未发送任何交易。');
   } catch {
     console.error('节点检查失败：请检查网络连接、服务商密钥、访问限制和服务状态。RPC 地址未输出。');
     process.exitCode = 1;

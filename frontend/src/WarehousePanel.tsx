@@ -31,7 +31,7 @@ export default function WarehousePanel({ weapons, currentId, disabled, feedback,
     }}
     onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="scene-warehouse-panel">
-      <header><div><small>FORGE OF FATE / STORAGE</small><h2 id="scene-warehouse-title">{t('武器仓库')}</h2></div>
+      <header><div><small>{t('工坊武器管理')}</small><h2 id="scene-warehouse-title">{t('武器仓库')}</h2></div>
         <button autoFocus className="secondary" onClick={onClose}>{t('返回游玩')} <span aria-hidden="true">×</span></button></header>
       <p className="scene-warehouse-description">{t('选择武器继续锻造，原工坊武器会自动存回。存取不消耗资源。')}</p>
       <div className="scene-warehouse-current"><div><span>{t('当前工坊')}</span><strong>{current ? `${name(current)} +${current.level}` : t('工坊空闲')}</strong></div>

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import test from 'node:test';
+import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import React from 'react';
@@ -28,6 +29,28 @@ test('Chinese and English UI, runtime messages, weapon identities and saved pref
     const page = (locale, child) => renderToStaticMarkup(React.createElement(LanguageProvider, { initialLocale: locale }, child));
     const text = html => html.replace(/<[^>]*>/g, '').replaceAll('&#x27;', "'").replaceAll('&amp;', '&');
     const parameters = key => [...key.matchAll(/\{(\d+)\}/g)].map(match => Number(match[1])).sort();
+
+    await t.test('every app-owned Chinese source message has an English entry', async () => {
+      const branches = JSON.parse(await fs.readFile(new URL('../../assets/3d/sword-branches.json', import.meta.url), 'utf8'));
+      const knownNames = new Set([...catalog, ...branches].map(item => item.name));
+      const bilingualLanguageControls = new Set(['Forge of Fate · 命运锻造所', '语言', '切换为中文', '中文']);
+      const missing = [];
+      for (const file of (await fs.readdir(path.join(root, 'src'))).filter(file => /\.tsx?$/.test(file))) {
+        const content = await fs.readFile(path.join(root, 'src', file), 'utf8');
+        const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+        function inspect(node) {
+          let value;
+          if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isJsxText(node)) value = node.text.trim();
+          if (ts.isTemplateExpression(node)) value = (node.head.text + node.templateSpans.map((span, i) => `{${i}}` + span.literal.text).join('')).trim();
+          if (value && /\p{Script=Han}/u.test(value) && !knownNames.has(value) && messages[value] === undefined && !(file === 'i18n.tsx' && bilingualLanguageControls.has(value))) {
+            missing.push(`${file}:${source.getLineAndCharacterOfPosition(node.pos).line + 1} ${value}`);
+          }
+          ts.forEachChild(node, inspect);
+        }
+        inspect(source);
+      }
+      assert.deepEqual(missing, [], 'Add an English translation when adding visible messages or runtime notices.');
+    });
 
     await t.test('every translated template preserves all parameters', () => {
       for (const [key, value] of Object.entries(messages)) {

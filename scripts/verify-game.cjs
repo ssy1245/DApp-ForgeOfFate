@@ -8,6 +8,16 @@ const { randomUUID } = require('node:crypto');
 const { Wallet, NonceManager, JsonRpcProvider, Contract, ContractFactory, parseEther, hexlify, randomBytes } = require('ethers');
 
 const root = path.resolve(__dirname, '..');
+const nftImages = JSON.parse(fs.readFileSync(path.join(root, 'assets/NFT_Pic/manifest.json'))).images;
+function verifyMetadata(uri, branch, level) {
+  assert.ok(uri.startsWith('data:application/json;base64,'));
+  const data = JSON.parse(Buffer.from(uri.split(',')[1], 'base64').toString('utf8'));
+  assert.equal(data.image, nftImages[branch]);
+  assert.ok(data.name.endsWith(' +' + level));
+  assert.ok(data.name_en.endsWith(' +' + level));
+  assert.equal(data.attributes.find(item => item.trait_type === 'Weapon Type').value, branch);
+  assert.equal(data.attributes.find(item => item.trait_type === 'Level').value, level);
+}
 fs.mkdirSync(path.join(root, '.local'), { recursive: true, mode: 0o700 });
 const directory = fs.mkdtempSync(path.join(root, '.local', 'verify-game-'));
 fs.chmodSync(directory, 0o700);
@@ -216,6 +226,8 @@ async function main() {
     const buyerContract = sellerContract.connect(new NonceManager(wb));
     const id = BigInt(seeded.weapon_id), price = parseEther('0.01');
     const mintedReceipt = await (await sellerContract.mint(authorization.voucher, authorization.signature)).wait();
+    assert.equal(await sellerContract.tokenURI(id), authorization.voucher.uri);
+    verifyMetadata(await sellerContract.tokenURI(id), 'longsword', Number(authorization.voucher.level));
     const mintStatus = await tester.request('/chain/receipts/' + mintedReceipt.hash);
     assert.equal(mintStatus.receipt.status, 1);
     const mintedSnapshot = await tester.request('/chain/nfts?account=' + wa.address);
@@ -233,6 +245,7 @@ async function main() {
     await (await buyerContract.list(id, price)).wait();
     await (await buyerContract['safeTransferFrom(address,address,uint256)'](wb.address, wa.address, id)).wait();
     assert.equal((await sellerContract.listings(id)).price, 0n);
+    assert.equal(await sellerContract.tokenURI(id), authorization.voucher.uri, 'Trading and transfer must preserve the artwork and attributes');
     const finalSnapshot = await tester.request('/chain/nfts?account=' + wa.address);
     assert.equal(finalSnapshot.items[0].owner, wa.address);
     assert.equal(finalSnapshot.items[0].price, '0');
@@ -274,6 +287,19 @@ async function main() {
     assert.equal(halted.state,'halted');assert.equal(halted.eventCount,recovered.status.eventCount);
     assert.deepEqual(await restored.state(),beforeRestart);
     check('Changed saved block halts indexing and preserves event evidence and game balances');
+    // The reorg reverted a send; read the wallet nonce afresh for these mints.
+    const artworkContract = new Contract(cfg.chain.address, cfg.chain.abi, new NonceManager(wa));
+    for (const branch of ['rapier', 'greatsword']) {
+      const spawned = await tester.request('/cheats/weapons', { count: 1, level: balance.mint_level });
+      await tester.request(`/weapons/${spawned.weapon_id}/branch`, { branch });
+      await tester.request(`/weapons/${spawned.weapon_id}/seal`, {});
+      const signed = await tester.request(`/weapons/${spawned.weapon_id}/voucher`, {});
+      await (await artworkContract.mint(signed.voucher, signed.signature)).wait();
+      const uri = await artworkContract.tokenURI(BigInt(spawned.weapon_id));
+      assert.equal(uri, signed.voucher.uri);
+      verifyMetadata(uri, branch, balance.mint_level);
+    }
+    check('All three NFT routes store the fixed public artwork URLs and individual attributes');
     report.passed = true;
   } finally { provider.destroy(); }
 }

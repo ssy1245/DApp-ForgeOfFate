@@ -19,8 +19,8 @@ export const STATIONS:Record<Exclude<Station,null>,Vector3> = {
 
 export { canStand } from './workshopLayout';
 
-export default function WorkshopControls({mode, reset, movement, sensitivity, suspended=false, onNear, onInteract, onActiveChange, onError, onPrimary}: {
-  mode: ViewMode; reset: number; movement: Set<MoveKey>; sensitivity: number;
+export default function WorkshopControls({mode, reset, sensitivity, suspended=false, onNear, onInteract, onActiveChange, onError, onPrimary}: {
+  mode: ViewMode; reset: number; sensitivity: number;
   suspended?: boolean;
   onPrimary: () => void;
   onNear: (station: Station) => void; onInteract: () => void;
@@ -53,7 +53,7 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, su
     previousView.current = viewKey;
     canvas.tabIndex = 0;
     canvas.style.touchAction = 'none';
-    near.current = null; onNear(null); keys.current.clear();movement.clear();
+    near.current = null; onNear(null); keys.current.clear();
     active.current=false;onActiveChange(false);
     if (suspended) return;
     if (mode === 'orbit') {
@@ -79,13 +79,13 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, su
     const captureCursor=()=>document.body.classList.add(cursorClass);
     const pause = () => {
       document.body.classList.remove(cursorClass);
-      requested=false;fallback=false;mouseLast=null;active.current=false;keys.current.clear();movement.clear();touchLast=null;onActiveChange(false);
+      requested=false;fallback=false;mouseLast=null;active.current=false;keys.current.clear();touchLast=null;onActiveChange(false);
       if(document.pointerLockElement===canvas)document.exitPointerLock();
     };
     const fail = () => {
       if(!requested||fallback)return;
       captureCursor();
-      fallback=true;active.current=true;keys.current.clear();movement.clear();onActiveChange(true);
+      fallback=true;active.current=true;keys.current.clear();onActiveChange(true);
       onError('鼠标已隐藏 · 移出工坊不暂停 · 按 Esc 退出操控。');
     };
     const rotate = (dx:number,dy:number) => {
@@ -111,7 +111,7 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, su
     const lockChanged = () => {
       const locked=document.pointerLockElement===canvas;
       if(locked&&!requested){document.exitPointerLock();return;}
-      if(locked){captureCursor();onError('鼠标已锁定 · WASD 移动 · 按 Esc 退出操控。');fallback=false;active.current=true;onActiveChange(true);keys.current.clear();movement.clear();}
+      if(locked){captureCursor();onError('鼠标已锁定 · WASD 移动 · 按 Esc 退出操控。');fallback=false;active.current=true;onActiveChange(true);keys.current.clear();}
       else if(!fallback)pause();
     };
     const mouseMove = (e:MouseEvent) => {
@@ -166,13 +166,13 @@ export default function WorkshopControls({mode, reset, movement, sensitivity, su
       window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',pause);
       pause();
     };
-  }, [mode,reset,suspended,camera,gl,onNear,onActiveChange,onError,movement,size.width,size.height]);
+  }, [mode,reset,suspended,camera,gl,onNear,onActiveChange,onError,size.width,size.height]);
 
   useFrame((_,dt) => {
     if(orbit.current){orbit.current.rotateSpeed=sensitivityRef.current;orbit.current.update();}
     if(mode !== 'walk') return;
-    // Both physical keys and on-screen WASD are ignored until the scene is entered.
-    const pressed=(code:MoveKey)=>active.current&&(keys.current.has(code)||movement.has(code));
+    // Physical movement keys are ignored until the scene is entered.
+    const pressed=(code:MoveKey)=>active.current&&keys.current.has(code);
     const y=Number(pressed('KeyW'))-Number(pressed('KeyS'));
     const x=Number(pressed('KeyD'))-Number(pressed('KeyA'));
     camera.getWorldDirection(forward.current);forward.current.y=0;forward.current.normalize();

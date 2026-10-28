@@ -32,9 +32,10 @@ test('normal registration, daily supply, three swords and reload match SQLite', 
   await page.getByRole('button', { name: '环绕查看', exact: true }).click();
   for (let remaining = 2; remaining >= 0; remaining--) {
     await clickAction(page, page.getByRole('button', { name: '领取一把', exact: true }), '/supply/sword');
-    await expect(page.locator('.sword-supply-hud strong')).toHaveText(`今日可领 ${remaining} / 3 把`);
+    await expect(page.locator('.claim-sword')).toHaveAttribute('title', `今日可领 ${remaining} / 3 把`);
     const data = await consistent(page, game, user.address);
     expect(data.weapons).toHaveLength(3 - remaining);
+    expect(data.player.daily_swords_remaining).toBe(remaining);
   }
   await expect(page.getByRole('button', { name: '今日已领完', exact: true })).toBeDisabled();
   await expect(page.locator('.claim')).toBeDisabled();

@@ -1,0 +1,9 @@
+{
+  "repository": "ssy1245/NFT_image",
+  "commit": "658de5dd69600b126345f028a7c7f30d7a7b63ed",
+  "images": {
+    "longsword": "https://raw.githubusercontent.com/ssy1245/NFT_image/658de5dd69600b126345f028a7c7f30d7a7b63ed/Image_Dapp/sword.png",
+    "rapier": "https://raw.githubusercontent.com/ssy1245/NFT_image/658de5dd69600b126345f028a7c7f30d7a7b63ed/Image_Dapp/Rapier.png",
+    "greatsword": "https://raw.githubusercontent.com/ssy1245/NFT_image/658de5dd69600b126345f028a7c7f30d7a7b63ed/Image_Dapp/GS.png"
+  }
+}

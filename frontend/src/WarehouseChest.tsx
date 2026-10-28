@@ -24,7 +24,10 @@ export default function WarehouseChest({ onInteract }: { onInteract: () => void 
       <mesh position={[0, 1.04, .76]}><boxGeometry args={[.28, .42, .1]}/><meshStandardMaterial color="#c9a05c" metalness={.75} roughness={.35}/></mesh>
       {[-.55, 0, .55].map(x => <mesh key={x} position={[x, .7, .731]}><boxGeometry args={[.02, 1.15, .01]}/><meshStandardMaterial color="#2a281f"/></mesh>)}
     </group>
-    <sprite position={[0, 2.65, 0]} scale={[3.4, 1.17, 1]}><spriteMaterial map={texture} toneMapped={false}/></sprite>
+    <group position={[-.8, 2.65, 0]} rotation={[0, Math.PI / 2, 0]}>
+      <mesh><boxGeometry args={[2.9, 1, .07]}/><meshStandardMaterial color="#493c2b" roughness={.85}/></mesh>
+      <mesh position={[0, 0, .04]}><planeGeometry args={[2.9, 1]}/><meshBasicMaterial map={texture} toneMapped={false}/></mesh>
+    </group>
     <pointLight position={[1.4, 2.4, 0]} intensity={7} distance={5} color="#e7c48b"/>
   </group>;
 }

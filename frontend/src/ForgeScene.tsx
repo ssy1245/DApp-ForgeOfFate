@@ -2,7 +2,7 @@ import { useI18n } from './i18n';
 import { Component, Suspense, createContext, useContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Box3, Group, Mesh, Object3D, Quaternion, Shape, Vector3 } from 'three';
-import WorkshopControls, { type ViewMode, type Station, type MoveKey } from './WorkshopControls';
+import WorkshopControls, { type ViewMode, type Station } from './WorkshopControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import ForgeEffects from './ForgeEffects';
@@ -205,7 +205,7 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
   const [active,setActive]=useState(false);
   const [warehouseOpen,setWarehouseOpen]=useState(false);
   const closeWarehouse=useCallback(()=>setWarehouseOpen(false),[]);
-  const [hudOpen,setHudOpen]=useState(()=>window.innerWidth>700);
+  const [hudOpen,setHudOpen]=useState(false);
   const [impactResult,setImpactResult]=useState('');
   useEffect(()=>{if(!hit)return;const timer=setTimeout(()=>setImpactResult(result),IMPACT_MS);return()=>clearTimeout(timer);},[hit,result]);
   useEffect(()=>setImpactResult(''),[weapon?.id,workshopKey]);
@@ -249,14 +249,13 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
   const [hint,setHint]=useState('点击画面进入：鼠标移动转头，WASD 移动，E 拿放；按 Esc 暂停并释放鼠标。');
   const startHeating=useCallback(()=>{if(weapon&&weapon.level>=maxLevel){setHint(`已达到当前路线最高等级 +${maxLevel}。`);return;}if(heatWarning){setHint(heatWarning);return;}onHeat();},[heatWarning,onHeat,weapon?.level,maxLevel]);
   const heatingMessage=heatWarning||strikeWarning||feedback;
-  const movement=useRef(new Set<MoveKey>());
   const [expanded,setExpanded]=useState(false);
   const container=useRef<HTMLDivElement>(null);
   const interact=useCallback((target:Station)=>{
     if(mode==='walk'&&!active)return;
     if(busy||warehouseOpen)return;
     if(mode==='walk'&&target!==near){setHint('再走近一些，就可以交互。');return;}
-    if(target==='warehouse'){movement.current.clear();setWarehouseOpen(true);return;}
+    if(target==='warehouse'){setWarehouseOpen(true);return;}
     if(target==='supply'){
       if(supplyRemaining===null){setHint('正在查询今日领剑额度，请稍候。');return;}
       if(supplyRemaining<=0){setHint('今天的基础剑已领完，UTC 零点刷新额度。');return;}
@@ -279,27 +278,38 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
     else if(place===target){setPlace('held');setHint('已拿起长剑，锻造锤自动收起。走近另一处可以放下长剑。');}
     else setHint('这里暂时没有武器；请先拿起长剑。');
   },[mode,near,place,active,weapon,busy,warehouseOpen,warming,hot,startHeating,displaySlots,moveWeapon,onSelectWeapon,setPlace,supplyRemaining,onClaimSword]);
-  useEffect(()=>{movement.current.clear();},[mode]);
-  useEffect(()=>{const stop=()=>movement.current.clear();window.addEventListener('blur',stop);return()=>window.removeEventListener('blur',stop);},[]);
-  const changeMode=(next:ViewMode)=>{movement.current.clear();setMode(next);setHint(next==='walk'?'点击画面进入：鼠标移动转头，WASD 移动，E 拿放；按 Esc 暂停并释放鼠标。':'拖动旋转视角，滚轮缩放；点击剑或下方按钮拿起。');};
+  useEffect(()=>{},[mode]);
+  useEffect(()=>{const stop=()=>window.addEventListener('blur',stop);return()=>window.removeEventListener('blur',stop);},[]);
+  const changeMode=(next:ViewMode)=>{setMode(next);setHint(next==='walk'?'点击画面进入：鼠标移动转头，WASD 移动，E 拿放；按 Esc 暂停并释放鼠标。':'拖动旋转视角，滚轮缩放；点击剑或下方按钮拿起。');};
   const hammerEquipped=mode==='walk'&&!!weapon&&place==='anvil'&&near==='anvil';
   const nearLabel=near==='anvil'?'锻造台':isCabinet(near)?CABINETS.find(cabinet=>cabinet.id===near)!.label:near==='furnace'?'熔炉':near==='supply'?'领剑处':near==='warehouse'?'武器仓库 · 按 E 打开':'靠近锻造设施';
   const placeLabel=isCabinet(place)?`长剑在${CABINETS.find(cabinet=>cabinet.id===place)!.label}`:'';
   const pickupStation:Station=mode==='walk'&&isCabinet(near)&&displaySlots[near]?near:place==='furnace'?'furnace':isCabinet(place)?place:'anvil';
   return <UpgradeContext.Provider value={appearanceTiers}><Fallback><div ref={container} data-near={near||''} data-active={active} data-weapon-id={weapon?.id||''} data-place={place} data-display-ids={Object.values(displaySlots).join(',')} className={`workshop-view ${expanded?'workshop-expanded':''}`}>
-    <div className="workshop-toolbar"><div className="view-modes"><button aria-pressed={mode==='orbit'} onClick={()=>changeMode('orbit')}>{t("环绕查看")}</button><button aria-pressed={mode==='walk'} onClick={()=>changeMode('walk')}>{t("第一人称")}</button></div><div><button aria-label={t('打开场景仓库')} aria-haspopup="dialog" onClick={()=>{movement.current.clear();setWarehouseOpen(true);}}>{t('仓库')}</button><button onClick={()=>{movement.current.clear();setReset(r=>r+1);}}>{t("复位")}</button><button aria-pressed={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded?t('收起'):t('展开')}</button></div></div>
-    <label className="look-sensitivity">{t("视角灵敏度 ")}<input aria-label={t("视角灵敏度")} type="range" min="0.2" max="2.5" step="0.1" value={sensitivity} onChange={e=>setSensitivity(Number(e.target.value))}/><output>{sensitivity.toFixed(1)}×</output></label>
+    <div className="workshop-toolbar">
+      <div className="view-modes"><button aria-pressed={mode==='orbit'} onClick={()=>changeMode('orbit')}>{t('环绕查看')}</button><button aria-pressed={mode==='walk'} onClick={()=>changeMode('walk')}>{t('第一人称')}</button></div>
+      <div className="view-tools">
+        <button aria-label={t('打开场景仓库')} aria-haspopup="dialog" onClick={()=>{setWarehouseOpen(true);}}>{t('仓库')}</button>
+        <details className="view-settings"><summary>{t('视角设置')}</summary><div className="view-settings-panel">
+          <label className="look-sensitivity">{t('视角灵敏度 ')}<input aria-label={t('视角灵敏度')} type="range" min="0.2" max="2.5" step="0.1" value={sensitivity} onChange={e=>setSensitivity(Number(e.target.value))}/><output>{sensitivity.toFixed(1)}×</output></label>
+          <button onClick={()=>{setReset(r=>r+1);}}>{t('复位')}</button>
+        </div></details>
+        <button aria-pressed={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded?t('收起'):t('展开')}</button>
+      </div>
+    </div>
     <Canvas shadows camera={{position:[6.6,6.3,9.3],fov:44}} dpr={[1,1.6]}>
-      <WorkshopControls mode={mode} reset={reset} suspended={warehouseOpen} movement={movement.current} sensitivity={sensitivity} onNear={setNear} onActiveChange={setActive} onError={setHint} onPrimary={strikeNow} onInteract={()=>interact(near)}/>
+      <WorkshopControls mode={mode} reset={reset} suspended={warehouseOpen} sensitivity={sensitivity} onNear={setNear} onActiveChange={setActive} onError={setHint} onPrimary={strikeNow} onInteract={()=>interact(near)}/>
       <Suspense fallback={null}><World supplyRemaining={supplyRemaining} supplyTotal={supplyTotal} displaySlots={displaySlots} weapons={weapons} roomView={mode} level={level} hit={hit} place={place} heat={heat} result={result} hammerEquipped={hammerEquipped} onStation={station=>{if(mode==='orbit')interact(station);}}/></Suspense>
     </Canvas>
-    {mode==='walk'&&!active&&!busy&&<div className="workshop-entry"><strong>{t("点击画面进入工坊")}</strong><span><kbd>W A S D</kbd> {t(" 移动 ")}<kbd>E</kbd> {t(" 拿放 ")}<kbd>Esc</kbd> {t(" 暂停")}</span></div>}
-    {mode==='walk'&&<><div className="workshop-crosshair" aria-hidden="true">+</div><div className="walk-pad" aria-label={t("移动方向")}>{[['KeyW',t('前进')],['KeyA',t('左移')],['KeyS',t('后退')],['KeyD',t('右移')]].map(([key,label])=><button key={key} aria-label={`${key.slice(-1)} ${label}`} disabled={!active} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);movement.current.add(key as MoveKey);}} onPointerUp={()=>movement.current.delete(key as MoveKey)} onPointerCancel={()=>movement.current.clear()} onLostPointerCapture={()=>movement.current.delete(key as MoveKey)}>{key.slice(-1)}</button>)}</div></>}
+    {mode==='walk'&&!active&&!busy&&<div className="workshop-entry"><strong>{t("点击画面进入工坊")}</strong></div>}
+    {mode==='walk'&&<div className="workshop-crosshair" aria-hidden="true">+</div>}
     <div className="workshop-interactions"><span>{place==='held'?t('持剑中'):place==='anvil'?t('长剑在锻造台'):place==='furnace'?t('长剑在熔炉'):place==='empty'?t('工坊空闲 · 可从仓库取出武器'):t(placeLabel)}{mode==='walk'?` · ${active?t(nearLabel):t('已暂停')}`:''}{hammerEquipped?t(' · 已取出锻造锤'):''}</span><div>
+      {(mode==='orbit'||near==='supply')&&<button className="claim-sword" title={supplyRemaining===null?t('正在清点…'):t`今日可领 ${supplyRemaining} / ${supplyTotal} 把`} disabled={busy||supplyRemaining===null||supplyRemaining<=0||(mode==='walk'&&!active)} onClick={()=>interact('supply')}>{supplyRemaining===0?t('今日已领完'):t('领取一把')}{mode==='walk'?' · E':''}</button>}
       {place!=='empty'&&place!=='held'?<button disabled={mode==='walk'&&(!active||near!==pickupStation)} onClick={()=>interact(pickupStation)}>{pickupStation!==place?t('拿起柜内武器'):t('拿起长剑')}{mode==='walk'?' · E':''}</button>:place==='held'?<><button disabled={mode==='walk'&&(!active||near!=='anvil')} onClick={()=>interact('anvil')}>{t("放回锻造台")}</button>{CABINETS.map(cabinet=><button key={cabinet.id} disabled={!!displaySlots[cabinet.id]||(mode==='walk'&&(!active||near!==cabinet.id))} onClick={()=>interact(cabinet.id)}>{t`放入${t(cabinet.label)}`}{displaySlots[cabinet.id]?t(' · 已占用'):''}</button>)}{!hot&&<button disabled={mode==='walk'&&(!active||near!=='furnace')} onClick={()=>interact('furnace')}>{t("放入熔炉")}</button>}</>:null}
     </div><small role="status" className={heatingMessage?'workshop-warning':undefined}>{t(heatingMessage||hint)}</small></div>
-    <aside className="sword-supply-hud" aria-label={t("领剑处")}><span>{t("领剑处 · 每日普通剑")}</span><strong aria-live="polite">{supplyRemaining===null?t('正在清点…'):t`今日可领 ${supplyRemaining} / ${supplyTotal} 把`}</strong><button disabled={busy||supplyRemaining===null||supplyRemaining<=0||(mode==='walk'&&(!active||near!=='supply'))} onClick={()=>interact('supply')}>{supplyRemaining===0?t('今日已领完'):t`领取一把${mode==='walk'&&active&&near==='supply'?' · E':''}`}</button><small>{mode==='walk'?t('左侧剑架 · 靠近按 E 领取'):t('点击左侧剑架或按钮领取')} {t(" · UTC 零点刷新")}</small></aside>
-    <aside className={`forge-hud ${hudOpen?'hud-open':'hud-compact'}`} aria-label={t("铁砧锻造面板")}><button className="hud-heading" aria-label={hudOpen?t('收起武器面板'):t('展开武器面板')} aria-expanded={hudOpen} onClick={()=>setHudOpen(v=>!v)}><span className="hud-heading-label">{t("武器状态 ")}<small>{hudOpen?t('收起 −'):t('展开 +')}</small></span><span className="hud-weapon"><span>{weapon?name(swordTier(level,appearanceTiers)):t('工坊空闲')}</span><strong>{weapon?`+${level}`:'—'}</strong></span></button>{heatingMessage&&<p className="hud-warning" role="alert">{t(heatingMessage)}</p>}{hudOpen&&<><p>{!weapon?t('尚未领取武器'):weapon.status!=='active'?t('已封存 · 属性固定'):level>=maxLevel?t`已达到路线等级上限 +${maxLevel}`:warming?t`熔炉加热中 · ${Math.max(0,weapon.heat_ready_at-clock).toFixed(1)} 秒`:hot?t`烧红 · 可敲 ${weapon.heat_charges} 锤`:t`需要加热 · 每炉可敲 ${heatStrikes} 锤`}</p>
+    <aside className={`forge-hud ${hudOpen?'hud-open':'hud-compact'}`} aria-label={t("铁砧锻造面板")}><button className="hud-heading" aria-label={hudOpen?t('收起武器面板'):t('展开武器面板')} aria-expanded={hudOpen} onClick={()=>setHudOpen(v=>!v)}><span className="hud-heading-label">{t("武器状态 ")}<small>{hudOpen?t('收起 −'):t('展开 +')}</small></span><span className="hud-weapon"><span>{weapon?name(swordTier(level,appearanceTiers)):t('工坊空闲')}</span><strong>{weapon?`+${level}`:'—'}</strong></span></button>{heatingMessage&&<p className="hud-warning" role="alert">{t(heatingMessage)}</p>}
+    {!hudOpen&&place==='furnace'&&<div className="hud-buttons hud-return"><button disabled={busy||warming} onClick={()=>{setPlace('anvil');setHint('已将烧红的武器放回铁砧。');}}>{warming?t('加热中…'):t('取回铁砧')}</button></div>}
+    {hudOpen&&<><p>{!weapon?t('尚未领取武器'):weapon.status!=='active'?t('已封存 · 属性固定'):level>=maxLevel?t`已达到路线等级上限 +${maxLevel}`:warming?t`熔炉加热中 · ${Math.max(0,weapon.heat_ready_at-clock).toFixed(1)} 秒`:hot?t`烧红 · 可敲 ${weapon.heat_charges} 锤`:t`需要加热 · 每炉可敲 ${heatStrikes} 锤`}</p>
       <div className={`hud-heat ${warming?'warming':''}`} aria-label={t`剩余热量 ${weapon?.heat_charges??0} / ${heatStrikes} 锤`}><span>{t("锻造热量")}</span><div>{Array.from({length:heatStrikes},(_,i)=><i key={i} className={i<(weapon?.heat_charges??0)?'charged':''}/>)}</div><b>{weapon?.heat_charges??0}/{heatStrikes}</b></div>
       <p>{nextAppearance?t`下一形态：+${nextAppearance.min_level} · ${name(nextAppearance)}`:pendingAppearances.length?t`骑士剑 ${pendingAppearances.map(n=>`+${n}`).join(locale==='en'?', ':'、')} 外观待补，暂沿用 +${swordTier(level,appearanceTiers).min_level} 外观。`:t('当前路线已达最终外观')}</p><div className="hud-transitions">{[['up',t('升级'),`+${Math.min(maxLevel,level+1)}`],['double',t('大成功'),`+${Math.min(maxLevel,level+2)}`],['down',t('降级'),`+${Math.max(0,level-1)}`],['destroy',t('损毁'),t('永久消失')],...(probabilities.saved?[['saved',t('保护生效'),t`维持 +${level}`]]:[])].map(([key,label,next])=><div key={key}><span>{label} → {next}</span><b>{weapon&&level<maxLevel?`${((probabilities[key]||0)*100).toFixed(1)}%`:'—'}</b></div>)}</div>
       <label className="hud-shield"><input type="checkbox" checked={shield} disabled={busy||!weapon||weapon.status!=='active'||weapon.protected_left>0||shields<1} onChange={e=>onShield(e.target.checked)}/><WardIcon/>{t("单锤保护符 · ")}{shields} {t(" 张")}</label>

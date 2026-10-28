@@ -25,6 +25,7 @@ from .chain import ChainSettings, ChainReader
 from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
 
 ROOT = Path(__file__).resolve().parent.parent
+NFT_IMAGES = json.loads((ROOT / 'assets/NFT_Pic/manifest.json').read_text(encoding='utf-8'))['images']
 LOCAL = ChainSettings.from_env().directory
 TYPES = {'Voucher': [
     {'name': 'weaponId', 'type': 'bytes32'}, {'name': 'recipient', 'type': 'address'},
@@ -79,12 +80,11 @@ def metadata(weapon):
     branch = weapon.get('branch', 'longsword')
     tier = weapon_tier(weapon['level'], branch)
     prefix = '[DEMO] ' if weapon['demo'] else ''
-    image = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#181713"/><text x="256" y="245" text-anchor="middle" fill="#e8ac5c" font-size="36">FORGE OF FATE</text><text x="256" y="310" text-anchor="middle" fill="white" font-size="48">+' + str(weapon['level']) + '</text></svg>'
     data = {'name': f"{prefix}{tier['name']} +{weapon['level']}",
             'name_en': f"{prefix}{tier['name_en']} +{weapon['level']}",
             'tier_id': tier['id'],
             'description': 'Sealed Forge of Fate collectible. Attributes are permanently fixed.',
-            'image': 'data:image/svg+xml;base64,' + base64.b64encode(image.encode()).decode(),
+            'image': NFT_IMAGES[branch],
             'attributes': [{'trait_type': 'Level', 'value': weapon['level']}, {'trait_type': 'Demo', 'value': bool(weapon['demo'])}, {'trait_type': 'Weapon Type', 'value': weapon.get('branch', 'longsword')}]}
     return 'data:application/json;base64,' + base64.b64encode(json.dumps(data, ensure_ascii=False).encode()).decode()
 

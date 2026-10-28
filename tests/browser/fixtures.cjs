@@ -88,7 +88,7 @@ async function register(page, tester, game) {
   await dialog.locator('button.primary').click();
   await expect(page.locator('.account-name')).toContainText(username);
   const address = game.sql('SELECT game_address FROM accounts WHERE username=?', [username])[0].game_address;
-  if (tester) { game.sql("UPDATE accounts SET role='tester' WHERE username=?", [username]); await page.reload(); await expect(page.locator('.cheat-panel')).toBeVisible(); }
+  if (tester) { game.sql("UPDATE accounts SET role='tester' WHERE username=?", [username]); await page.reload(); await expect(page.locator('.cheat-panel')).toBeVisible(); if (await page.locator('.cheat-heading').getAttribute('aria-expanded') === 'false') await page.locator('.cheat-heading').click(); }
   return { address, username };
 }
 async function state(page) {

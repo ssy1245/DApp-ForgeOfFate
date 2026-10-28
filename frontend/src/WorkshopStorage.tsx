@@ -13,7 +13,6 @@ export default function WorkshopStorage({ weapon, storedCount, disabled, onStore
   return <section className="workshop-storage" aria-label={t('工坊武器与仓库')}>
     <div className="workshop-storage-copy"><span>{t('当前工坊')}</span>
       <strong>{weapon ? `${name(weapon)} +${weapon.level}` : t('工坊空闲')}</strong>
-      <small>{t('仓库中的武器保留等级、热量和保护进度。')}</small>
     </div>
     <div className="workshop-storage-actions">
       <button className="secondary" disabled={disabled || !weapon} onClick={onStore}>{t('存入仓库')}</button>

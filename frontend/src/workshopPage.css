@@ -1,0 +1,137 @@
+/* Gameplay hierarchy: compact status,a clear work surface,optional details. */
+.app-shell .sidebar { width: 190px; padding: 26px 14px; }
+.app-shell .workspace { margin-left: 190px; width: calc(100% - 190px); }
+.app-shell main { padding: 24px 28px; }
+.app-shell .topbar { padding: 12px 28px; min-height: 64px; }
+.app-shell .save-status { color: #a4ad93; font-size: 11px; }
+.app-shell .page-heading { margin-bottom: 18px; }
+.app-shell h1 { font-size: 25px; margin: 0 0 6px; }
+.app-shell .page-heading p { color: #a3aa96; }
+.app-shell .resources { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(180px, 1.2fr); margin-bottom: 16px; }
+.app-shell .resource { padding: 12px 16px; gap: 12px; min-width: 0; }
+.app-shell .resource strong { font: 500 22px/1.3 Georgia, serif; font-variant-numeric: tabular-nums; margin-top: 3px; }
+.app-shell .resource-icon .material-icon { width: 32px; height: 32px; }
+.app-shell .claim { padding: 10px 12px; }
+.app-shell .claim small { margin-top: 4px; line-height: 1.6; }
+.app-shell .notice { margin-bottom: 14px; }
+.app-shell .notice-idle { display: none; }
+.app-shell .forge-layout { grid-template-columns: minmax(0, 1fr) 310px; align-items: start; gap: 18px; }
+.app-shell .panel-top { padding: 12px 16px; }
+.app-shell .workshop-storage { gap: 12px; padding: 12px 16px; }
+.app-shell .workshop-storage-copy { gap: 4px; }
+.app-shell .workshop-storage-copy>span { font-size: 10px; letter-spacing: .05em; }
+.app-shell .workshop-storage-copy>strong { font-size: 14px; }
+.app-shell .workshop-storage-actions { flex-shrink: 1; }
+.app-shell .workshop-storage-actions button { padding: 9px 11px; }
+.app-shell .scene { height: 560px; }
+.app-shell .scene-tag { display: none; }
+.app-shell .forge-footer { padding: 14px 16px; min-height: 0; }
+.app-shell .forge-footer>span { color: #a4ac97; font-size: 12px; line-height: 1.6; max-width: 65%; }
+.app-shell .forge-footer>button { flex-shrink: 0; }
+.app-shell .control-card { padding-bottom: 16px; }
+.app-shell .control-card>.panel-top { margin-bottom: 14px; }
+.app-shell .field-label { margin: 14px 16px 6px; font-size: 12px; color: #c1c5af; }
+.app-shell .control-card select { width: calc(100% - 32px); margin: 0 16px; font-size: 12px; padding: 10px; }
+.app-shell .level-line { margin: 16px 16px 8px; gap: 10px; }
+.app-shell .level-line>span { display: flex; flex-direction: column; gap: 4px; font-size: 10px; }
+.app-shell .level-line strong { margin: 0; font-size: 21px; }
+.app-shell .progress { margin: 0 16px 18px; }
+.app-shell .probability-title { margin: 0 16px 8px; }
+.app-shell .probability-title small { font-size: 9px; }
+.app-shell .probabilities { margin: 0 16px 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.app-shell .prob { padding: 8px; border: 1px solid #343d2e; border-radius: 5px; font-size: 11px; gap: 4px; }
+.app-shell .prob>span { display: flex; gap: 6px; align-items: center; }
+.app-shell .prob b { margin: 0; }
+.app-shell .shield-toggle { margin: 0 16px; padding: 10px; }
+.app-shell .stage-info { margin: 10px 16px; line-height: 1.6; }
+.app-shell .heat-button,.app-shell .strike { width: calc(100% - 32px); margin: 0 16px 10px; padding: 12px; }
+.app-shell .forge-rules { margin: 10px 16px; border-top: 1px solid #343b2e; padding-top: 10px; }
+.app-shell .forge-rules summary { color: #b8bca7; cursor: pointer; font-size: 11px; }
+.app-shell .forge-rules .risk-note { display: block; margin: 8px 0 0; line-height: 1.8; color: #adb39c; }
+.app-shell summary:focus-visible { outline: 2px solid #e7b675; outline-offset: 4px; }
+.app-shell .cheat-panel { margin: 22px 0 0; }
+.app-shell .cheat-heading { padding: 12px 16px; font-size: 13px; }
+.app-shell .cheat-intro { margin: 14px 0; }
+.app-shell .bottom-panels { margin-top: 20px; padding: 18px; gap: 18px; }
+.app-shell .bottom-panels h3 { margin: 0 0 6px; }
+.app-shell footer { line-height: 1.6; gap: 12px; }
+/* Keep secondary camera controls out of the 3D canvas until requested. */
+.app-shell .workshop-toolbar { left: 12px; right: 12px; top: 12px; gap: 8px; align-items: flex-start; z-index: 8; }
+.app-shell .workshop-toolbar>div { flex-wrap: wrap; }
+.app-shell .view-tools { justify-content: flex-end; }
+.app-shell .view-settings { position: relative; font-size: 11px; }
+.app-shell .view-settings summary { cursor: pointer; padding: 9px 10px; color: #d4d9cc; background: #171d1de8; border: 1px solid #505a55; border-radius: 7px; list-style: none; }
+.app-shell .view-settings summary::-webkit-details-marker { display: none; }
+.app-shell .view-settings[open] summary { border-color: #b4905b; }
+.app-shell .view-settings-panel { position: absolute; top: calc(100% + 8px); right: 0; width: 246px; max-width: calc(100vw - 48px); padding: 14px; background: #18221bf5; border: 1px solid #647053; border-radius: 8px; box-shadow: 0 10px 30px #0006; }
+.app-shell .view-settings .look-sensitivity { position: static; display: flex; flex-wrap: wrap; gap: 10px; padding: 0; border: 0; background: none; margin-bottom: 12px; font-size: 12px; }
+.app-shell .view-settings input { width: 130px; }
+.app-shell .forge-hud,.app-shell[lang=en] .forge-hud { top: 92px; right: 12px; max-height: calc(100% - 240px); overflow-y: auto; }
+.app-shell .forge-hud.hud-compact,.app-shell[lang=en] .forge-hud.hud-compact { width: 190px; padding: 10px 12px; }
+.app-shell .hud-compact .hud-weapon { font-size: 12px; }
+.app-shell .hud-compact .hud-weapon strong { font-size: 23px; }
+.app-shell .hud-return { margin-top: 10px; }
+.app-shell .workshop-view .workshop-entry { top: auto; bottom: 160px; width: max-content; max-width: calc(100% - 24px); padding: 10px 14px; }
+.app-shell .workshop-entry span { margin-top: 6px; }
+.app-shell .workshop-interactions { left: 12px; right: 12px; bottom: 12px; }
+
+@media (max-width: 1150px) {
+.app-shell .sidebar { width: 166px; padding-inline: 10px; }
+.app-shell .workspace { margin-left: 166px; width: calc(100% - 166px); }
+.app-shell main { padding: 20px; }
+.app-shell .forge-layout { grid-template-columns: minmax(0, 1fr); }
+.app-shell .control-card { max-width: none; }
+.app-shell .probabilities { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 850px) {
+.app-shell { display: block; }
+.app-shell .sidebar { position: static; width: 100%; padding: 10px 16px; flex-direction: row; align-items: center; gap: 8px; }
+.app-shell .brand { padding: 0; margin-right: auto; }
+.app-shell .workspace { width: 100%; margin: 0; }
+.app-shell .nav-item { width: auto; margin: 0; padding: 10px; font-size: 12px; }
+.app-shell .nav-label,.app-shell .sidebar-bottom { display: none; }
+.app-shell .topbar { padding: 10px 16px; }
+.app-shell .header-actions { gap: 8px; }
+.app-shell .resources { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.app-shell .claim { grid-column: 1/-1; border-top: 1px solid #34382a; }
+.app-shell .claim small { display: inline; margin-left: 10px; }
+}
+@media (max-width: 600px) {
+.app-shell main { padding: 16px 12px; }
+.app-shell .sidebar { padding: 10px 12px; flex-wrap: wrap; gap: 6px; }
+.app-shell .brand { font-size: 16px; letter-spacing: 2px; }
+.app-shell .brand-small { font-size: 9px; letter-spacing: 3px; }
+.app-shell .nav-item { font-size: 11px; padding: 9px 7px; }
+.app-shell[lang=en] .nav-item { font-size: 10px; }
+.app-shell .breadcrumb,.app-shell .save-status,.app-shell .demo-badge { display: none; }
+.app-shell .topbar { min-height: 0; padding: 9px 12px; }
+.app-shell .header-actions { width: 100%; justify-content: space-between; }
+.app-shell .account-name { font-size: 11px; max-width: 140px; overflow-wrap: anywhere; }
+.app-shell .page-heading { margin-bottom: 14px; align-items: flex-start; }
+.app-shell h1,.app-shell[lang=en] h1 { font-size: 22px; line-height: 1.4; }
+.app-shell .page-heading p { font-size: 11px; line-height: 1.6; }
+.app-shell .resources .resource { padding: 9px; gap: 5px; grid-template-rows: 26px auto; }
+.app-shell .resources .resource strong { font-size: clamp(16px, 4.3vw, 21px); }
+.app-shell .resource-icon .material-icon { width: 26px; height: 26px; }
+.app-shell .claim { font-size: 12px; }
+.app-shell .claim small { font-size: 9px; line-height: 1.5; }
+.app-shell .workshop-storage { padding: 10px 12px; gap: 10px; flex-direction: column; align-items: stretch; }
+.app-shell .workshop-storage-copy { flex-direction: row; align-items: baseline; gap: 8px; }
+.app-shell .workshop-storage-actions { display: flex; }
+.app-shell .workshop-storage-actions button { flex: 1; padding: 8px 6px; font-size: 11px; }
+.app-shell .scene { height: 590px; }
+.app-shell .workshop-toolbar { gap: 6px; flex-wrap: wrap; }
+.app-shell .workshop-toolbar>div { gap: 4px; }
+.app-shell .workshop-toolbar button,.app-shell[lang=en] .workshop-toolbar button,.app-shell .view-settings summary { font-size: 10px; padding: 8px; }
+.app-shell .forge-hud.hud-compact,.app-shell[lang=en] .forge-hud.hud-compact { width: 144px; padding: 9px; }
+.app-shell .forge-hud,.app-shell[lang=en] .forge-hud { top: 96px; right: 10px; max-height: calc(100% - 260px); }
+.app-shell .hud-compact .hud-weapon { font-size: 11px; gap: 4px; }
+.app-shell .hud-compact .hud-weapon strong { font-size: 20px; }
+.app-shell .workshop-view .workshop-entry { bottom: 205px; text-align: center; }
+.app-shell .workshop-entry span { font-size: 9px; white-space: normal; }
+.app-shell .forge-footer { align-items: center; gap: 10px; padding: 12px; }
+.app-shell .forge-footer>span { font-size: 11px; max-width: 55%; }
+.app-shell .forge-footer>button { flex-shrink: 1; }
+.app-shell .probabilities { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.app-shell .bottom-panels { padding: 16px; }
+}

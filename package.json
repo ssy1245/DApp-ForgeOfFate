@@ -18,6 +18,7 @@
     "demo": "node scripts/demo.cjs",
     "start": "node scripts/start.cjs",
     "start:demo": "node scripts/start.cjs --demo",
+    "check:sepolia": "node scripts/check-sepolia.cjs",
     "accounts:setup": ".venv/bin/python scripts/create_dev_accounts.py"
   }
 }

@@ -1,8 +1,11 @@
 # Local secrets and configuration
 .env
 .env.*
+# Filled Sepolia settings stay local; only empty examples are published.
+/.env.sepolia
 !.env.example
 !.env.*.example
+!/.env.sepolia.example
 /secrets/
 /credentials/
 /keystore/
@@ -90,7 +93,7 @@ backend/data/
 *.orig
 *.rej
 
-# Keep source, README files, dependency locks and .env.example.
+# Keep source, README files, dependency locks and empty .env*.example templates.
 # Keep assets/stories/**/*.md, assets/3d/**/*.glb and assets/reference_page/**/*.png.
 # Keep assets/display/ transparent PNGs, manifest.json and README.md, plus item icons.
 # Never ignore all *.json, *.sql, *.png or *.glb: these can be project sources.

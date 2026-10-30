@@ -1,6 +1,9 @@
 const { defineConfig } = require('@playwright/test');
 module.exports = defineConfig({
-  testDir: './tests/browser',
+  projects: [
+    { name: 'game', testDir: './tests/browser' },
+    { name: 'chain', testDir: './chain/tests/browser' },
+  ],
   timeout: 90000,
   expect: { timeout: 12000 },
   workers: 1,

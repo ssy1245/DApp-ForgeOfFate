@@ -11,7 +11,7 @@ type Wallet = {
 };
 type Deployment = {
   healthy?: boolean; warning?: string; balanceWei?: string | null;
-  plan: { deploymentId: string; contractName: string; deployer: string; data: string; dataHash: string; value: string;
+  plan: { deploymentId: string; module: string; contractName: string; mintSigner?: string; deployer: string; data: string; dataHash: string; value: string;
     network: { chainId: number; chainName: string; rpcUrls: string[]; nativeCurrency: { name: string; symbol: string; decimals: number } } };
   state: { phase: 'ready' | 'awaiting_wallet' | 'submitted' | 'confirming' | 'confirmed' | 'failed'; intent: string | null;
     deploymentBlock?: number; finalizedBlock?: number;
@@ -160,13 +160,14 @@ export default function DeployApp() {
   }
   const plan = snapshot?.plan, state = snapshot?.state;
   const sepolia = plan?.network.chainId === 11155111;
+  const nft = plan?.module === 'forge-of-fate';
   const noBalance = sepolia && snapshot?.balanceWei === '0';
   const matched = !!plan && !!account && same(account, plan.deployer);
   const correctChain = !!plan && chainId !== '' && BigInt(chainId) === BigInt(plan.network.chainId);
   return <main className="deployment-page">
     <header><div><span className="deployment-eyebrow">FORGE OF FATE · {sepolia || !plan ? 'SEPOLIA' : 'LOCAL TEST'}</span><h1>{t('合约部署工作台')}</h1></div><LanguageSwitch /></header>
     <p className="deployment-intro">{t(sepolia || !plan ? '使用 MetaMask 在 Ethereum Sepolia 部署合约。手续费从项目钱包的 Sepolia 测试 ETH 余额扣除。' : '先在本地走通钱包部署流程。测试 ETH 由本地节点提供，不消耗 Sepolia 余额。')}</p>
-    <div className="deployment-banner">{t('本轮仅部署一个验证合约，不包含 NFT 或充值功能。')}</div>
+    {plan && <div className="deployment-banner">{t(nft ? '部署武器 NFT 与 ETH 交易市场。卖家自行定价并提取成交收益；游戏币保留在服务器。' : '本轮仅部署一个验证合约，不包含 NFT 或充值功能。')}</div>}
     {(error || serviceError) && <div className="deployment-error" role="alert">{t(error || serviceError)}</div>}
     {!plan && <section><h2>{t('连接本地部署服务')}</h2><p>{t('在项目目录运行 npm run deploy:console，再打开终端显示的部署页面。')}</p><button onClick={() => void refresh()}>{t('重新检查')}</button></section>}
     {plan && <div className="deployment-grid">
@@ -181,9 +182,11 @@ export default function DeployApp() {
         {noBalance && <p>{t('项目钱包暂无 Sepolia 测试 ETH，请先补充测试币用于手续费。')}</p>}
       </section>
       <section><h2><span>02</span>{t('核对并部署')}</h2><dl>
-        <dt>{t('测试合约')}</dt><dd>{plan.contractName}</dd><dt>{t('发送金额')}</dt><dd>0 ETH</dd>
+        <dt>{t(nft ? '武器 NFT / 市场合约' : '测试合约')}</dt><dd>{plan.contractName}</dd><dt>{t('发送金额')}</dt><dd>0 ETH</dd>
+        {nft && <><dt>{t('铸造授权地址')}</dt><dd className="deployment-code" data-testid="mint-signer">{plan.mintSigner}</dd></>}
         <dt>{t('部署内容指纹')}</dt><dd className="deployment-code">{plan.dataHash}</dd>
-      </dl><p>{t('钱包会显示预计手续费。点击后，请在 MetaMask 中核对并确认。')}</p>
+      </dl>{nft && <p>{t('铸造授权密钥由本机保存，用于核准游戏武器。部署由你的 MetaMask 钱包确认，无需向服务器提供钱包私钥。')}</p>}
+        <p>{t('钱包会显示预计手续费。点击后，请在 MetaMask 中核对并确认。')}</p>
         <button className="primary" disabled={busy || !healthy || noBalance || !matched || !correctChain || !state || !['ready', 'failed'].includes(state.phase)} onClick={() => void run(deploy)}>{t(busy ? '正在处理…' : sepolia ? '部署到 Sepolia' : '部署本地测试合约')}</button>
       </section>
       <section className="deployment-result"><h2><span>03</span>{t('部署结果与恢复')}</h2>
@@ -192,6 +195,9 @@ export default function DeployApp() {
         {state?.transactionHash && <dl><dt>{t('交易哈希')}</dt><dd className="deployment-code">{sepolia ? <a href={'https://sepolia.etherscan.io/tx/' + state.transactionHash} target="_blank" rel="noopener noreferrer">{state.transactionHash}</a> : state.transactionHash}</dd></dl>}
         {healthy && state?.phase === 'confirmed' && state.manifest && <><dl><dt>{t('合约地址')}</dt><dd className="deployment-code" data-testid="deployed-address">{state.manifest.address}</dd><dt>{t('部署区块')}</dt><dd>{state.manifest.deploymentBlock}</dd></dl>
           <p>{t('地址和交易回执已通过节点核验，并保存在本轮部署记录目录。')}</p><button onClick={download}>{t('下载部署记录')}</button></>}
+        {nft && healthy && state?.phase === 'confirmed' && <p data-testid="nft-game-ready">{t(sepolia
+          ? 'NFT 配置已保存。请重新启动游戏服务（npm start 或 npm run start:demo），再刷新游戏页面；启动器会连接该合约并启动事件监听。'
+          : 'NFT 配置已写入本轮隔离目录，未改动日常游戏的部署和存档。')}</p>}
         {sepolia && healthy && state?.phase === 'confirmed' && state.manifest && <p><a href={'https://sepolia.etherscan.io/address/' + state.manifest.address} target="_blank" rel="noopener noreferrer">{t('在区块浏览器查看合约')}</a></p>}
         {state && ['awaiting_wallet', 'submitted', 'confirming'].includes(state.phase) && <div className="deployment-recovery"><p>{t('已发出的交易不会因刷新而重新发送。若钱包已发送但页面未收到结果，请粘贴交易哈希继续核验。')}</p>
           <label htmlFor="deployment-hash">{t('部署交易哈希')}</label><input id="deployment-hash" value={recoveryHash} onChange={event => setRecoveryHash(event.target.value)} placeholder="0x…" autoComplete="off" spellCheck={false} />

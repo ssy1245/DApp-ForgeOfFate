@@ -55,11 +55,14 @@ htmlcov/
 playwright-report/
 test-results/
 blob-report/
+# npm test writes under .local/test-runs/. Also exclude root-level report copies.
+/test-runs/
+/results.json
+/verification.json
 # Browser sign-in state and local profiles must not accompany source submissions.
-/.auth/
-/playwright/.auth/
-/browser-profiles/
-/storage-state*.json
+.auth/
+browser-profiles/
+storage-state*.json
 # Root-level manual network/trace exports; public assets remain versioned.
 /*.har
 /trace*.zip
@@ -72,12 +75,15 @@ blob-report/
 /*-preview.webp
 
 # Runtime data, local credentials, deployment state and logs
-# Covers live saves, isolated browser-tests-* / verify-game-* runs and backups.
+# Covers live saves, test-runs/, browser-tests-* / verify-game-* runs and backups.
 .local/
-# Known local credential exports, including copies in subdirectories.
+# Known local credentials and manually suffixed copies, in any directory.
 test-accounts.md
+test-accounts.md.*
 mint-key
+mint-key.*
 quote-key
+quote-key.*
 # Local deployment and cleanup exports, if copied into the project root.
 /deployment.json
 /local-deployment-*.json
@@ -89,6 +95,11 @@ quote-key
 /build-info.json
 /nft-inventory.json
 /cleanup-summary.json
+# Interrupted atomic writes, if runtime files were placed in the project root.
+/deployment.json.*.tmp
+/plan.json.*.tmp
+/state.json.*.tmp
+/build-info.json.*.tmp
 backend/data/
 *.sqlite
 *.sqlite-*
@@ -112,6 +123,9 @@ backend/data/
 *.rej
 
 # Keep source, README files, dependency locks and empty .env*.example templates.
+# Keep chain/contracts/, chain/client/, chain/server/, chain/test/, chain/tests/
+# and chain/scripts/; only their generated output is ignored by the rules above.
+# Keep docs/ and chain/ testing summaries / plans; raw test reports stay local.
 # Keep assets/stories/**/*.md, assets/3d/**/*.glb and assets/reference_page/**/*.png.
 # Keep assets/display/ transparent PNGs, manifest.json and README.md, plus item icons.
 # NFT artwork is a project source asset and should be included in GitHub submissions.

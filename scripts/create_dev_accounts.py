@@ -10,7 +10,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from eth_account import Account
 from web3 import Web3
 from backend.storage import Store
-from backend.chain import ChainSettings
+from chain.server.rpc import ChainSettings
 from backend.accounts import hash_password
 
 
@@ -34,6 +34,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--demo-wallet',help='Mark an already verified account as tester for the local two-wallet demo')
     parser.add_argument('--network', choices=['local', 'sepolia'], help='Choose the account data environment')
+    parser.add_argument('--with-player', action='store_true', help='Also create the optional ordinary-player account for a separate test')
     args=parser.parse_args()
     if args.network:
         os.environ['FORGE_NETWORK'] = args.network
@@ -49,7 +50,9 @@ def main():
             db.execute("UPDATE accounts SET role='tester' WHERE id=?",(row['account_id'],))
         print('Verified local demo account marked as tester.')
         return
-    fixtures=[('forge_test','ForgeTest2026!','tester'),('forge_player','ForgePlayer2026!','player')]
+    fixtures=[('forge_test','ForgeTest2026!','tester')]
+    if args.with_player:
+        fixtures.append(('forge_player','ForgePlayer2026!','player'))
     created=[]
     for name,password,role in fixtures:
         if provision(store,name,password,role):created.append(name)
@@ -61,6 +64,14 @@ def main():
             for name,password,role in fixtures:
                 shown=password if name in created else '沿用已有密码（未重置）'
                 f.write(f"| {'测试（作弊菜单）' if role=='tester' else '普通玩家'} | {name} | {shown} |\n")
+    else:
+        saved=path.read_text()
+        missing=[(name,password,role) for name,password,role in fixtures if name in created and f'| {name} |' not in saved]
+        if missing:
+            os.chmod(path,0o600)
+            with path.open('a') as f:
+                for name,password,role in missing:
+                    f.write(f"| {'测试（作弊菜单）' if role=='tester' else '普通玩家'} | {name} | {password} |\n")
     print('Created: '+(', '.join(created) or 'none; existing accounts preserved'))
     print('Local credentials: '+str(path))
 

@@ -9,8 +9,8 @@ import threading
 import time
 
 from web3 import Web3
-from .chain import ChainReader, ChainSettings
-from .storage import Store
+from .rpc import ChainReader, ChainSettings
+from backend.storage import Store
 
 
 class IndexFailure(Exception):

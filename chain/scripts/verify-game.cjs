@@ -7,7 +7,7 @@ const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { Wallet, NonceManager, JsonRpcProvider, Contract, ContractFactory, parseEther, hexlify, randomBytes } = require('ethers');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '../..');
 const nftImages = JSON.parse(fs.readFileSync(path.join(root, 'assets/NFT_Pic/manifest.json'))).images;
 function verifyMetadata(uri, branch, level) {
   assert.ok(uri.startsWith('data:application/json;base64,'));
@@ -100,8 +100,8 @@ async function main() {
   const rpcUrl = `http://127.0.0.1:${chainPort}`, apiUrl = `http://127.0.0.1:${apiPort}`;
   const env = { FORGE_NETWORK: 'local', FORGE_RPC_URL: '', FORGE_LOCAL_DIR: directory, LOCAL_RPC_URL: rpcUrl, DEMO_MODE: '1' };
   report.chainPort = chainPort; report.apiPort = apiPort;
-  await run('npm', ['run', 'compile', '-w', 'contracts'], 'compile');
-  const chain = launch(process.execPath, [require.resolve('hardhat/internal/cli/cli'), 'node', '--config', path.join(root, 'contracts/hardhat.config.cjs'), '--hostname', '127.0.0.1', '--port', String(chainPort)], 'chain');
+  await run('npm', ['run', 'compile', '-w', 'chain'], 'compile');
+  const chain = launch(process.execPath, [require.resolve('hardhat/internal/cli/cli'), 'node', '--config', path.join(root, 'chain/hardhat.config.cjs'), '--hostname', '127.0.0.1', '--port', String(chainPort)], 'chain');
   await untilReady(async () => {
     const response = await fetch(rpcUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }) });
     return (await response.json()).result === '0x7a69';
@@ -111,7 +111,7 @@ async function main() {
   try {
     const funder = await provider.getSigner(0);
     const authority = Wallet.createRandom(), epoch = hexlify(randomBytes(32));
-    const artifact = JSON.parse(fs.readFileSync(path.join(root, 'contracts/artifacts/contracts/ForgeOfFate.sol/ForgeOfFate.json')));
+    const artifact = JSON.parse(fs.readFileSync(path.join(root, 'chain/artifacts/contracts/ForgeOfFate.sol/ForgeOfFate.json')));
     const deployed = await new ContractFactory(artifact.abi, artifact.bytecode, funder).deploy(authority.address, epoch);
     await deployed.waitForDeployment();
     fs.writeFileSync(path.join(directory, 'mint-key'), authority.privateKey, { mode: 0o600 });
@@ -257,8 +257,8 @@ async function main() {
 
     const python=path.join(root,'.venv/bin/python');
     // Upgrade the legacy fixture by discovering its real creation receipt. No deployment or signing.
-    await run(python,['-m','backend.indexer','--record-deployment'],'index-record',env);
-    const catchUp=()=>run(python,['-m','backend.indexer','--once'],'index-once',env);
+    await run(python,['-m','chain.server.indexer','--record-deployment'],'index-record',env);
+    const catchUp=()=>run(python,['-m','chain.server.indexer','--once'],'index-once',env);
     await catchUp();
     const indexedBefore=await tester.request('/chain/indexed-nfts');
     assert.equal(indexedBefore.items[0].owner,wa.address);

@@ -657,5 +657,21 @@
   "保护符不足，请补充保护符或关闭保护后再敲击。": "No wards available. Add wards or disable protection before striking.",
   "点击画面进入：鼠标移动转头，WASD 移动，E 拿放，Q 开关保护符；按 Esc 暂停并释放鼠标。": "Click to enter: mouse to look, WASD to move, E to pick up or place, Q to toggle wards; Esc to pause and release the mouse.",
   "工坊三维视图：点击进入，鼠标移动转头，WASD 移动，E 交互，Q 开关保护符，Esc 暂停": "3D workshop: click to enter, mouse to look, WASD to move, E to interact, Q to toggle wards, Esc to pause",
-  "剩余 {0} 张": "{0} wards left"
+  "剩余 {0} 张": "{0} wards left",
+  "部署武器 NFT 与 ETH 交易市场。卖家自行定价并提取成交收益；游戏币保留在服务器。": "Deploy weapon NFTs and the ETH marketplace. Sellers set prices and withdraw sale proceeds; game coins stay on the server.",
+  "武器 NFT / 市场合约": "Weapon NFT / marketplace contract",
+  "铸造授权地址": "Mint authorization address",
+  "铸造授权密钥由本机保存，用于核准游戏武器。部署由你的 MetaMask 钱包确认，无需向服务器提供钱包私钥。": "The mint authorization key stays on this computer to approve game weapons. Your MetaMask wallet confirms deployment; its private key is never needed by the server.",
+  "NFT 配置已保存。请重新启动游戏服务（npm start 或 npm run start:demo），再刷新游戏页面；启动器会连接该合约并启动事件监听。": "NFT configuration saved. Restart the game services (npm start or npm run start:demo), then refresh the game. The launcher connects to this contract and starts event indexing.",
+  "NFT 配置已写入本轮隔离目录，未改动日常游戏的部署和存档。": "NFT configuration saved in this isolated test directory. Your regular game deployment and save are unchanged.",
+  "交易回执与当前钱包记录不匹配，请检查交易哈希。": "The receipt does not match the wallet record. Check the transaction hash.",
+  "交易已提交，但浏览器无法保存记录。请保存交易哈希：{0}": "Transaction submitted, but browser storage failed. Save this transaction hash: {0}",
+  "浏览器无法更新交易记录，请保留当前页面并重试。": "Browser storage could not update the transaction record. Keep this page open and retry.",
+  "交易已打包，正在等待网络最终确认。请勿重复提交。": "Transaction included in a block. Waiting for network finality. Do not submit again.",
+  "钱包或登录账号已变化，请重新操作。": "Your wallet or game account changed. Please try again.",
+  "浏览器无法保存交易记录，请允许本站存储后再进行链上操作。": "Allow browser storage for this site before submitting a blockchain transaction.",
+  "交易仍待最终确认，记录已保存，可稍后检查。": "Waiting for final confirmation. The transaction is saved; check again later.",
+  "交易结果已确认，但页面数据刷新失败，请刷新状态。": "Transaction result confirmed, but page data could not refresh. Refresh the game state.",
+  "交易所属环境已变化，记录已保留；切回原环境后可继续检查。": "The environment changed. The transaction is saved; switch back to check it.",
+  "查看交易": "View transaction"
 }

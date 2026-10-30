@@ -1,4 +1,4 @@
-const {test,expect,register}=require('./fixtures.cjs');
+const {test,expect,register}=require('../../../tests/browser/fixtures.cjs');
 
 test('chain history distinguishes a stopped listener, saved progress and a chain conflict',async({page,game})=>{
   await register(page,false,game);

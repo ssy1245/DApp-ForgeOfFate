@@ -6,6 +6,7 @@ import CheatPanel from './CheatPanel';
 import WorkshopStorage from './WorkshopStorage';
 import ChainHistory from './ChainHistory';
 import './workshopPage.css';
+import {type Pending, readPending, writePending, removePending, samePending, matchesPending, storageAvailable, finalReceipt} from '../../chain/client/transactions';
 import WeaponCard from './WeaponCard';
 import WeaponLore from './WeaponLore';
 import IronIcon, { IronAmount } from './IronIcon';
@@ -19,7 +20,6 @@ import { IMPACT_MS, SWING_MS } from './forgeMotion';
 declare global {interface Window {ethereum?:any}}
 type Weapon={max_level?:number;branch?:string;branch_locked?:boolean;strike_materials?:number;id:string;name:string;name_en?:string;tier_id?:string;level:number;status:string;strikes:number;protected_left:number;demo:number;quality:string;source:string;heat_ready_at:number;heat_charges:number;recycle_price:number;probabilities:Record<string,number>};
 type NFT={branch?:string;id:string;owner:string;seller:string;price:bigint;level:number;name:string;name_en?:string;tier_id?:string;demo:boolean};
-type Pending={hash:string;account:string;contract:string;epoch:string;chainId?:number;label:string};
 const short=(s:string)=>s?`${s.slice(0,6)}…${s.slice(-4)}`:'—';
 const outcome:Record<string,string>={up:'强化成功 · +1',double:'大成功 · +2',down:'强化降级 · −1',destroy:'武器已损毁',saved:'保护生效 · 等级不变'};
 
@@ -33,7 +33,7 @@ export default function App(){
  const [lastResult,setLastResult]=useState('');
  const [now,setNow]=useState(Date.now()/1000);
  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()/1000),250);return()=>clearInterval(timer);},[]);
- const [tab,setTab]=useState('forge'),[shield,setShield]=useState(false),[busy,setBusy]=useState(''),[notice,setNotice]=useState(''),[error,setError]=useState(false),[hit,setHit]=useState(0),[nfts,setNfts]=useState<NFT[]>([]),[prices,setPrices]=useState<Record<string,string>>({}),[recipients,setRecipients]=useState<Record<string,string>>({}),[proceeds,setProceeds]=useState(0n),[pending,setPending]=useState<Pending|null>(()=>{try{return JSON.parse(sessionStorage.getItem('forge:pending')||'null');}catch{return null;}});
+ const [tab,setTab]=useState('forge'),[shield,setShield]=useState(false),[busy,setBusy]=useState(''),[notice,setNotice]=useState(''),[error,setError]=useState(false),[hit,setHit]=useState(0),[nfts,setNfts]=useState<NFT[]>([]),[prices,setPrices]=useState<Record<string,string>>({}),[recipients,setRecipients]=useState<Record<string,string>>({}),[proceeds,setProceeds]=useState(0n),[pendingRecords,setPendingRecords]=useState<Pending[]>(()=>readPending());
  const bootstrap=useRef<Promise<any>|null>(null);
  const stateRequest=useRef(0), nftRequest=useRef(0);
  const generation=useRef(0), lock=useRef(false), sessionRef=useRef(session);sessionRef.current=session;
@@ -59,7 +59,9 @@ export default function App(){
   action('选择突变路线',`/weapons/${weapon.id}/branch`,{branch});
  }
  const minted=new Set(nfts.map(n=>`0x${BigInt(n.id).toString(16).padStart(64,'0')}`));
+ const pending=pendingRecords.find(p=>matchesPending(p,config?.chain,session?.wallet_address));
  const activePending=!!pending;
+ useEffect(()=>{const sync=()=>setPendingRecords(readPending());window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);},[]);
  const tell=(s:string,bad=false)=>{setNotice(s);setError(bad);};
  async function api(path:string,opts:RequestInit={},token=sessionRef.current?.token){
   const requestGeneration=generation.current, requestSession=sessionRef.current;
@@ -159,12 +161,71 @@ export default function App(){
  async function storeCurrent(){if(!weapon)return;await action('存入仓库','/workshop/store',{weapon_id:weapon.id,expected_revision:state.player.workshop_revision});}
  async function strikeWeapon(){if(!weapon||weapon.status!=='active')return;if(strikeShortage){tell(strikeShortage,true);return;}if(workshopPlace!=='anvil'){tell('先将加热后的武器放回铁砧。',true);return;}await action('敲击强化',`/weapons/${weapon.id}/strike`,{shield,expected_level:weapon.level,expected_strikes:weapon.strikes,expected_protected_left:weapon.protected_left});}
  async function heatWeapon(){if(!weapon)return;if(heatShortage){tell(heatShortage,true);return;}await action('加热武器',`/weapons/${weapon.id}/heat`);}
- async function mintWeapon(w:Weapon){if(!sessionRef.current?.wallet_verified){await login();if(!sessionRef.current?.wallet_verified)return;}await transact('铭刻 NFT',async c=>{const r=await api(`/weapons/${w.id}/voucher`,{method:'POST'});return c.mint(r.voucher,r.signature);});}
+ async function mintWeapon(w:Weapon){
+  if(!sessionRef.current?.wallet_verified){await login();if(!sessionRef.current?.wallet_verified)return;}
+  await transact('铭刻 NFT',async(c,guard)=>{
+   const r=await api(`/weapons/${w.id}/voucher`,{method:'POST',headers:{'X-Forge-Player':sessionRef.current?.address||''}});
+   guard();return c.mint(r.voucher,r.signature);
+  });
+ }
  async function checkedSigner(){if(!sessionRef.current||!config?.chain)throw Error('请先登录并确认合约已部署。');if(!window.ethereum)throw Error('未检测到钱包。');const p=new BrowserProvider(window.ethereum);const signer=await p.getSigner();if((await p.getNetwork()).chainId!==BigInt(config.chain.chainId))throw Error('钱包网络与当前游戏环境不一致，请重新连接钱包。');const current=await api('/session',{method:'POST'});if(current.address!==sessionRef.current.address)throw Error('当前登录账号已变化，请刷新后重新操作。');if(!current.wallet_verified||(await signer.getAddress()).toLowerCase()!==current.wallet_address?.toLowerCase())throw Error('当前钱包与账号绑定的钱包不一致，请切回已绑定钱包。');const c=new Contract(config.chain.address,config.chain.abi,signer);if(await c.deploymentId()!==config.chain.deploymentId)throw Error('部署信息已变化，请刷新页面。');return c;}
- function savePending(p:Pending|null){setPending(p);if(p)sessionStorage.setItem('forge:pending',JSON.stringify(p));else sessionStorage.removeItem('forge:pending');}
- async function waitReceipt(hash:string,chain:any){const deadline=Date.now()+120000;while(Date.now()<deadline){const data=await api(`/chain/receipts/${hash}`);if(data.chainId!==chain.chainId||data.deploymentId!==chain.deploymentId)throw Error('部署信息已变化，请刷新页面。');if(data.receipt)return data.receipt;await new Promise(resolve=>setTimeout(resolve,1500));}return null;}
- async function transact(label:string,send:(c:Contract)=>Promise<any>){if(!sessionRef.current?.wallet_verified){await login();if(!sessionRef.current?.wallet_verified)return;}await run(label,async()=>{if(activePending)throw Error('已有交易等待确认，请先检查交易状态。');const c=await checkedSigner();const account=sessionRef.current!.wallet_address!;const tx=await send(c);savePending({hash:tx.hash,account,contract:config.chain.address,epoch:config.chain.deploymentId,chainId:config.chain.chainId,label});tell(`${label}已提交，等待链上确认：${short(tx.hash)}`);try{const receipt=await waitReceipt(tx.hash,config.chain);if(!receipt)throw Error('交易仍待确认，请点击“检查待确认交易”。');savePending(null);if(receipt.status!==1)throw Error('链上执行失败。');await refresh();tell(`${label}成功，已获得链上确认。`);}catch(e:any){if(e.receipt)savePending(null);throw e;}});}
- async function checkPending(){await run('检查交易',async()=>{if(!pending)return;const cfg=await api('/config');if(!cfg.chain||pending.contract!==cfg.chain.address||pending.epoch!==cfg.chain.deploymentId||(pending.chainId!==undefined&&pending.chainId!==cfg.chain.chainId)){savePending(null);await refresh();tell('交易所属环境已变化，请在原网络的钱包记录中查看。');return;}const receipt=(await api(`/chain/receipts/${pending.hash}`)).receipt;if(!receipt){tell('交易仍待确认；若已在钱包中替换或取消，请使用钱包中的交易记录排查。');return;}savePending(null);await refresh();tell(receipt.status===1?`${pending.label}已确认。`:'交易执行失败，可以重新操作。',receipt.status!==1);});}
+ function savePending(p:Pending){
+  setPendingRecords(records=>[...records.filter(old=>!samePending(old,p)),p]);
+  if(!writePending(p))throw Error(`交易已提交，但浏览器无法保存记录。请保存交易哈希：${p.hash}`);
+ }
+ function clearPending(p:Pending){
+  if(!removePending(p))throw Error('浏览器无法更新交易记录，请保留当前页面并重试。');
+  setPendingRecords(records=>records.filter(old=>!samePending(old,p)));
+ }
+ async function readReceipt(p:Pending){return finalReceipt(await api(`/chain/receipts/${p.hash}`),p);}
+ async function waitReceipt(p:Pending,isCurrent:()=>boolean){
+  const deadline=Date.now()+120000;
+  while(Date.now()<deadline&&isCurrent()){
+   const data=await api(`/chain/receipts/${p.hash}`),receipt=finalReceipt(data,p);
+   if(receipt)return receipt;
+   if(data.state==='confirming')tell('交易已打包，正在等待网络最终确认。请勿重复提交。');
+   await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+  return null;
+ }
+ async function transact(label:string,send:(c:Contract,guard:()=>void)=>Promise<any>){
+  if(!sessionRef.current?.wallet_verified){await login();if(!sessionRef.current?.wallet_verified)return;}
+  await run(label,async()=>{
+   const chain=config?.chain,account=sessionRef.current!.wallet_address!,player=sessionRef.current!.address;
+   const g=generation.current,walletVersion=walletGeneration.current;
+   const isCurrent=()=>g===generation.current&&walletVersion===walletGeneration.current&&player===sessionRef.current?.address;
+   const guard=()=>{if(!isCurrent())throw Error('钱包或登录账号已变化，请重新操作。');};
+   if(activePending||readPending().some(p=>matchesPending(p,chain,account)))throw Error('已有交易等待确认，请先检查交易状态。');
+   if(!storageAvailable())throw Error('浏览器无法保存交易记录，请允许本站存储后再进行链上操作。');
+   const c=await checkedSigner();guard();
+   const tx=await send(c,guard);
+   // A wallet change after broadcast cannot undo the transaction. Retain its original identity.
+   const record={hash:tx.hash,account,contract:chain.address,epoch:chain.deploymentId,chainId:chain.chainId,label};
+   savePending(record);
+   if(!isCurrent())return;
+   tell(`${label}已提交，等待链上确认：${short(tx.hash)}`);
+   const receipt=await waitReceipt(record,isCurrent);
+   if(!isCurrent())return;
+   if(!receipt){tell('交易仍待最终确认，记录已保存，可稍后检查。');return;}
+   await finishTransaction(record,receipt);
+  });
+ }
+ async function finishTransaction(p:Pending,receipt:{status:number}){
+  clearPending(p);
+  tell(receipt.status===1?`${p.label}已确认。`:'交易执行失败，可以重新操作。',receipt.status!==1);
+  try{await refresh();}catch{tell('交易结果已确认，但页面数据刷新失败，请刷新状态。',true);}
+ }
+ async function checkPending(){await run('检查交易',async()=>{
+  if(!pending)return;
+  const g=generation.current,cfg=await api('/config');
+  if(!matchesPending(pending,cfg.chain,sessionRef.current?.wallet_address)){
+   await refresh();tell('交易所属环境已变化，记录已保留；切回原环境后可继续检查。');return;
+  }
+  const receipt=await readReceipt(pending);
+  if(g!==generation.current)return;
+  if(!receipt){tell('交易仍待最终确认，记录已保存，可稍后检查。');return;}
+  await finishTransaction(pending,receipt);
+ });}
  const percent=(p:number)=>`${(p*100).toFixed(1)}%`;
  let probs=weapon?.probabilities||{};if(weapon?.status==='active'&&shield&&weapon.protected_left===0){probs={...probs,saved:probs.destroy,destroy:0};}
  const hasMinted=weapon&&minted.has(weapon.id);
@@ -197,7 +258,7 @@ export default function App(){
    {syncError&&<div className="service-note" role="status">{t('与服务器的同步已中断，当前显示上次保存的数据，恢复连接后会自动更新。')}</div>}
    {tab!=='forge'&&config?.chain_error&&<div className="service-note">{t(config.chain_error)}</div>}
    <div className={`notice ${error?'error':''} ${!notice&&!busy?'notice-idle':''}`} role="status"><span>{busy?'◌':'✦'}</span>{busy?t`${t(busy)}中… `:''}{t(notice)}</div>
-   {pending&&<div className="pending">{t("待确认：")}{t(pending.label)} · {short(pending.hash)}<button onClick={checkPending} disabled={!!busy}>{t("检查待确认交易")}</button></div>}
+   {pending&&<div className="pending">{t("待确认：")}{t(pending.label)} · <span title={pending.hash}>{short(pending.hash)}</span>{pending.chainId===11155111&&<a href={`https://sepolia.etherscan.io/tx/${pending.hash}`} target="_blank" rel="noreferrer">{t("查看交易")}</a>}<button onClick={checkPending} disabled={!!busy}>{t("检查待确认交易")}</button></div>}
    {tab==='forge'&&state?.can_rescue&&<div className="daily-swords"><button className="secondary" disabled={disabled} onClick={()=>action('领取普通测试剑','/test/supply')}>{t('没有可强化的剑？领取一把普通测试剑')}</button></div>}
    {tab==='forge'&&<div className="forge-layout"><section className="forge-card"><div className="panel-top"><span>{t("01 / 锻造台")}</span><span className="live-dot">{t("领剑 → 加热 → 锻造")}</span></div><WorkshopStorage weapon={weapon} storedCount={(state?.weapons.length||0)-(weapon?1:0)} disabled={disabled} onStore={storeCurrent} onOpen={()=>setTab('bag')}/><div className="scene"><ForgeScene supplyRemaining={state?.player.daily_swords_remaining??null} supplyTotal={balance?.daily_swords??3} onClaimSword={()=>action('领取基础剑','/supply/sword')} storageWeapons={syncError?[]:state?.weapons||[]} storageFeedback={syncError?'与服务器的同步已中断，当前显示上次保存的数据，恢复连接后会自动更新。':busy?'正在处理操作，请稍候。':notice} onStoreWeapon={storeCurrent} workshopKey={workshopKey} weapons={syncError?[]:(state?.weapons||[]).filter((w:Weapon)=>w.status==='active')} onSelectWeapon={takeOut} level={syncError?0:weapon?.level||0} hit={hit} weapon={syncError?undefined:weapon} result={lastResult} busy={disabled} probabilities={probs} shield={shield} canToggleShield={canToggleShield} shields={state?.player.shields||0} onShield={setShield} onPlacement={setWorkshopPlace} onHeat={heatWeapon} heatWarning={heatShortage} strikeWarning={strikeShortage} strikeMaterials={strikeCost} feedback={error&&!busy?notice:''} onStrike={strikeWeapon} visualTiers={balance?.visual_tiers} maxLevel={maxLevel} heatSeconds={balance?.heat_seconds??3} heatStrikes={balance?.heat_strikes??5}/><div className="scene-caption"><span>EMBER FORGE</span><small>{t("余烬未熄，传奇未定")}</small></div><div className="scene-tag">{weapon?`${name(weapon)} +${weapon.level}`:t('等待一把新武器')}</div></div><div className="forge-footer"><span>{t("从领剑处领取基础剑，也可以消耗铁块锻造新武器。")}</span><button className="secondary" disabled={disabled} onClick={()=>action('锻造武器','/forge')}>{t("＋ 锻造新武器 ")}<small><IronAmount amount={balance?.forge_materials??10}/></small></button></div>{weapon&&<WeaponLore weapon={weapon}/>}</section>
    <section className="control-card"><div className="panel-top"><span>{t("02 / 命运之锤")}</span><span>{t("风险与回报")}</span></div><label className="field-label" htmlFor="workshop-weapon">{t("从仓库取用")}</label><select id="workshop-weapon" value={weapon?.id||''} disabled={disabled} onChange={e=>takeOut(e.target.value)}><option value="" disabled>{t("工坊空闲 · 选择武器取出")}</option>{state?.weapons.filter((w:Weapon)=>w.status==='active').map((w:Weapon)=><option key={w.id} value={w.id}>{w.demo?'[DEMO] ':''}{name(w)} +{w.level} · {w.id===weapon?.id?t('工坊中'):t('仓库中')} · {short(w.id)}</option>)}</select><label className="field-label" htmlFor="weapon-branch">{t("武器路线 · 按等级解锁")}</label><select id="weapon-branch" value={weapon?.branch||'longsword'} disabled={disabled||!weapon||weapon.status!=='active'||weapon.branch_locked||weapon.level<branchUnlockLevel} onChange={e=>chooseBranch(e.target.value)}>{swordBranches.map(branch=><option key={branch.id} value={branch.id} disabled={!weapon||weapon.level<branch.unlock_level||weapon.level>branch.max_level}>{t`${name(branch)} · +${branch.unlock_level} 解锁 · 最高 +${branch.max_level}`}</option>)}</select><details className="forge-rules"><summary>{t("查看路线规则")}</summary><small className="risk-note">{t("基础剑 +5 可选择刺剑，+10 可选择巨剑，也可继续骑士剑路线。骑士剑最高 +")}{maxSwordLevel('longsword')}{t("，刺剑最高 +")}{maxSwordLevel('rapier')}{t("，巨剑最高 +")}{maxSwordLevel('greatsword')}{t("；目标路线需容纳当前等级。选定刺剑或巨剑后路线固定；降级保留路线，低于门槛时恢复基础外观。")}</small></details><div className="level-line"><span>{t("当前等级")}<strong>+{weapon?.level??0}</strong></span><span>{t("路线等级上限")}<strong>+{maxLevel}</strong></span><span>{t("上链门槛")}<strong>+{balance?.mint_level??50}</strong></span></div><div className="progress"><div style={{width:`${Math.min((weapon?.level||0)/(balance?.mint_level||20)*100,100)}%`}}/></div><div className="probability-title">{t("下一锤的命运 ")}<small>{t("服务端结算 · 暂定数值")}</small></div><div className="probabilities">{[['up',t('普通升级'),'+1'],['double',t('大成功'),'+2'],['down',t('降级'),'−1'],['destroy',t('永久损毁'),'×'],...(probs.saved?[['saved',t('保护后不变'),'—']]:[])].map(([id,label,symbol])=><div key={id} className={`prob ${id}`}><span><b>{symbol}</b>{label}</span><strong>{weapon&&weapon.level<maxLevel?percent(probs[id]||0):'—'}</strong></div>)}</div><label className="shield-toggle"><input type="checkbox" checked={shield} aria-keyshortcuts="Q" disabled={!canToggleShield} onChange={e=>setShield(e.target.checked)}/><span><b>{t("启用保护符 · Q")}</b><small>{t("仅挡住损毁时消耗 1 张，仍可能降级")}</small></span><span className="shield-icon"><WardIcon size="medium"/></span></label><div className="stage-info">{weapon?.protected_left?t`✦ 无敌阶段 · 剩余 ${weapon.protected_left} 锤免损毁`:t`距离免损毁阶段还需 ${Math.max(0,(balance?.protection_trigger||10)-(weapon?.strikes||0))} 锤`}</div><button className="secondary heat-button" disabled={disabled||!weapon||weapon.status!=='active'||weapon.level>=maxLevel||weapon.heat_charges>0} onClick={heatWeapon}>♨ {weapon&&weapon.level>=maxLevel?t('已达到路线等级上限'):heatShortage?t('铁块不足，无法加热'):warming?t('加热中…'):hot?t`热量剩余 ${weapon.heat_charges} 锤`:t('送入熔炉加热')}<small>{balance?.heat_seconds??3} {t(" 秒 · ")}<IronAmount amount={heatCost}/> {t(" · 可敲 ")}{balance?.heat_strikes??5} {t(" 锤")}</small></button><button className="primary strike" disabled={disabled||!weapon||weapon.status!=='active'||!hot||workshopPlace!=='anvil'||weapon.level>=maxLevel||!!strikeShortage} onClick={strikeWeapon}>{t("⚒ 敲下命运之锤 ")}<span><IronAmount amount={strikeCost}/></span></button>{strikeShortage&&<small className="risk-note" role="alert">{t(strikeShortage)}</small>}<details className="forge-rules"><summary>{t("消耗与损毁说明")}</summary><small className="risk-note">{t("每次敲击都会消耗铁块，降级、保护生效与损毁也照常扣除。损毁会永久失去当前武器及已投入资源。")}</small></details></section></div>}

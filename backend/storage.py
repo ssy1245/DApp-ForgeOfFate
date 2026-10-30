@@ -3,8 +3,8 @@ import sqlite3
 from pathlib import Path
 from contextlib import contextmanager
 from .game import BALANCE
-from .chain_store import migrate_chain
-from .wallets import migrate_wallets
+from chain.server.store import migrate_chain
+from chain.server.wallets import migrate_wallets
 
 
 class Store:

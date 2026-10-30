@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from web3.exceptions import TransactionNotFound
 
 from backend.app import Store, create_app
-from backend.chain import ChainReader, ChainSettings
+from chain.server.rpc import ChainReader, ChainSettings
 
 ADDRESS = '0x' + '11' * 20
 AUTHORITY = '0x' + '22' * 20
@@ -95,7 +95,7 @@ def test_wrong_chain_or_contract_fails_closed_without_leaking_rpc(reader, monkey
     if change == 'epoch': contract.functions.deploymentId.return_value.call.return_value = bytes(32)
     if change == 'authority': contract.functions.mintSigner.return_value.call.return_value = ADDRESS
     if change == 'rpc_failure': eth.get_code.side_effect = ValueError('https://example.invalid/credential')
-    import backend.chain as module
+    import chain.server.rpc as module
     factory = Mock(return_value=SimpleNamespace(eth=eth))
     factory.HTTPProvider = Mock()
     factory.to_hex = lambda value: '0x' + value.hex()
@@ -133,12 +133,53 @@ def test_pending_receipt_and_foreign_contract(reader):
     eth.get_transaction_receipt.side_effect = TransactionNotFound('not found')
     assert result.receipt(TX)['receipt'] is None
     eth.get_transaction_receipt.side_effect = None
-    eth.get_transaction_receipt.return_value = {'to': AUTHORITY, 'status': 1, 'blockNumber': 20}
+    eth.get_transaction_receipt.return_value = {'to': AUTHORITY, 'from': AUTHORITY, 'status': 1, 'blockNumber': 20, 'blockHash': bytes(32)}
+    eth.block_number = 20
+    eth.get_block.return_value = {'hash': bytes(32)}
     with pytest.raises(HTTPException) as error:
         result.receipt(TX)
     assert error.value.status_code == 400
     eth.get_transaction_receipt.return_value['to'] = ADDRESS
     assert result.receipt(TX)['receipt']['status'] == 1
+
+
+@pytest.mark.parametrize('status', [0, 1])
+@pytest.mark.parametrize('finalized', [19, 20, 21])
+def test_sepolia_receipt_requires_finality_for_success_and_failure(tmp_path, status, finalized):
+    result = ChainReader(ChainSettings('sepolia', tmp_path, 'private-rpc'))
+    info = {'address': ADDRESS, 'chainId': 11155111, 'deploymentId': EPOCH}
+    receipt = {'to': ADDRESS, 'from': AUTHORITY, 'status': status, 'blockNumber': 20, 'blockHash': bytes(32)}
+    eth = SimpleNamespace(block_number=21, get_transaction_receipt=Mock(return_value=receipt),
+                          get_block=Mock(side_effect=lambda block: {'number': finalized} if block == 'finalized' else {'hash': bytes(32)}))
+    result.connect = Mock(return_value=(info, SimpleNamespace(eth=eth), None))
+    data = result.receipt(TX)
+    assert data['state'] == ('confirming' if finalized < 20 else 'confirmed' if status else 'failed')
+    assert data['confirmationPolicy'] == 'finalized'
+    assert data['receipt']['finalized'] == (finalized >= 20)
+    assert data['receipt']['confirmations'] == 2
+    assert data['receipt']['from'] == AUTHORITY
+
+
+@pytest.mark.parametrize('change', ['reorg', 'ahead_of_head', 'finality_unavailable', 'invalid_boundary', 'invalid_status'])
+def test_uncertain_receipts_never_report_completion(tmp_path, change):
+    result = ChainReader(ChainSettings('sepolia', tmp_path, 'private-rpc'))
+    receipt = {'to': ADDRESS, 'from': AUTHORITY, 'status': 1, 'blockNumber': 20, 'blockHash': bytes(32)}
+    def get_block(block):
+        if block == 'finalized':
+            if change == 'finality_unavailable': raise RuntimeError('private-rpc-secret')
+            return {'number': 100 if change == 'invalid_boundary' else 19}
+        return {'hash': bytes([1])*32 if change == 'reorg' else bytes(32)}
+    if change == 'invalid_status': receipt['status'] = 2
+    eth = SimpleNamespace(block_number=19 if change == 'ahead_of_head' else 21,
+                          get_transaction_receipt=Mock(return_value=receipt), get_block=Mock(side_effect=get_block))
+    result.connect = Mock(return_value=({'address': ADDRESS, 'chainId': 11155111, 'deploymentId': EPOCH}, SimpleNamespace(eth=eth), None))
+    if change in ['reorg', 'ahead_of_head']:
+        assert result.receipt(TX)['state'] == 'pending'
+        assert result.receipt(TX)['receipt'] is None
+    else:
+        with pytest.raises(HTTPException) as error: result.receipt(TX)
+        assert error.value.status_code == 503
+        assert 'secret' not in error.value.detail
 
 
 @pytest.mark.parametrize('query', ['offset=-1', 'limit=101', 'limit=0', 'block=-1'])

@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from backend.app import metadata
+from chain.server.nft import metadata
 from backend.game import BALANCE, SWORD_BRANCHES, weapon_tier
 
 

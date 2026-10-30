@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from backend.game import BALANCE, SWORD_CATALOG, SWORD_TIERS, probabilities, strike, weapon_name, weapon_tier, weapon_max_level
-from backend.app import metadata
+from chain.server.nft import metadata
 
 @pytest.mark.parametrize('level,model', [
     (0,'sword'),(3,'sword'),(9,'sword'),

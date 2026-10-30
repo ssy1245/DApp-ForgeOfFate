@@ -1,4 +1,4 @@
-const { test, expect, register, state, consistent } = require('./fixtures.cjs');
+const { test, expect, register, state, consistent } = require('../../../tests/browser/fixtures.cjs');
 const { Wallet, getBytes } = require('ethers');
 
 async function installWallet(page, wallet) {

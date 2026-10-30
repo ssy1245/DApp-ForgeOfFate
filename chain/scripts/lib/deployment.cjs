@@ -31,7 +31,10 @@ async function prepare({ artifact, args, deployer, network, module, deploymentId
   };
 }
 
-function createService({ plan, provider, directory, origin, server = http.createServer() }) {
+function createService({ plan, provider, directory, origin, hooks = {}, server = http.createServer() }) {
+  if (plan.module === 'forge-of-fate' && ['checkReady', 'verifyContract', 'publishManifest'].some(key => typeof hooks[key] !== 'function')) {
+    fail('NFT 部署必须配置授权核验和游戏清单保存。');
+  }
   if (![31338, 11155111].includes(plan.network.chainId)
       || plan.confirmationPolicy !== (plan.network.chainId === 11155111 ? 'sepolia-finalized' : 'local-latest')) fail('部署计划的确认策略无效。');
   const stateFile = path.join(directory, 'state.json');
@@ -84,6 +87,7 @@ function createService({ plan, provider, directory, origin, server = http.create
     if (!equal(receipt.contractAddress, address)) fail('部署回执中的合约地址不匹配。', 409);
     const code = await provider.getCode(address, receipt.blockNumber);
     if (code === '0x' || await provider.getCode(address) !== code) fail('合约代码不存在或已变化。', 409);
+    const moduleFields = await hooks.verifyContract?.(address, receipt.blockNumber);
     const manifest = {
       manifestVersion: 1, module: plan.module, contractName: plan.contractName,
       deploymentId: plan.deploymentId, chainId: plan.network.chainId, network: plan.network.chainName,
@@ -91,6 +95,7 @@ function createService({ plan, provider, directory, origin, server = http.create
       deploymentTransaction: hash, deploymentBlock: receipt.blockNumber, deploymentBlockHash: receipt.blockHash,
       genesisHash: plan.genesisHash, creationDataHash: plan.dataHash, runtimeCodeHash: keccak256(code),
       confirmationPolicy: plan.confirmationPolicy, recordedAt: new Date().toISOString(),
+      ...moduleFields,
     };
     // Re-read after the RPC calls so a reset/reorg cannot silently certify stale data.
     if (!equal((await provider.getBlock(receipt.blockNumber))?.hash, receipt.blockHash)) fail('交易区块已变化，请稍后重新检查。', 409);
@@ -100,12 +105,15 @@ function createService({ plan, provider, directory, origin, server = http.create
       for (const key of Object.keys(manifest).filter(key => key !== 'recordedAt')) {
         if (JSON.stringify(old[key]) !== JSON.stringify(manifest[key])) fail('已保存的部署记录与链上核验不一致，请保留文件并排查。', 409);
       }
+      await hooks.publishManifest?.(old);
       return { phase: 'confirmed', transactionHash: hash, nonce: tx.nonce, manifest: old };
     }
     save(manifestFile, manifest);
+    await hooks.publishManifest?.(manifest);
     return { phase: 'confirmed', transactionHash: hash, nonce: tx.nonce, manifest };
   };
   const refresh = async () => {
+    await hooks.checkReady?.();
     if (state.transactionHash && ['submitted', 'confirming', 'confirmed'].includes(state.phase)) {
       const result = await verify(state.transactionHash);
       if (state.phase === 'confirmed' && result.phase !== 'confirmed') fail('已记录的部署无法在当前链上验证。', 409);
@@ -118,6 +126,7 @@ function createService({ plan, provider, directory, origin, server = http.create
     async begin(body) {
       if (body.deploymentId !== plan.deploymentId) fail('部署计划已变化，请刷新页面。', 409);
       await guardNetwork();
+      await hooks.checkReady?.();
       if (!['ready', 'failed'].includes(state.phase)) fail('已有部署正在处理，请继续检查原交易。', 409);
       commit({ phase: 'awaiting_wallet', intent: crypto.randomUUID(), transactionHash: null });
       return { plan, state };
@@ -143,6 +152,12 @@ function createService({ plan, provider, directory, origin, server = http.create
         validateTransaction(replacement);
         if (replacement.nonce !== state.nonce) fail('替换交易必须使用原交易的序号。', 409);
       }
+      // Retain the hash before finalization/publication. A disk error or a lost
+      // response must not lose the transaction or invite a second deployment.
+      const tx = await provider.getTransaction(body.transactionHash);
+      if (!tx) fail('节点暂未找到交易，请保留交易哈希后重试。', 409);
+      validateTransaction(tx);
+      if (state.phase !== 'confirmed') commit({ ...state, phase: 'submitted', transactionHash: body.transactionHash, nonce: tx.nonce });
       const result = await verify(body.transactionHash);
       commit({ ...state, ...result });
       return { plan, state };

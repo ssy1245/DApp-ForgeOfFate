@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
-const sepolia = require('./lib/sepolia.cjs');
+const sepolia = require('../chain/scripts/lib/sepolia.cjs');
 const root = path.resolve(__dirname, '..');
 const directory = path.join(root, '.local/sepolia');
 const children = []; let stopping = false;
@@ -46,10 +46,10 @@ async function main() {
   const cfg = await (await fetch('http://127.0.0.1:8000/api/config')).json();
   if (cfg.network?.chainId !== 11155111 || cfg.network?.name !== 'sepolia') throw Error('后端网络不匹配，已停止启动。');
   if (fs.existsSync(path.join(directory, 'deployment.json'))) {
-    launch(process.execPath, ['scripts/indexer-sepolia.cjs'], 'indexer');
+    launch(process.execPath, ['chain/scripts/indexer-sepolia.cjs'], 'indexer');
   }
   launch(process.execPath, [path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js'), '--host', '127.0.0.1', '--port', '5173', '--strictPort', '--config', path.join(root, 'frontend/vite.config.ts'), path.join(root, 'frontend')], 'frontend', { FORGE_API_TARGET: 'http://127.0.0.1:8000' });
   await ready('http://127.0.0.1:5173/');
-  console.log(`游戏页面：http://127.0.0.1:5173/\n网络：Ethereum Sepolia（11155111）；存档：.local/sepolia/\n测试菜单：${cfg.demo_mode ? '开启' : '关闭'}。NFT 与充值仍待后续开发，启动不会自动部署。\n部署工作台请另行运行 npm run deploy:console。按 Ctrl+C 停止本次服务。`);
+  console.log(`游戏页面：http://127.0.0.1:5173/\n网络：Ethereum Sepolia（11155111）；存档：.local/sepolia/\n测试菜单：${cfg.demo_mode ? '开启' : '关闭'}。${cfg.chain ? '已读取 NFT 合约配置。' : '尚无可用 NFT 配置，请先完成部署。'}充值与质押暂未开放，启动不会自动部署。\n部署工作台请另行运行 npm run deploy:console。按 Ctrl+C 停止本次服务。`);
 }
 main().catch(error => { console.error(error.message); stop(1); });

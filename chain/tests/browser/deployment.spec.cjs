@@ -2,9 +2,10 @@ const { test: base, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
-const { spawn } = require('node:child_process');
-const { JsonRpcProvider, Contract } = require('ethers');
-const root = path.resolve(__dirname, '../..');
+const { spawn, execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const { JsonRpcProvider, Contract, Wallet, hexlify, randomBytes } = require('ethers');
+const root = path.resolve(__dirname, '../../..');
 const deployer = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'; // Public Hardhat account; local chain only.
 const other = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -15,12 +16,13 @@ async function freePort() {
   await new Promise(resolve => server.close(resolve)); return port;
 }
 const test = base.extend({
-  rehearsal: async ({}, use) => {
+  deploymentModule: ['deployment-probe', { option: true }],
+  rehearsal: async ({ deploymentModule }, use) => {
     const ports = new Set(); while (ports.size < 3) ports.add(await freePort());
     const [rpcPort, apiPort, uiPort] = [...ports];
     const origin = `http://127.0.0.1:${uiPort}`, rpc = `http://127.0.0.1:${rpcPort}`;
     let output = '';
-    const child = spawn(process.execPath, ['scripts/deploy-console-local.cjs', '--test'], { cwd: root,
+    const child = spawn(process.execPath, ['chain/scripts/deploy-console-local.cjs', '--test', '--module', deploymentModule], { cwd: root,
       env: { ...process.env, FORGE_DEPLOYER_ADDRESS: deployer, FORGE_DEPLOY_RPC_PORT: String(rpcPort), FORGE_DEPLOY_API_PORT: String(apiPort), FORGE_DEPLOY_UI_PORT: String(uiPort) }, stdio: ['ignore', 'pipe', 'pipe'] });
     child.stdout.on('data', value => { output += value; }); child.stderr.on('data', value => { output += value; });
     let provider;
@@ -33,7 +35,7 @@ const test = base.extend({
         return { code: response.status, body: await response.json() };
       };
       const directory = output.match(/记录目录：([^\n]+)/)[1].trim();
-      await use({ origin, provider, status, post, directory });
+      await use({ origin, rpc, provider, status, post, directory });
     } finally {
       provider?.destroy();
       child.kill('SIGTERM');
@@ -41,6 +43,69 @@ const test = base.extend({
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
     }
   },
+});
+
+test.describe('NFT business deployment', () => {
+  test.use({ deploymentModule: 'forge-of-fate' });
+  test('publishes matching game configuration, mints, and reconnects the backend/indexer', async ({ page, rehearsal }) => {
+    const controls = await wallet(page, rehearsal);
+    const { body: { plan } } = await rehearsal.status();
+    await expect(page.getByTestId('mint-signer')).toHaveText(plan.mintSigner);
+    await expect(page.getByText('武器 NFT / 市场合约', { exact: true })).toBeVisible();
+    controls.rejectNext = true;
+    await deployButton(page).click();
+    await expect(page.getByRole('alert')).toContainText('你取消了钱包操作。');
+    await expect(deployButton(page)).toBeEnabled();
+    const gameDirectory = path.join(rehearsal.directory, 'game');
+    expect(fs.existsSync(path.join(gameDirectory, 'deployment.json'))).toBe(false);
+    controls.loseNext = true;
+    await deployButton(page).click();
+    await expect(page.getByRole('alert')).toContainText('钱包操作未完成');
+    await page.reload();
+    await page.getByLabel('部署交易哈希', { exact: true }).fill(controls.sent[0]);
+    await page.getByRole('button', { name: '检查并恢复交易' }).click();
+    await expect(confirmed(page)).toBeVisible();
+    await expect(page.getByTestId('nft-game-ready')).toContainText('本轮隔离目录');
+    const manifest = JSON.parse(fs.readFileSync(path.join(gameDirectory, 'deployment.json')));
+    expect(manifest).toEqual((await rehearsal.status()).body.state.manifest);
+    expect(manifest.manifestVersion).toBe(2);
+    const authority = new Wallet(fs.readFileSync(path.join(gameDirectory, 'mint-key'), 'utf8').trim());
+    expect(manifest.mintSigner).toBe(authority.address);
+    const contract = new Contract(manifest.address, manifest.abi, await rehearsal.provider.getSigner(deployer));
+    const voucher = { weaponId: hexlify(randomBytes(32)), recipient: deployer, level: 50,
+      uri: 'data:application/json;base64,e30=', deadline: (await rehearsal.provider.getBlock('latest')).timestamp + 600, deploymentId: plan.deploymentId };
+    const signature = await authority.signTypedData({ name: 'ForgeOfFate', version: '1', chainId: 31338, verifyingContract: manifest.address },
+      { Voucher: [{ name: 'weaponId', type: 'bytes32' }, { name: 'recipient', type: 'address' }, { name: 'level', type: 'uint256' },
+        { name: 'uri', type: 'string' }, { name: 'deadline', type: 'uint256' }, { name: 'deploymentId', type: 'bytes32' }] }, voucher);
+    await (await contract.mint(voucher, signature)).wait();
+    expect(await contract.ownerOf(BigInt(voucher.weaponId))).toBe(deployer);
+    // Read the exported file through the actual Python game and indexer twice.
+    // The helper admits 31338 only inside its own disposable test process.
+    for (let i = 0; i < 2; i++) {
+      const { stdout } = await promisify(execFile)(path.join(root, '.venv/bin/python'),
+        ['chain/tests/check_deployment_game.py', gameDirectory, rehearsal.rpc, BigInt(voucher.weaponId).toString()], { cwd: root });
+      expect(JSON.parse(stdout)).toEqual({ connected: true, indexed: true, nftCount: 1 });
+    }
+    const { loadPlan, nftHooks } = require('../../scripts/lib/deployment-modules.cjs');
+    const { createService } = require('../../scripts/lib/deployment.cjs');
+    const savedPlan = await loadPlan({ root, directory: rehearsal.directory, gameDirectory, module: 'forge-of-fate', deployer,
+      provider: rehearsal.provider, network: plan.network, compile: async () => { throw Error('Restart must reuse the build'); } });
+    const service = createService({ plan: savedPlan, provider: rehearsal.provider, directory: rehearsal.directory, origin: rehearsal.origin,
+      hooks: nftHooks({ plan: savedPlan, provider: rehearsal.provider, gameDirectory }) });
+    await new Promise(resolve => service.listen(0, '127.0.0.1', resolve));
+    try {
+      const response = await fetch(`http://127.0.0.1:${service.address().port}/api/deploy/status`);
+      expect((await response.json()).state.manifest).toEqual(manifest);
+    } finally { await new Promise(resolve => service.close(resolve)); }
+    await page.reload(); await expect(confirmed(page)).toBeVisible();
+    expect(controls.sent).toHaveLength(1);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'Switch to English' }).click();
+    expect((await page.locator('main section').allInnerTexts()).join('\n')).not.toMatch(/\p{Script=Han}/u);
+    await expect(page.locator('.deployment-banner')).toContainText('Deploy weapon NFTs');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: path.join(root, 'test-results/nft-deployment-mobile.png'), fullPage: true });
+  });
 });
 
 async function wallet(page, rehearsal) {

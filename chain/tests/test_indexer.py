@@ -8,9 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.storage import Store
-from backend.indexer import Indexer, IndexFailure, IndexHalt, RpcSource
-from backend.chain import ChainSettings
-from backend.chain_store import index_status, event_history
+from chain.server.indexer import Indexer, IndexFailure, IndexHalt, RpcSource
+from chain.server.rpc import ChainSettings
+from chain.server.store import index_status, event_history
 from backend.app import create_app
 from web3 import Web3
 from hexbytes import HexBytes

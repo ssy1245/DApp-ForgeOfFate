@@ -3,7 +3,8 @@ import base64
 import json
 import uuid
 import pytest
-from backend.app import metadata, create_app
+from backend.app import create_app
+from chain.server.nft import metadata
 from fastapi.testclient import TestClient
 from backend.game import BALANCE, weapon_tier, weapon_name
 from backend.tests.test_game import client, login, forge, post, weapon

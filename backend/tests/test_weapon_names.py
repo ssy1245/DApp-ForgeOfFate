@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from backend.app import metadata
+from chain.server.nft import metadata
 from backend.game import SWORD_BRANCHES, SWORD_CATALOG, weapon_name, weapon_tier
 from backend.tests.test_game import client, login, forge, weapon
 

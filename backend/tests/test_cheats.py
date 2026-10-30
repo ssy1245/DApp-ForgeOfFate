@@ -7,6 +7,7 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 
 from backend.app import create_app
+from backend.storage import Store
 from backend.game import BALANCE
 from backend.tests.test_game import post
 from backend.tests.test_accounts_supply import credentials
@@ -161,6 +162,31 @@ def test_local_account_setup_is_non_destructive(tmp_path):
     with store.connection() as db:assert dict(db.execute('SELECT * FROM accounts').fetchone())==old
     with pytest.raises(RuntimeError):provision(store,data['username'],data['password'],'player')
     assert c.post('/api/account/login',json=data).json()['role']=='tester'
+
+
+def test_setup_defaults_to_one_account_and_preserves_its_verified_wallet(tmp_path, monkeypatch):
+    from scripts.create_dev_accounts import main
+    monkeypatch.setenv('FORGE_LOCAL_DIR', str(tmp_path))
+    monkeypatch.setattr('sys.argv', ['create_dev_accounts.py', '--network', 'local'])
+    main()
+    store = Store(tmp_path / 'game.sqlite3')
+    wallet = Account.create().address
+    with store.connection() as db:
+        account = dict(db.execute('SELECT * FROM accounts').fetchone())
+        assert account['username'] == 'forge_test' and account['role'] == 'tester'
+        db.execute('INSERT INTO wallet_bindings VALUES(?,?,?)', (account['id'], wallet, 123))
+        db.execute('UPDATE players SET coins=12345 WHERE address=?', (account['game_address'],))
+    main()
+    with store.connection() as db:
+        assert db.execute('SELECT COUNT(*) FROM accounts').fetchone()[0] == 1
+        assert dict(db.execute('SELECT * FROM accounts').fetchone()) == account
+        assert tuple(db.execute('SELECT * FROM wallet_bindings').fetchone()) == (account['id'], wallet, 123)
+        assert db.execute('SELECT coins FROM players').fetchone()[0] == 12345
+    monkeypatch.setattr('sys.argv', ['create_dev_accounts.py', '--network', 'local', '--with-player'])
+    main()
+    with store.connection() as db:
+        assert db.execute("SELECT role FROM accounts WHERE username='forge_player'").fetchone()[0] == 'player'
+    assert '| forge_player |' in (tmp_path / 'test-accounts.md').read_text()
 
 
 def test_cheat_levels_respect_weapon_route_caps(tester):

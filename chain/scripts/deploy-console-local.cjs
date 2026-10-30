@@ -1,13 +1,14 @@
 // Dedicated, disposable local node + unsigned deployment API + browser UI.
-// No Sepolia transaction, game database, wallet private key or mint key is used.
+// No Sepolia transaction, real game database or real mint key is used.
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
 const { parseEnv } = require('node:util');
-const { JsonRpcProvider, FetchRequest, isAddress, ZeroAddress, hexlify, randomBytes, toBeHex, parseEther } = require('ethers');
-const { prepare, createService, save } = require('./lib/deployment.cjs');
-const root = path.resolve(__dirname, '..');
+const { JsonRpcProvider, FetchRequest, isAddress, ZeroAddress, toBeHex, parseEther } = require('ethers');
+const { createService } = require('./lib/deployment.cjs');
+const { selectModule, loadPlan, nftHooks } = require('./lib/deployment-modules.cjs');
+const root = path.resolve(__dirname, '../..');
 const children = [];
 let server, provider, stopping = false;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -42,7 +43,8 @@ function run(args, cwd, env, directory, name) {
   return child;
 }
 async function main() {
-  if (process.argv.length !== 3 || process.argv[2] !== '--test') throw Error('此入口仅供隔离自动测试使用；日常操作请运行 npm run deploy:console 连接 Sepolia。');
+  if (process.argv[2] !== '--test') throw Error('此入口仅供隔离自动测试使用；日常操作请运行 npm run deploy:console 连接 Sepolia。');
+  const module = selectModule(process.argv.slice(3), 'deployment-probe');
   const rpcPort = port('FORGE_DEPLOY_RPC_PORT', 8546), apiPort = port('FORGE_DEPLOY_API_PORT', 8010), uiPort = port('FORGE_DEPLOY_UI_PORT', 5174);
   if (new Set([rpcPort, apiPort, uiPort]).size !== 3) throw Error('三个服务必须使用不同端口。');
   // An explicit public address override is useful for isolated automated tests.
@@ -55,10 +57,10 @@ async function main() {
   const directory = fs.mkdtempSync(path.join(base, 'run-')); fs.chmodSync(directory, 0o700);
   console.log('准备独立的本地部署演练。记录目录：' + directory);
   const hardhat = path.join(path.dirname(require.resolve('hardhat/package.json')), 'internal/cli/cli.js');
-  const compile = run([hardhat, 'compile'], path.join(root, 'contracts'), {}, directory, 'compile');
+  const compile = run([hardhat, 'compile'], path.join(root, 'chain'), {}, directory, 'compile');
   const code = await new Promise(resolve => compile.once('exit', resolve));
   if (code !== 0) throw Error('合约编译失败，请查看本轮 compile.log。');
-  const chain = run([hardhat, 'node', '--hostname', '127.0.0.1', '--port', String(rpcPort)], path.join(root, 'contracts'), { FORGE_DEPLOY_REHEARSAL: '1' }, directory, 'chain');
+  const chain = run([hardhat, 'node', '--hostname', '127.0.0.1', '--port', String(rpcPort)], path.join(root, 'chain'), { FORGE_DEPLOY_REHEARSAL: '1' }, directory, 'chain');
   const rpc = `http://127.0.0.1:${rpcPort}`, origin = `http://127.0.0.1:${uiPort}`;
   // Probe with fetch first to avoid noisy provider retries during node startup.
   let ready = false;
@@ -76,12 +78,10 @@ async function main() {
   provider = new JsonRpcProvider(rpcRequest, undefined, { cacheTimeout: -1 });
   // Funds exist only on this owned, disposable local node (chain ID 31338).
   await provider.send('hardhat_setBalance', [deployer, toBeHex(parseEther('10'))]);
-  const artifact = JSON.parse(fs.readFileSync(path.join(root, 'contracts/artifacts/contracts/DeploymentProbe.sol/DeploymentProbe.json')));
-  const deploymentId = hexlify(randomBytes(32));
-  const plan = await prepare({ artifact, args: [deploymentId], deployer, deploymentId, module: 'deployment-probe', provider,
+  const gameDirectory = path.join(directory, 'game');
+  const plan = await loadPlan({ root, directory, gameDirectory, module, deployer, provider, compile: async () => {},
     network: { chainId: 31338, chainName: 'Forge Deployment Local', rpcUrls: [rpc], nativeCurrency: { name: 'Local ETH', symbol: 'ETH', decimals: 18 } } });
-  save(path.join(directory, 'plan.json'), plan);
-  server = createService({ plan, provider, directory, origin });
+  server = createService({ plan, provider, directory, origin, hooks: nftHooks({ plan, provider, gameDirectory }) });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(apiPort, '127.0.0.1', resolve); });
   const vite = path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js');
   const frontend = run([vite, '--host', '127.0.0.1', '--port', String(uiPort), '--strictPort'], path.join(root, 'frontend'), { FORGE_API_TARGET: `http://127.0.0.1:${apiPort}` }, directory, 'frontend');

@@ -4,7 +4,7 @@ const path = require('node:path');
 const { parseEnv } = require('node:util');
 const { isAddress, ZeroAddress } = require('ethers');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '../..');
 const sepoliaChainId = 11155111n;
 
 function checkAddress(value) {

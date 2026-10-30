@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from web3 import Web3
 from web3.exceptions import TransactionNotFound
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 NETWORKS = {
     'local': {'chainId': 31337, 'chainName': 'Forge Local', 'rpcUrls': ['http://127.0.0.1:8545'], 'blockExplorerUrls': []},
     # The wallet already knows Sepolia. Our private provider URL stays on the server.
@@ -94,14 +94,29 @@ class ChainReader:
         if not re.fullmatch(r'0x[0-9a-fA-F]{64}', tx_hash):
             raise HTTPException(400, '交易哈希格式无效。')
         info, w3, _ = self.connect()
+        envelope = {'chainId': info['chainId'], 'deploymentId': info['deploymentId'],
+                    'confirmationPolicy': 'finalized' if self.settings.network == 'sepolia' else 'local-latest'}
         try:
-            receipt = w3.eth.get_transaction_receipt(tx_hash)
+            try:
+                receipt = w3.eth.get_transaction_receipt(tx_hash)
+            except TransactionNotFound:
+                return {**envelope, 'receipt': None, 'state': 'pending'}
             if not receipt['to'] or receipt['to'].lower() != info['address'].lower():
                 raise HTTPException(400, '交易不属于当前合约。')
-            return {'receipt': {'hash': tx_hash, 'status': receipt['status'], 'blockNumber': receipt['blockNumber']},
-                    'chainId': info['chainId'], 'deploymentId': info['deploymentId']}
-        except TransactionNotFound:
-            return {'receipt': None, 'chainId': info['chainId'], 'deploymentId': info['deploymentId']}
+            height = receipt['blockNumber']
+            head = w3.eth.block_number
+            boundary = w3.eth.get_block('finalized')['number'] if self.settings.network == 'sepolia' else head
+            if not 0 <= boundary <= head or receipt['status'] not in (0, 1):
+                raise ValueError('invalid chain response')
+            # A receipt can outlive its block during a reorg. Never turn it into a final result.
+            if height > head or w3.eth.get_block(height)['hash'] != receipt['blockHash']:
+                return {**envelope, 'receipt': None, 'state': 'pending'}
+            finalized = height <= boundary
+            state = ('confirmed' if receipt['status'] == 1 else 'failed') if finalized else 'confirming'
+            return {**envelope, 'state': state,
+                    'receipt': {'hash': tx_hash, 'status': receipt['status'], 'blockNumber': height,
+                                'blockHash': Web3.to_hex(receipt['blockHash']), 'from': receipt['from'],
+                                'confirmations': head - height + 1, 'finalized': finalized}}
         except HTTPException:
             raise
         except Exception:

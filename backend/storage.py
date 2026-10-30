@@ -4,6 +4,7 @@ from pathlib import Path
 from contextlib import contextmanager
 from .game import BALANCE
 from .chain_store import migrate_chain
+from .wallets import migrate_wallets
 
 
 class Store:
@@ -42,6 +43,7 @@ class Store:
                 if column not in {row['name'] for row in db.execute('PRAGMA table_info(players)')}:
                     db.execute(f'ALTER TABLE players ADD COLUMN {column} {definition}')
             migrate_chain(db)
+            migrate_wallets(db)
     @contextmanager
     def connection(self):
         db = sqlite3.connect(self.path, timeout=15, isolation_level=None)

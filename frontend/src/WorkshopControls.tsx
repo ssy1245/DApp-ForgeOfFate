@@ -41,7 +41,7 @@ export default function WorkshopControls({mode, reset, sensitivity, suspended=fa
   const forward = useRef(new Vector3()), right = useRef(new Vector3());
 
   useEffect(() => {
-    gl.domElement.setAttribute('aria-label', t('工坊三维视图：点击进入，鼠标移动转头，WASD 移动，E 交互，Esc 暂停'));
+    gl.domElement.setAttribute('aria-label', t('工坊三维视图：点击进入，鼠标移动转头，WASD 移动，E 交互，Q 开关保护符，Esc 暂停'));
   }, [gl, t]);
 
   useEffect(() => {

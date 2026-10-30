@@ -189,12 +189,12 @@ function World({level,hit,place,heat,result,hammerEquipped,onStation,roomView,di
 </>;}
 function SceneUnavailable(){const {t}=useI18n();return <div className="scene-fallback">⚒<span>{t('命运锻造台 · 3D 暂不可用，游戏操作仍可继续')}</span></div>;}
 class Fallback extends Component<{children:ReactNode},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return{failed:true};}render(){return this.state.failed?<SceneUnavailable/>:this.props.children;}}
-export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,storageFeedback,onStoreWeapon,workshopKey,onSelectWeapon,supplyRemaining,supplyTotal,onClaimSword,result,busy,probabilities,shield,shields,onShield,onPlacement,onHeat,onStrike,visualTiers=swordTiers,maxLevel,heatSeconds,heatStrikes,strikeMaterials,heatWarning='',strikeWarning='',feedback=''}: {
+export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,storageFeedback,onStoreWeapon,workshopKey,onSelectWeapon,supplyRemaining,supplyTotal,onClaimSword,result,busy,probabilities,shield,canToggleShield,shields,onShield,onPlacement,onHeat,onStrike,visualTiers=swordTiers,maxLevel,heatSeconds,heatStrikes,strikeMaterials,heatWarning='',strikeWarning='',feedback=''}: {
   level:number;hit:number;weapon?:SceneWeapon;weapons:SceneWeapon[];workshopKey:string;onSelectWeapon:(id:string)=>void;result:string;busy:boolean;probabilities:Record<string,number>;
   storageWeapons:StoredWeapon[];storageFeedback:string;onStoreWeapon:()=>void;
   onPlacement:(place:string)=>void;
   supplyRemaining:number|null;supplyTotal:number;onClaimSword:()=>void;
-  shield:boolean;shields:number;onShield:(value:boolean)=>void;onHeat:()=>void;onStrike:()=>void;visualTiers?:SwordTier[];maxLevel:number;heatSeconds:number;heatStrikes:number;
+  shield:boolean;canToggleShield:boolean;shields:number;onShield:(value:boolean)=>void;onHeat:()=>void;onStrike:()=>void;visualTiers?:SwordTier[];maxLevel:number;heatSeconds:number;heatStrikes:number;
   strikeMaterials:number;heatWarning?:string;strikeWarning?:string;feedback?:string;
 }){
  const {t, name, locale} = useI18n();
@@ -246,7 +246,7 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
   const strikeNow=()=>{if(ready&&near==='anvil')onStrike();else setHint(strikeWarning||'先将武器加热并放回铁砧，再敲击强化。');};
   const [near,setNear]=useState<Station>(null);
   const [reset,setReset]=useState(0);
-  const [hint,setHint]=useState('点击画面进入：鼠标移动转头，WASD 移动，E 拿放；按 Esc 暂停并释放鼠标。');
+  const [hint,setHint]=useState('点击画面进入：鼠标移动转头，WASD 移动，E 拿放，Q 开关保护符；按 Esc 暂停并释放鼠标。');
   const startHeating=useCallback(()=>{if(weapon&&weapon.level>=maxLevel){setHint(`已达到当前路线最高等级 +${maxLevel}。`);return;}if(heatWarning){setHint(heatWarning);return;}onHeat();},[heatWarning,onHeat,weapon?.level,maxLevel]);
   const heatingMessage=heatWarning||strikeWarning||feedback;
   const [expanded,setExpanded]=useState(false);
@@ -280,7 +280,7 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
   },[mode,near,place,active,weapon,busy,warehouseOpen,warming,hot,startHeating,displaySlots,moveWeapon,onSelectWeapon,setPlace,supplyRemaining,onClaimSword]);
   useEffect(()=>{},[mode]);
   useEffect(()=>{const stop=()=>window.addEventListener('blur',stop);return()=>window.removeEventListener('blur',stop);},[]);
-  const changeMode=(next:ViewMode)=>{setMode(next);setHint(next==='walk'?'点击画面进入：鼠标移动转头，WASD 移动，E 拿放；按 Esc 暂停并释放鼠标。':'拖动旋转视角，滚轮缩放；点击剑或下方按钮拿起。');};
+  const changeMode=(next:ViewMode)=>{setMode(next);setHint(next==='walk'?'点击画面进入：鼠标移动转头，WASD 移动，E 拿放，Q 开关保护符；按 Esc 暂停并释放鼠标。':'拖动旋转视角，滚轮缩放；点击剑或下方按钮拿起。');};
   const hammerEquipped=mode==='walk'&&!!weapon&&place==='anvil'&&near==='anvil';
   const nearLabel=near==='anvil'?'锻造台':isCabinet(near)?CABINETS.find(cabinet=>cabinet.id===near)!.label:near==='furnace'?'熔炉':near==='supply'?'领剑处':near==='warehouse'?'武器仓库 · 按 E 打开':'靠近锻造设施';
   const placeLabel=isCabinet(place)?`长剑在${CABINETS.find(cabinet=>cabinet.id===place)!.label}`:'';
@@ -308,11 +308,14 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
       {place!=='empty'&&place!=='held'?<button disabled={mode==='walk'&&(!active||near!==pickupStation)} onClick={()=>interact(pickupStation)}>{pickupStation!==place?t('拿起柜内武器'):t('拿起长剑')}{mode==='walk'?' · E':''}</button>:place==='held'?<><button disabled={mode==='walk'&&(!active||near!=='anvil')} onClick={()=>interact('anvil')}>{t("放回锻造台")}</button>{CABINETS.map(cabinet=><button key={cabinet.id} disabled={!!displaySlots[cabinet.id]||(mode==='walk'&&(!active||near!==cabinet.id))} onClick={()=>interact(cabinet.id)}>{t`放入${t(cabinet.label)}`}{displaySlots[cabinet.id]?t(' · 已占用'):''}</button>)}{!hot&&<button disabled={mode==='walk'&&(!active||near!=='furnace')} onClick={()=>interact('furnace')}>{t("放入熔炉")}</button>}</>:null}
     </div><small role="status" className={heatingMessage?'workshop-warning':undefined}>{t(heatingMessage||hint)}</small></div>
     <aside className={`forge-hud ${hudOpen?'hud-open':'hud-compact'}`} aria-label={t("铁砧锻造面板")}><button className="hud-heading" aria-label={hudOpen?t('收起武器面板'):t('展开武器面板')} aria-expanded={hudOpen} onClick={()=>setHudOpen(v=>!v)}><span className="hud-heading-label">{t("武器状态 ")}<small>{hudOpen?t('收起 −'):t('展开 +')}</small></span><span className="hud-weapon"><span>{weapon?name(swordTier(level,appearanceTiers)):t('工坊空闲')}</span><strong>{weapon?`+${level}`:'—'}</strong></span></button>{heatingMessage&&<p className="hud-warning" role="alert">{t(heatingMessage)}</p>}
+    {weapon&&weapon.status==='active'&&level<maxLevel&&<label className={`hud-ward-status ${shield?'armed':''}`}>
+      <input type="checkbox" checked={shield} aria-label={t('启用保护符 · Q')} aria-keyshortcuts="Q" disabled={!canToggleShield||warehouseOpen} onChange={e=>onShield(e.target.checked)}/>
+      <WardIcon/><span className="hud-ward-copy" aria-live="polite"><span>{t(weapon.protected_left>0?(shield?'阶段保护中，保护符待命':'阶段保护中，不耗符'):shield?'保护符已开启 · Q 取消':shields>0?'保护符未开启 · Q 开启':'保护符不足')}</span><small>{t`剩余 ${shields} 张`}</small></span>
+    </label>}
     {!hudOpen&&place==='furnace'&&<div className="hud-buttons hud-return"><button disabled={busy||warming} onClick={()=>{setPlace('anvil');setHint('已将烧红的武器放回铁砧。');}}>{warming?t('加热中…'):t('取回铁砧')}</button></div>}
     {hudOpen&&<><p>{!weapon?t('尚未领取武器'):weapon.status!=='active'?t('已封存 · 属性固定'):level>=maxLevel?t`已达到路线等级上限 +${maxLevel}`:warming?t`熔炉加热中 · ${Math.max(0,weapon.heat_ready_at-clock).toFixed(1)} 秒`:hot?t`烧红 · 可敲 ${weapon.heat_charges} 锤`:t`需要加热 · 每炉可敲 ${heatStrikes} 锤`}</p>
       <div className={`hud-heat ${warming?'warming':''}`} aria-label={t`剩余热量 ${weapon?.heat_charges??0} / ${heatStrikes} 锤`}><span>{t("锻造热量")}</span><div>{Array.from({length:heatStrikes},(_,i)=><i key={i} className={i<(weapon?.heat_charges??0)?'charged':''}/>)}</div><b>{weapon?.heat_charges??0}/{heatStrikes}</b></div>
       <p>{nextAppearance?t`下一形态：+${nextAppearance.min_level} · ${name(nextAppearance)}`:pendingAppearances.length?t`骑士剑 ${pendingAppearances.map(n=>`+${n}`).join(locale==='en'?', ':'、')} 外观待补，暂沿用 +${swordTier(level,appearanceTiers).min_level} 外观。`:t('当前路线已达最终外观')}</p><div className="hud-transitions">{[['up',t('升级'),`+${Math.min(maxLevel,level+1)}`],['double',t('大成功'),`+${Math.min(maxLevel,level+2)}`],['down',t('降级'),`+${Math.max(0,level-1)}`],['destroy',t('损毁'),t('永久消失')],...(probabilities.saved?[['saved',t('保护生效'),t`维持 +${level}`]]:[])].map(([key,label,next])=><div key={key}><span>{label} → {next}</span><b>{weapon&&level<maxLevel?`${((probabilities[key]||0)*100).toFixed(1)}%`:'—'}</b></div>)}</div>
-      <label className="hud-shield"><input type="checkbox" checked={shield} disabled={busy||!weapon||weapon.status!=='active'||weapon.protected_left>0||shields<1} onChange={e=>onShield(e.target.checked)}/><WardIcon/>{t("单锤保护符 · ")}{shields} {t(" 张")}</label>
       {weapon?.protected_left? <p>{t("免损毁阶段 · 剩余 ")}{weapon.protected_left} {t(" 锤")}</p>:null}
       <p className="hud-cost">{t("每锤消耗 ")}<IronAmount amount={strikeMaterials}/></p><div className="hud-buttons"><button disabled={busy||!weapon||weapon.status!=='active'||level>=maxLevel||weapon.heat_charges>0} onClick={startHeating}>{t("送入熔炉")}</button>{place==='furnace'?<button disabled={busy||warming} onClick={()=>{setPlace('anvil');setHint('已将烧红的武器放回铁砧。');}}>{t("取回铁砧")}</button>:<button disabled={!ready} onClick={onStrike}>{t("敲击 · 空格 / 左键")}</button>}</div>
       {hit>0&&impactResult&&<div className={`hud-result ${impactResult}`} role="status">{({up:t('强化成功 +1'),double:t('大成功 +2'),down:t('强化降级 −1'),destroy:t('武器损毁，已失去'),saved:t('保护生效，等级不变')} as Record<string,string>)[impactResult]}</div>}

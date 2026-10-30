@@ -46,7 +46,7 @@ const test = base.extend({
     const apiPort = await port(); let uiPort = await port();
     while (uiPort === apiPort) uiPort = await port();
     const apiUrl = `http://127.0.0.1:${apiPort}`, url = `http://127.0.0.1:${uiPort}`;
-    const env = { FORGE_NETWORK: 'local', FORGE_LOCAL_DIR: directory, FORGE_RPC_URL: '', LOCAL_RPC_URL: 'http://127.0.0.1:1', DEMO_MODE: '1', FORGE_API_TARGET: apiUrl };
+    const env = { FORGE_NETWORK: 'local', FORGE_LOCAL_DIR: directory, FORGE_RPC_URL: '', LOCAL_RPC_URL: 'http://127.0.0.1:1', DEMO_MODE: '1', FORGE_API_TARGET: apiUrl, FORGE_APP_ORIGIN: url };
     const python = path.join(root, '.venv/bin/python');
     const boot = () => start(python, ['-m', 'uvicorn', 'backend.app:app', '--host', '127.0.0.1', '--port', String(apiPort)], directory, 'backend', env);
     let backend, frontend;

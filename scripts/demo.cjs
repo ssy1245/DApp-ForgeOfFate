@@ -6,7 +6,11 @@ async function main(){
  const cfg=await(await fetch('http://127.0.0.1:8000/api/config')).json();assert(cfg.demo_mode,'Start backend with DEMO_MODE=1');assert(cfg.chain,'Deploy contracts first');
  const funder=await provider.getSigner(0);const wa=Wallet.createRandom().connect(provider),wb=Wallet.createRandom().connect(provider);
  for(const w of[wa,wb])await(await funder.sendTransaction({to:w.address,value:parseEther('2')})).wait();
- async function login(w){const c=await api('/auth/challenge',null,{address:w.address});return(await api('/auth/login',null,{challenge_id:c.challenge_id,signature:await w.signMessage(c.message)})).token;}
+ async function login(w){
+  const response=await fetch('http://127.0.0.1:8000/api/account/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'demo_'+randomUUID().slice(0,8),password:randomUUID()})});
+  assert.equal(response.status,200);const cookie=response.headers.get('set-cookie');const token=cookie.split(';')[0].split('=').slice(1).join('=');
+  const c=await api('/wallet/challenge',token,{address:w.address});await api('/wallet/bind',token,{challenge_id:c.challenge_id,signature:await w.signMessage(c.message)});return token;
+ }
  const a=await login(wa),b=await login(wb);
  const key=randomUUID();await api('/claim',a,{},key);await api('/claim',a,{},key);
  const forged=await api('/forge',a);const forgedState=await(await fetch('http://127.0.0.1:8000/api/state',{headers:{Authorization:`Bearer ${a}`}})).json();const w=forgedState.weapons.find(w=>w.id===forged.weapon_id);

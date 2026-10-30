@@ -14,12 +14,14 @@ def client(tmp_path):
     return TestClient(create_app(str(tmp_path / 'game.sqlite3'), demo=False))
 
 def login(client):
+    client.cookies.clear()
+    assert client.post('/api/account/register',json={'username':'u_'+uuid.uuid4().hex[:12],'password':'test-password-2026'}).status_code==200
     wallet = Account.create()
-    c = client.post('/api/auth/challenge', json={'address': wallet.address}).json()
+    c = client.post('/api/wallet/challenge', json={'address': wallet.address}).json()
     sig = Account.sign_message(encode_defunct(text=c['message']), wallet.key).signature.hex()
-    r = client.post('/api/auth/login', json={'challenge_id': c['challenge_id'], 'signature': sig})
+    r = client.post('/api/wallet/bind', json={'challenge_id': c['challenge_id'], 'signature': sig})
     assert r.status_code == 200
-    return {'Authorization': 'Bearer ' + r.json()['token']}, wallet, c, sig
+    return {'Authorization': 'Bearer ' + client.cookies.get('forge_session')}, wallet, c, sig
 
 def post(client, path, headers, body=None, key=None):
     return client.post('/api' + path, headers={**headers, 'Idempotency-Key': key or str(uuid.uuid4())}, **({'json': body} if body is not None else {}))
@@ -40,16 +42,18 @@ def weapon(client, headers):
 def test_login_replay_and_expiry(client):
     h, _, c, sig = login(client)
     assert client.get('/api/state', headers=h).status_code == 200
-    assert client.post('/api/auth/login', json={'challenge_id': c['challenge_id'], 'signature': sig}).status_code == 401
+    assert client.post('/api/wallet/bind', json={'challenge_id': c['challenge_id'], 'signature': sig}).status_code == 409
     client.cookies.clear()
     assert client.get('/api/state').status_code == 401
-    assert client.post('/api/auth/challenge', json={'address': 'fake'}).status_code == 400
+    assert client.post('/api/wallet/challenge', json={'address': 'fake'}).status_code == 400
 
 def test_wrong_signature(client):
+    client.cookies.clear()
+    assert client.post('/api/account/register',json={'username':'u_'+uuid.uuid4().hex[:12],'password':'test-password-2026'}).status_code==200
     wallet = Account.create()
-    c = client.post('/api/auth/challenge', json={'address': wallet.address}).json()
+    c = client.post('/api/wallet/challenge', json={'address': wallet.address}).json()
     signature = Account.sign_message(encode_defunct(text=c['message']), Account.create().key).signature.hex()
-    assert client.post('/api/auth/login', json={'challenge_id': c['challenge_id'], 'signature': signature}).status_code == 401
+    assert client.post('/api/wallet/bind', json={'challenge_id': c['challenge_id'], 'signature': signature}).status_code == 400
 
 def test_claim_and_idempotency(client):
     h, *_ = login(client)
@@ -210,18 +214,19 @@ def test_guest_progress_persists_and_binds_at_mint(tmp_path):
     with c.app.state.store.connection() as db:
         db.execute("UPDATE weapons SET level=?,status='sealed' WHERE id=?",(BALANCE['mint_level'],wid))
     assert post(c,f'/weapons/{wid}/voucher',{}).status_code==403
+    registered=c.post('/api/account/register',json={'username':'bound_player','password':'test-password-2026'}).json()
     wallet=Account.create()
-    challenge=c.post('/api/auth/challenge',json={'address':wallet.address}).json()
-    assert guest['address'] in challenge['message']
+    challenge=c.post('/api/wallet/challenge',json={'address':wallet.address}).json()
+    assert registered['player_id'] in challenge['message']
     signature=Account.sign_message(encode_defunct(text=challenge['message']),wallet.key).signature.hex()
-    logged=c.post('/api/auth/login',json={'challenge_id':challenge['challenge_id'],'signature':signature})
+    logged=c.post('/api/wallet/bind',json={'challenge_id':challenge['challenge_id'],'signature':signature})
     assert logged.status_code==200
     assert not logged.json()['guest']
-    assert c.post('/api/session').json()['address']==wallet.address
+    assert c.post('/api/session').json()['address']==guest['address']
     state=c.get('/api/state').json()
     assert next(w for w in state['weapons'] if w['id']==wid)['level']==BALANCE['mint_level']
     assert 'ap' not in state['player']
-    assert c.get('/api/state',headers={'Authorization':'Bearer '+old_token}).status_code==401
+    assert c.get('/api/state',headers={'Authorization':'Bearer '+old_token}).status_code==200
 
 def test_legacy_database_migration(tmp_path):
     import sqlite3

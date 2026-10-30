@@ -1,7 +1,6 @@
 """Provision explicit local fixtures without changing existing accounts or passwords."""
 import argparse
 import os
-import secrets
 import sys
 import time
 import uuid
@@ -15,18 +14,17 @@ from backend.chain import ChainSettings
 from backend.accounts import hash_password
 
 
-def provision(store, username, password, role, address=None):
+def provision(store, username, password, role):
     encoded=hash_password(password)
     with store.connection() as db:
         prior=db.execute('SELECT role FROM accounts WHERE username=?',(username,)).fetchone()
         if prior:
             if prior['role']!=role:raise RuntimeError(f'{username}: existing account has a different role; no changes made')
             return False
-        wallet_supplied=address is not None
-        address=address or Account.create().address
+        address=Account.create().address
         if db.execute('SELECT 1 FROM accounts WHERE game_address=?',(address,)).fetchone():
             raise RuntimeError('This game archive already has an account; no changes made')
-        db.execute('INSERT OR IGNORE INTO players(address,guest) VALUES(?,?)',(address,0 if wallet_supplied else 1))
+        db.execute('INSERT OR IGNORE INTO players(address,guest) VALUES(?,?)',(address,1))
         db.execute('INSERT INTO accounts(id,username,password_hash,game_address,created,role) VALUES(?,?,?,?,?,?)',
                    (str(uuid.uuid4()),username,encoded,address,int(time.time()),role))
         return True
@@ -34,7 +32,7 @@ def provision(store, username, password, role, address=None):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--demo-wallet',help='Create an ephemeral tester fixture for the local two-wallet demo')
+    parser.add_argument('--demo-wallet',help='Mark an already verified account as tester for the local two-wallet demo')
     parser.add_argument('--network', choices=['local', 'sepolia'], help='Choose the account data environment')
     args=parser.parse_args()
     if args.network:
@@ -44,8 +42,12 @@ def main():
     store=Store(str(LOCAL/'game.sqlite3'), network=settings.network)
     if args.demo_wallet:
         if not Web3.is_address(args.demo_wallet):raise ValueError('Invalid wallet address')
-        provision(store,'demo_'+uuid.uuid4().hex[:12],secrets.token_urlsafe(24),'tester',args.demo_wallet)
-        print('Ephemeral demo tester provisioned.')
+        if settings.network != 'local':raise ValueError('Demo-wallet fixtures are restricted to the isolated local network')
+        with store.connection() as db:
+            row=db.execute('SELECT account_id FROM wallet_bindings WHERE wallet_address=? COLLATE NOCASE AND verified_at IS NOT NULL',(args.demo_wallet,)).fetchone()
+            if not row:raise ValueError('Register a game account and prove wallet control first')
+            db.execute("UPDATE accounts SET role='tester' WHERE id=?",(row['account_id'],))
+        print('Verified local demo account marked as tester.')
         return
     fixtures=[('forge_test','ForgeTest2026!','tester'),('forge_player','ForgePlayer2026!','player')]
     created=[]

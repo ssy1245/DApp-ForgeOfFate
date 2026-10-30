@@ -1,5 +1,7 @@
 # 道具 UI 图片
 
+[← 返回项目总览](../../../README.md)
+
 - `Fe.png`：用户提供的铁矿石参考图，原文件保留。
 - `Fe-icon.png`：通过 imagegen 内置编辑生成的透明底版本，已接入 `frontend/src/IronIcon.tsx`。RGBA PNG，边角完全透明；仅用于二维界面，不作为三维模型。
 - `Gold.png`：用户提供的王冠雄狮金币原图，原文件保留。

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 from eth_account import Account
-from eth_account.messages import encode_defunct, encode_typed_data
+from eth_account.messages import encode_typed_data
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,6 +21,7 @@ from web3 import Web3
 from .storage import Store
 from .chain_store import index_status, event_history
 from .accounts import normalize_username, hash_password, verify_password
+from .wallets import identity, create_challenge, bind_wallet, check_available
 from .chain import ChainSettings, ChainReader
 from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
 
@@ -98,7 +99,9 @@ def create_app(db_path=None, demo=None):
     demo_enabled = os.getenv('DEMO_MODE', '0') == '1' if demo is None else demo
     app.state.store = store
     app.state.chain_reader = reader
-    app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'], allow_methods=['GET', 'POST'], allow_headers=['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Forge-Player', 'X-Forge-Workshop-Revision'])
+    wallet_origin = os.getenv('FORGE_APP_ORIGIN', 'http://127.0.0.1:5173').rstrip('/')
+    allowed_origins = [wallet_origin] if os.getenv('FORGE_APP_ORIGIN') else ['http://localhost:5173', 'http://127.0.0.1:5173']
+    app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=['GET', 'POST'], allow_headers=['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Forge-Player', 'X-Forge-Workshop-Revision'])
 
     @app.middleware('http')
     async def cookie_session(request: Request, call_next):
@@ -122,14 +125,14 @@ def create_app(db_path=None, demo=None):
             if token:
                 row=db.execute('SELECT p.address,p.guest FROM sessions s JOIN players p ON s.address=p.address WHERE s.token=? AND s.expires>?',(hashlib.sha256(token.encode()).hexdigest(),int(time.time()))).fetchone()
                 if row:
-                    account=db.execute('SELECT username,role FROM accounts WHERE game_address=?',(row['address'],)).fetchone()
-                    return {'address':row['address'],'guest':bool(row['guest']),'username':account['username'] if account else None,'role':account['role'] if account else 'player'}
+                    return identity(db, row['address'])
             address=Account.create().address
             token=secrets.token_urlsafe(32)
             db.execute('INSERT INTO players(address,guest) VALUES(?,1)',(address,))
             db.execute('INSERT INTO sessions VALUES(?,?,?)',(hashlib.sha256(token.encode()).hexdigest(),address,int(time.time())+2592000))
         response.set_cookie('forge_session',token,httponly=True,samesite='lax',max_age=2592000)
-        return {'address':address,'guest':True}
+        with store.connection() as db:
+            return identity(db, address)
 
     def authenticated(authorization):
         if not authorization or not authorization.startswith('Bearer '):
@@ -209,9 +212,14 @@ def create_app(db_path=None, demo=None):
             db.execute('INSERT INTO accounts(id,username,password_hash,game_address,created) VALUES(?,?,?,?,?)',(str(uuid.uuid4()),name,password_hash,address,int(time.time())))
             token=secrets.token_urlsafe(32)
             db.execute('INSERT INTO sessions VALUES(?,?,?)',(hashlib.sha256(token.encode()).hexdigest(),address,int(time.time())+2592000))
-            guest=bool(db.execute('SELECT guest FROM players WHERE address=?',(address,)).fetchone()[0])
+            # Historical wallet-only saves can register without losing progress.
+            if not db.execute('SELECT guest FROM players WHERE address=?',(address,)).fetchone()[0]:
+                account_id=db.execute('SELECT id FROM accounts WHERE game_address=?',(address,)).fetchone()[0]
+                check_available(db, account_id, address)
+                db.execute('INSERT INTO wallet_bindings VALUES(?,?,NULL)',(account_id,Web3.to_checksum_address(address)))
+            result=identity(db,address)
         response.set_cookie('forge_session',token,httponly=True,samesite='lax',max_age=2592000)
-        return {'address':address,'guest':guest,'username':name,'role':'player'}
+        return result
 
     @app.post('/api/account/login')
     def account_login(body: Credentials,response:Response):
@@ -223,10 +231,10 @@ def create_app(db_path=None, demo=None):
             raise HTTPException(401,'用户名或密码不正确。')
         token=secrets.token_urlsafe(32)
         with store.connection() as db:
-            row=db.execute('SELECT guest FROM players WHERE address=?',(account['game_address'],)).fetchone()
+            result=identity(db,account['game_address'])
             db.execute('INSERT INTO sessions VALUES(?,?,?)',(hashlib.sha256(token.encode()).hexdigest(),account['game_address'],int(time.time())+2592000))
         response.set_cookie('forge_session',token,httponly=True,samesite='lax',max_age=2592000)
-        return {'address':account['game_address'],'guest':bool(row[0]),'username':name,'role':account['role']}
+        return result
 
     @app.post('/api/account/logout')
     def logout(request:Request,response:Response,authorization: str | None = Header(default=None)):
@@ -272,61 +280,28 @@ def create_app(db_path=None, demo=None):
     def receipt(tx_hash: str):
         return reader.receipt(tx_hash)
 
-    @app.post('/api/auth/challenge')
-    def challenge(body: AddressBody, authorization: str | None = Header(default=None)):
-        if not Web3.is_address(body.address):
-            raise HTTPException(400, '钱包地址无效。')
-        address = Web3.to_checksum_address(body.address)
-        cid = str(uuid.uuid4())
-        expiry = int(time.time()) + 300
-        message = f'Forge of Fate — Local development login\nDomain: localhost\nAddress: {address}\nNonce: {cid}\nExpires: {expiry}\nSign in only. No transaction or payment.'
-        guest_owner=None
-        try:
-            candidate=authenticated(authorization)
-            with store.connection() as check:
-                if check.execute('SELECT guest FROM players WHERE address=?',(candidate,)).fetchone()[0]:guest_owner=candidate
-        except HTTPException:
-            pass
-        if guest_owner:message+=f'\nLink game progress {guest_owner} to wallet {address}. This does not mint or transfer an NFT.'
-        with store.connection() as db:
-            db.execute('DELETE FROM challenges WHERE expires<?', (int(time.time()),))
-            db.execute('INSERT INTO challenges(id,address,message,expires,guest_owner) VALUES(?,?,?,?,?)', (cid,address,message,expiry,guest_owner))
-        return {'challenge_id': cid, 'message': message}
+    def binding_origin(request):
+        origin = request.headers.get('origin', wallet_origin)
+        if origin not in allowed_origins:
+            raise HTTPException(403, '钱包绑定请求来自不受信任的网站。')
+        return origin
 
-    @app.post('/api/auth/login')
-    def login(body: LoginBody, response: Response):
+    @app.post('/api/wallet/challenge')
+    def wallet_challenge(body: AddressBody, request: Request, authorization: str | None = Header(default=None)):
+        origin = binding_origin(request)
         with store.connection() as db:
-            row = db.execute('SELECT * FROM challenges WHERE id=? AND expires>?', (body.challenge_id, int(time.time()))).fetchone()
-            if not row:
-                raise HTTPException(401, '登录挑战已过期或已使用。')
-            try:
-                signer = Account.recover_message(encode_defunct(text=row['message']), signature=body.signature)
-            except Exception:
-                raise HTTPException(401, '签名无效。')
-            if signer.lower() != row['address'].lower():
-                raise HTTPException(401, '签名与钱包不一致。')
-            db.execute('DELETE FROM challenges WHERE id=?', (body.challenge_id,))
-            db.execute('INSERT OR IGNORE INTO players(address) VALUES(?)', (row['address'],))
-            if row['guest_owner']:
-                guest=db.execute('SELECT * FROM players WHERE address=? AND guest=1',(row['guest_owner'],)).fetchone()
-                if not guest:raise HTTPException(409,'此档案已经绑定，请刷新后重新签名。')
-                if db.execute('SELECT 1 FROM accounts WHERE game_address=?',(row['address'],)).fetchone():
-                    raise HTTPException(409,'此钱包已绑定其他账号，请使用该账号登录。')
-                db.execute('UPDATE accounts SET game_address=? WHERE game_address=?',(row['address'],row['guest_owner']))
-                db.execute('UPDATE weapons SET owner=? WHERE owner=?',(row['address'],row['guest_owner']))
-                if guest['workshop_weapon_id']:
-                    db.execute('UPDATE players SET workshop_weapon_id=?,workshop_revision=workshop_revision+1 WHERE address=?', (guest['workshop_weapon_id'], row['address']))
-                target=db.execute('SELECT * FROM players WHERE address=?',(row['address'],)).fetchone()
-                sword_day=max(guest['sword_day'] or '',target['sword_day'] or '')
-                claimed=min(BALANCE['daily_swords'],sum(p['daily_swords_claimed'] for p in [guest,target] if p['sword_day']==sword_day))
-                db.execute("UPDATE players SET materials=materials+?,shields=shields+?,coins=coins+?,sword_day=?,daily_swords_claimed=?,claim_day=MAX(COALESCE(claim_day,''),COALESCE(?,'')) WHERE address=?",(guest['materials'],guest['shields'],guest['coins'],sword_day or None,claimed,guest['claim_day'],row['address']))
-                db.execute('DELETE FROM sessions WHERE address=?',(row['guest_owner'],))
-                db.execute('DELETE FROM players WHERE address=?',(row['guest_owner'],))
-            token = secrets.token_urlsafe(32)
-            db.execute('INSERT INTO sessions VALUES(?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), row['address'], int(time.time()) + 86400))
-        response.set_cookie('forge_session',token,httponly=True,samesite='lax',max_age=86400)
-        with store.connection() as db:account=db.execute('SELECT username,role FROM accounts WHERE game_address=?',(row['address'],)).fetchone()
-        return {'token': token, 'address': row['address'],'guest':False,'username':account['username'] if account else None,'role':account['role'] if account else 'player'}
+            return create_challenge(db, authorization, body.address, origin, settings.public()['chainId'])
+
+    @app.post('/api/wallet/bind')
+    def wallet_bind(body: LoginBody, request: Request, authorization: str | None = Header(default=None)):
+        origin = binding_origin(request)
+        with store.connection() as db:
+            return bind_wallet(db, authorization, body.challenge_id, body.signature, origin, settings.public()['chainId'])
+
+    @app.post('/api/auth/challenge')
+    @app.post('/api/auth/login')
+    def retired_wallet_login():
+        raise HTTPException(410, '钱包登录入口已停用，请登录游戏账号后绑定钱包。')
 
     @app.get('/api/state')
     def state(authorization: str | None = Header(default=None)):
@@ -334,6 +309,7 @@ def create_app(db_path=None, demo=None):
         with store.connection() as db:
             workshop(db, address)
             player = dict(db.execute('SELECT * FROM players WHERE address=?', (address,)).fetchone())
+            player.update(identity(db, address))
             now=datetime.now(timezone.utc)
             day=now.date().isoformat()
             claimed=player['daily_swords_claimed'] if player['sword_day']==day else 0
@@ -506,8 +482,8 @@ def create_app(db_path=None, demo=None):
         def run(db):
             charge(db,address,coins=BALANCE['coin_sword_price'])
             wid=new_weapon(db,address,level=BALANCE['coin_sword_level'])
-            db.execute("UPDATE weapons SET quality='精良',source='coin_shop' WHERE id=?",(wid,))
-            return {'weapon_id':wid,'message':f"已购买 +{BALANCE['coin_sword_level']} 精良长剑。"}
+            db.execute("UPDATE weapons SET source='coin_shop' WHERE id=?",(wid,))
+            return {'weapon_id':wid,'message':f"已购买 +{BALANCE['coin_sword_level']} 普通剑。"}
         return mutate(address,idempotency_key,'coin_sword',{},run)
 
     @app.post('/api/materials')
@@ -518,6 +494,15 @@ def create_app(db_path=None, demo=None):
             db.execute('UPDATE players SET materials=materials+? WHERE address=?', (BALANCE['material_pack_size'], address))
             return {'message': f"已补充 {BALANCE['material_pack_size']} 铁块。"}
         return mutate(address, idempotency_key, 'materials', {}, run)
+
+    @app.post('/api/shop/wards')
+    def buy_wards(authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address = authenticated(authorization)
+        def run(db):
+            charge(db, address, coins=BALANCE['shield_pack_price'])
+            db.execute('UPDATE players SET shields=shields+? WHERE address=?', (BALANCE['shield_pack_size'], address))
+            return {'message': f"已购买 {BALANCE['shield_pack_size']} 张保护符。"}
+        return mutate(address, idempotency_key, 'buy_wards', {}, run)
 
     @app.post('/api/weapons/{wid}/branch')
     def choose_branch(wid: str, body: BranchChoice, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
@@ -570,6 +555,11 @@ def create_app(db_path=None, demo=None):
             materials = db.execute('SELECT materials FROM players WHERE address=?', (address,)).fetchone()['materials']
             if materials < cost:
                 raise HTTPException(409, f'强化需要 {cost} 铁块，当前剩余 {materials}。')
+            # Check possession before rolling: otherwise an empty inventory could
+            # keep successful rolls and roll back only lethal ones for free.
+            if body.shield and w['protected_left'] == 0:
+                if db.execute('SELECT shields FROM players WHERE address=?', (address,)).fetchone()['shields'] < 1:
+                    raise HTTPException(409, '保护符不足，请补充保护符或关闭保护后再敲击。')
             result = strike(w, secrets.randbelow(1_000_000) / 1_000_000, body.shield)
             charge(db, address, materials=cost, shields=int(result['shield_used']))
             db.execute('UPDATE weapons SET level=?,strikes=?,protected_left=?,status=?,heat_charges=heat_charges-1 WHERE id=?', (result['level'], result['strikes'], result['protected_left'], result['status'], wid))
@@ -610,8 +600,10 @@ def create_app(db_path=None, demo=None):
         address = authenticated(authorization)
         with store.connection() as db:
             w = owned(db, address, wid, 'sealed')
-            if db.execute('SELECT guest FROM players WHERE address=?',(address,)).fetchone()[0]:
-                raise HTTPException(403, '铭刻 NFT 前请连接钱包并签名绑定当前游戏档案。')
+            player = identity(db, address)
+            if not player['wallet_verified']:
+                raise HTTPException(403, '铭刻 NFT 前请登录游戏账号并签名绑定钱包。')
+            recipient = player['wallet_address']
             if w['level'] < BALANCE['mint_level']:
                 raise HTTPException(409, f"当前铭刻门槛为 +{BALANCE['mint_level']}。")
         info, _, contract = chain()
@@ -626,7 +618,7 @@ def create_app(db_path=None, demo=None):
                 raise ValueError('wrong authority')
         except Exception:
             raise HTTPException(503, '铸造授权配置与当前合约不匹配。') from None
-        data = {'weaponId': wid, 'recipient': address, 'level': w['level'], 'uri': metadata(w), 'deadline': int(time.time()) + 600, 'deploymentId': info['deploymentId']}
+        data = {'weaponId': wid, 'recipient': recipient, 'level': w['level'], 'uri': metadata(w), 'deadline': int(time.time()) + 600, 'deploymentId': info['deploymentId']}
         domain = {'name': 'ForgeOfFate', 'version': '1', 'chainId': info['chainId'], 'verifyingContract': info['address']}
         signed = Account.sign_message(encode_typed_data(domain, TYPES, data), signing_key)
         return {'voucher': data, 'signature': Web3.to_hex(signed.signature)}

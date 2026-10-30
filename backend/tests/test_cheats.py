@@ -144,9 +144,9 @@ def test_cheats_disabled_in_normal_environment(tester):
 def test_wallet_binding_preserves_test_role(tester):
     c,address,data=tester
     wallet=Account.create()
-    challenge=c.post('/api/auth/challenge',json={'address':wallet.address}).json()
+    challenge=c.post('/api/wallet/challenge',json={'address':wallet.address}).json()
     signature=Account.sign_message(encode_defunct(text=challenge['message']),wallet.key).signature.hex()
-    r=c.post('/api/auth/login',json={'challenge_id':challenge['challenge_id'],'signature':signature})
+    r=c.post('/api/wallet/bind',json={'challenge_id':challenge['challenge_id'],'signature':signature})
     assert r.status_code==200 and r.json()['role']=='tester'
     assert c.get('/api/state').json()['player']['can_cheat']
     assert post(c,'/cheats/daily',{}).status_code==200

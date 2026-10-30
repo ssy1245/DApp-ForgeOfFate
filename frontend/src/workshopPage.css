@@ -135,3 +135,15 @@
 .app-shell .probabilities { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .app-shell .bottom-panels { padding: 16px; }
 }
+
+.wallet-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.wallet-status small { flex-basis: 100%; }
+
+.hud-ward-status { display: flex; align-items: center; gap: 8px; padding: 6px 0; color: #9baa7e; font-size: 11px; cursor: pointer; pointer-events: auto; }
+.hud-ward-status.armed { color: #f0ca84; }
+.hud-ward-status input { width: 18px; height: 18px; flex: 0 0 18px; margin: 0; accent-color: #e5b866; cursor: inherit; }
+.hud-ward-status input:focus-visible { outline: 2px solid #f0ca84; outline-offset: 3px; }
+.hud-ward-status:has(input:disabled) { cursor: not-allowed; }
+.hud-ward-copy { display: grid; gap: 4px; min-width: 0; line-height: 1.5; }
+
+.hud-ward-status small { font-size: inherit; white-space: nowrap; color: inherit; }

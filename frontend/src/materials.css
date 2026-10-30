@@ -34,7 +34,7 @@
 .strike .material-amount .iron-icon { --icon-size: 20px; border-color: #806d49; }
 .forge-hud .hud-cost { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .hud-cost .iron-icon { --icon-size: 20px; }
-.material-pack-button { display: flex; align-items: center; justify-content: center; gap: 11px; text-align: left; }
+.material-pack-button, .ward-pack-button { display: flex; align-items: center; justify-content: center; gap: 11px; text-align: left; }
 .material-pack-copy { display: block; line-height: 1.5; }
 .material-pack-copy small { display: block; color: #b9a47c; margin-top: 3px; font-size: 10px; }
 

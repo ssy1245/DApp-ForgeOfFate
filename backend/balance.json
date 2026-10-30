@@ -52,6 +52,8 @@
   "protection_duration": 3,
   "material_pack_size": 20,
   "material_pack_price": 5000,
+  "shield_pack_size": 1,
+  "shield_pack_price": 2500,
   "recycle_base": 1000,
   "heat_seconds": 3,
   "heat_strikes": 5,
@@ -60,7 +62,7 @@
   "destroy_base": 0.01,
   "destroy_per_level": 0.002,
   "destroy_cap": 0.15,
-  "coin_sword_price": 20000,
-  "coin_sword_level": 3,
+  "coin_sword_price": 2500,
+  "coin_sword_level": 0,
   "test_supply_materials": 20
 }

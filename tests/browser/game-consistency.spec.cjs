@@ -59,7 +59,11 @@ test('real heating, protected strike, shops and recycle stay consistent', async 
   expect(after.player.materials).toBe(before.player.materials - 4);
   expect(after.weapons[0].heat_charges).toBe(4);
   await expect(page.locator('.level-line').first()).toContainText(`+${after.weapons[0].level}`);
-  await clickAction(page, page.getByRole('button', { name: /购买 \+3 精良剑/ }), '/shop/sword');
+  const shopButton = page.getByRole('button', { name: /购买 \+0 普通剑/ });
+  await expect(shopButton).toContainText('2,500');
+  await clickAction(page, shopButton, '/shop/sword');
+  const bought = (await state(page)).weapons.find(w => w.source === 'coin_shop');
+  expect(bought).toMatchObject({ level: 0, quality: '普通', recycle_price: 1000 });
   await clickAction(page, page.locator('.material-pack-button'), '/materials');
   await bag(page); await expect(page.locator('.weapon-card')).toHaveCount(2);
   const snapshot = await state(page);

@@ -172,8 +172,41 @@ def test_coin_shop_cost_retry_and_insufficient_balance(tmp_path):
     state=c.get('/api/state').json()
     assert state['player']['coins']==0
     w=next(w for w in state['weapons'] if w['id']==response.json()['weapon_id'])
-    assert w['quality']=='精良' and w['level']==BALANCE['coin_sword_level'] and w['source']=='coin_shop'
+    assert w['quality']=='普通' and w['level']==0 and w['source']=='coin_shop'
     assert len(state['weapons'])==1
+
+
+def test_ward_shop_cost_retry_and_restart(tmp_path):
+    c,address=guest(tmp_path,demo=False)
+    price,size=BALANCE['shield_pack_price'],BALANCE['shield_pack_size']
+    key=str(uuid.uuid4())
+    with c.app.state.store.connection() as db:
+        db.execute('UPDATE players SET coins=?,shields=0,materials=17 WHERE address=?',(price-1,address))
+    assert post(c,'/shop/wards',{},key=key).status_code==409
+    before=c.get('/api/state').json()['player']
+    assert (before['coins'],before['shields'],before['materials'])==(price-1,0,17)
+    with c.app.state.store.connection() as db:
+        db.execute('UPDATE players SET coins=? WHERE address=?',(price,address))
+    response=post(c,'/shop/wards',{},key=key)
+    assert response.status_code==200
+    assert post(c,'/shop/wards',{},key=key).json()==response.json()
+    assert post(c,'/shop/wards',{}).status_code==409
+    restored=TestClient(create_app(c.app.state.store.path,demo=False))
+    restored.cookies.update(c.cookies)
+    assert post(restored,'/shop/wards',{},key=key).json()==response.json()
+    after=restored.get('/api/state').json()['player']
+    assert (after['coins'],after['shields'],after['materials'])==(0,size,17)
+
+
+def test_concurrent_ward_purchases_cannot_overspend(tmp_path):
+    c,address=guest(tmp_path,demo=False)
+    with c.app.state.store.connection() as db:
+        db.execute('UPDATE players SET coins=?,shields=0 WHERE address=?',(BALANCE['shield_pack_price'],address))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        codes=list(pool.map(lambda _:post(c,'/shop/wards',{}).status_code,range(2)))
+    assert sorted(codes)==[200,409]
+    after=c.get('/api/state').json()['player']
+    assert after['coins']==0 and after['shields']==BALANCE['shield_pack_size']
 
 
 def test_account_wallet_binding_preserves_daily_grant(tmp_path):
@@ -182,16 +215,16 @@ def test_account_wallet_binding_preserves_daily_grant(tmp_path):
     assert post(c,'/supply/sword',{}).status_code==200
     before=c.get('/api/state').json()
     wallet=Account.create()
-    challenge=c.post('/api/auth/challenge',json={'address':wallet.address}).json()
+    challenge=c.post('/api/wallet/challenge',json={'address':wallet.address}).json()
     signature=Account.sign_message(encode_defunct(text=challenge['message']),wallet.key).signature.hex()
-    result=c.post('/api/auth/login',json={'challenge_id':challenge['challenge_id'],'signature':signature})
+    result=c.post('/api/wallet/bind',json={'challenge_id':challenge['challenge_id'],'signature':signature})
     assert result.status_code==200
     assert result.json()['username']==data['username'] and not result.json()['guest']
     after=c.get('/api/state').json()
     assert {w['id'] for w in after['weapons']}=={w['id'] for w in before['weapons']}
     assert after['player']['daily_swords_remaining']==before['player']['daily_swords_remaining']==2
     c.post('/api/account/logout')
-    assert c.post('/api/account/login',json=data).json()['address']==wallet.address
+    assert c.post('/api/account/login',json=data).json()['address']==address
     assert c.get('/api/state').json()['player']['username']==data['username']
 
 
@@ -200,27 +233,6 @@ def test_reduced_destruction_curve():
     assert probabilities(10)['destroy']==0.03
     assert probabilities(50)['destroy']==0.11
     assert probabilities(100)['destroy']==0.15
-
-
-@pytest.mark.parametrize('same_day',[True,False])
-def test_wallet_binding_merges_daily_sword_allowances(tmp_path,same_day):
-    c,_=guest(tmp_path,demo=False)
-    assert post(c,'/supply/sword',{}).status_code==200
-    other=TestClient(c.app)
-    wallet=Account.create()
-    challenge=other.post('/api/auth/challenge',json={'address':wallet.address}).json()
-    signature=Account.sign_message(encode_defunct(text=challenge['message']),wallet.key).signature.hex()
-    assert other.post('/api/auth/login',json={'challenge_id':challenge['challenge_id'],'signature':signature}).status_code==200
-    for _ in range(2):assert post(other,'/supply/sword',{}).status_code==200
-    if not same_day:
-        with c.app.state.store.connection() as db:
-            db.execute("UPDATE players SET sword_day='2000-01-01' WHERE address=?",(wallet.address,))
-    challenge=c.post('/api/auth/challenge',json={'address':wallet.address}).json()
-    signature=Account.sign_message(encode_defunct(text=challenge['message']),wallet.key).signature.hex()
-    assert c.post('/api/auth/login',json={'challenge_id':challenge['challenge_id'],'signature':signature}).status_code==200
-    state=c.get('/api/state').json()
-    assert len(state['weapons'])==3
-    assert state['player']['daily_swords_remaining']==(0 if same_day else 2)
 
 
 def test_daily_allowance_precedes_demo_rescue(tmp_path):

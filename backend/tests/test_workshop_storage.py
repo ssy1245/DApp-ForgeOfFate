@@ -18,7 +18,7 @@ def setup(tmp_path):
     post(client, '/claim', headers)
     a = post(client, '/forge', headers).json()['weapon_id']
     b = post(client, '/forge', headers).json()['weapon_id']
-    return client, headers, wallet.address, a, b
+    return client, headers, client.get('/api/state',headers=headers).json()['player']['address'], a, b
 
 
 def state(client, headers):
@@ -156,10 +156,11 @@ def test_wallet_binding_preserves_workshop_selection(tmp_path):
     c.post('/api/session')
     post(c, '/claim', {})
     wid = post(c, '/forge', {}).json()['weapon_id']
+    archive=c.post('/api/account/register',json={'username':'workshop_wallet','password':'test-password-2026'}).json()['address']
     wallet = Account.create()
-    challenge = c.post('/api/auth/challenge', json={'address': wallet.address}).json()
+    challenge = c.post('/api/wallet/challenge', json={'address': wallet.address}).json()
     signature = Account.sign_message(encode_defunct(text=challenge['message']), wallet.key).signature.hex()
-    assert c.post('/api/auth/login', json={'challenge_id': challenge['challenge_id'], 'signature': signature}).status_code == 200
+    assert c.post('/api/wallet/bind', json={'challenge_id': challenge['challenge_id'], 'signature': signature}).status_code == 200
     data = state(c, {})
     assert data['player']['workshop_weapon_id'] == wid
-    assert data['weapons'][0]['owner'] == wallet.address
+    assert data['weapons'][0]['owner'] == archive

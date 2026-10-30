@@ -170,8 +170,8 @@ async function main() {
     await restored.request('/account/login', credentials);
     assert.deepEqual(await restored.state(), beforeFailure);
     const boundWallet = Wallet.createRandom();
-    const challenge = await restored.request('/auth/challenge', { address: boundWallet.address });
-    await restored.request('/auth/login', { challenge_id: challenge.challenge_id, signature: await boundWallet.signMessage(challenge.message) });
+    const challenge = await restored.request('/wallet/challenge', { address: boundWallet.address });
+    await restored.request('/wallet/bind', { challenge_id: challenge.challenge_id, signature: await boundWallet.signMessage(challenge.message) });
     const boundState = await restored.state();
     for (const resource of ['materials', 'shields', 'coins']) assert.equal(boundState.player[resource], beforeFailure.player[resource]);
     assert.deepEqual(boundState.weapons.map(item => item.id), beforeFailure.weapons.map(item => item.id));
@@ -180,9 +180,11 @@ async function main() {
     const wa = Wallet.createRandom().connect(provider), wb = Wallet.createRandom().connect(provider);
     for (const wallet of [wa, wb]) await (await funder.sendTransaction({ to: wallet.address, value: parseEther('2') })).wait();
     async function walletClient(wallet) {
-      const client = apiClient(apiUrl), c = await client.request('/auth/challenge', { address: wallet.address });
-      const logged = await client.request('/auth/login', { challenge_id: c.challenge_id, signature: await wallet.signMessage(c.message) });
-      return apiClient(apiUrl, logged.token);
+      const client = apiClient(apiUrl);
+      await client.request('/account/register', { username: 'wallet_' + randomUUID().slice(0, 8), password: randomUUID() });
+      const c = await client.request('/wallet/challenge', { address: wallet.address });
+      await client.request('/wallet/bind', { challenge_id: c.challenge_id, signature: await wallet.signMessage(c.message) });
+      return client;
     }
     const tester = await walletClient(wa), buyer = await walletClient(wb);
     await run(path.join(root, '.venv/bin/python'), ['scripts/create_dev_accounts.py', '--demo-wallet', wa.address], 'tester-fixture', env);
@@ -216,7 +218,7 @@ async function main() {
     assert.equal(boughtSword.level, balance.coin_sword_level);
     await tester.request(`/weapons/${bought.weapon_id}/recycle`, {});
     assert.equal((await tester.state()).player.coins, shopAfter.player.coins + boughtSword.recycle_price);
-    check('Gold purchases iron and a refined sword; system recycle credits the displayed amount');
+    check('Gold purchases iron and a +0 common sword; system recycle credits the displayed amount');
 
     const seeded = await tester.request('/demo/seed', {});
     await tester.request(`/weapons/${seeded.weapon_id}/seal`, {});

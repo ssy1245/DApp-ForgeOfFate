@@ -51,9 +51,18 @@ htmlcov/
 .hypothesis/
 
 # Test and browser output
+# Includes screenshots, videos, traces and failure-state attachments.
 playwright-report/
 test-results/
 blob-report/
+# Browser sign-in state and local profiles must not accompany source submissions.
+/.auth/
+/playwright/.auth/
+/browser-profiles/
+/storage-state*.json
+# Root-level manual network/trace exports; public assets remain versioned.
+/*.har
+/trace*.zip
 # Local UI captures kept outside .local; weapon reference images stay tracked.
 /screenshots/
 /previews/
@@ -63,6 +72,7 @@ blob-report/
 /*-preview.webp
 
 # Runtime data, local credentials, deployment state and logs
+# Covers live saves, isolated browser-tests-* / verify-game-* runs and backups.
 .local/
 # Known local credential exports, including copies in subdirectories.
 test-accounts.md

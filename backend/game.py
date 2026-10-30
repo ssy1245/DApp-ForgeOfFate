@@ -48,7 +48,7 @@ def strike(weapon, roll, shield):
     return {'level': level, 'strikes': count, 'protected_left': left,
             'branch':weapon.get('branch','longsword'),
             'status': 'destroyed' if result == 'destroy' else 'active',
-            'result': result, 'shield_used': bool(shield and not stage)}
+            'result': result, 'shield_used': bool(shield and not stage and result == 'saved')}
 
 def weapon_economy(level, branch='longsword'):
     # Below a route's first model, the weapon is still the shared basic sword.

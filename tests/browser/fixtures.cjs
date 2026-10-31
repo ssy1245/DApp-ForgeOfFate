@@ -84,7 +84,7 @@ async function register(page, tester, game) {
   await dialog.getByRole('button', { name: '注册新账号', exact: true }).click();
   const username = 'ui_' + require('node:crypto').randomBytes(6).toString('hex');
   await dialog.locator('input').nth(0).fill(username);
-  await dialog.locator('input').nth(1).fill('test-only-password-2026');
+  await dialog.locator('input').nth(1).fill('test-password-2026');
   await dialog.locator('button.primary').click();
   await expect(page.locator('.account-name')).toContainText(username);
   const address = game.sql('SELECT game_address FROM accounts WHERE username=?', [username])[0].game_address;

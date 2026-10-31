@@ -5,6 +5,9 @@ from contextlib import contextmanager
 from .game import BALANCE
 from chain.server.store import migrate_chain
 from chain.server.wallets import migrate_wallets
+from .mailbox import migrate_mailbox
+from .staking_rewards import migrate_staking
+from .market import migrate_market
 
 
 class Store:
@@ -44,6 +47,9 @@ class Store:
                     db.execute(f'ALTER TABLE players ADD COLUMN {column} {definition}')
             migrate_chain(db)
             migrate_wallets(db)
+            migrate_mailbox(db)
+            migrate_staking(db)
+            migrate_market(db)
     @contextmanager
     def connection(self):
         db = sqlite3.connect(self.path, timeout=15, isolation_level=None)

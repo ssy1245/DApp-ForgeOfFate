@@ -108,7 +108,7 @@ def test_weapon_spawn_edit_seal_and_other_archive(tester):
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':10}).status_code==404
 
 
-@pytest.mark.parametrize('body',[{'count':0},{'count':101},{'count':1,'level':101},{'count':1,'level':-1},{'count':1.5},{'quality':'unknown'}])
+@pytest.mark.parametrize('body',[{'count':0},{'count':101},{'count':1,'level':101},{'count':1,'level':-1},{'count':1.5},{'quality':'unknown'},{'branch':'unknown'},{'branch':'rapier','level':1.5}])
 def test_invalid_spawn_rejected(tester,body):
     c,_,_=tester
     before=c.get('/api/state').json()['weapons']
@@ -205,3 +205,33 @@ def test_cheat_levels_respect_weapon_route_caps(tester):
     assert post(c,f'/weapons/{wid}/branch',{}, {'branch':'rapier'}).status_code==200
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':80}).status_code==200
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':81}).status_code==409
+
+
+@pytest.mark.parametrize('branch,limit',[('longsword',90),('rapier',80),('greatsword',70)])
+def test_batch_spawn_route_cap_and_idempotency(tester,branch,limit):
+    c,_,_=tester
+    before=c.get('/api/state').json()
+    rejected=post(c,'/cheats/weapons',{}, {'count':3,'branch':branch,'level':limit+1})
+    assert rejected.status_code==422 and f'+{limit}' in rejected.json()['detail']
+    assert c.get('/api/state').json()==before
+    body={'count':3,'branch':branch,'level':limit};key=str(uuid.uuid4())
+    result=post(c,'/cheats/weapons',{},body,key)
+    assert result.status_code==200
+    assert post(c,'/cheats/weapons',{},body,key).json()==result.json()
+    weapons=c.get('/api/state').json()['weapons']
+    assert len(weapons)==3
+    assert all(w['branch']==branch and w['level']==limit and w['max_level']==limit
+               and w['demo']==1 and w['source']=='cheat' for w in weapons)
+    other='rapier' if branch=='longsword' else 'longsword'
+    assert post(c,'/cheats/weapons',{}, {**body,'branch':other},key).status_code==409
+    assert c.get('/api/state').json()['weapons']==weapons
+
+
+@pytest.mark.parametrize('branch,limit',[('longsword',90),('rapier',80),('greatsword',70)])
+def test_low_level_spawn_keeps_selected_route(tester,branch,limit):
+    c,_,_=tester
+    result=post(c,'/cheats/weapons',{}, {'count':1,'branch':branch,'level':0})
+    assert result.status_code==200
+    w=c.get('/api/state').json()['weapons'][0]
+    assert w['branch']==branch and w['level']==0 and w['max_level']==limit
+    assert post(c,f"/cheats/weapons/{w['id']}",{}, {'level':limit+1}).status_code==409

@@ -16,11 +16,13 @@ from pydantic import BaseModel, Field
 from web3 import Web3
 
 from .storage import Store
+from . import mailbox
 from chain.server.store import index_status, event_history
 from .accounts import normalize_username, hash_password, verify_password
 from chain.server.wallets import identity, create_challenge, bind_wallet, check_available
 from chain.server.rpc import ChainSettings, ChainReader
 from chain.server.nft import mint_authorization
+from chain.server.diagnostics import inspect_chain
 from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
 
 LOCAL = ChainSettings.from_env().directory
@@ -47,15 +49,19 @@ class WorkshopChoice(BaseModel):
 
 class Credentials(BaseModel):
     username: str = Field(min_length=3,max_length=24)
-    password: str = Field(min_length=8,max_length=128)
+    password: str = Field(min_length=8,max_length=20)
 
 class CheatResources(BaseModel):
     resource: Literal['materials','shields','coins','all']
     amount: int = Field(ge=1,le=1_000_000,strict=True)
 
+class TestRewardMail(BaseModel):
+    coins: int = Field(default=1000,ge=1,le=1_000_000,strict=True)
+
 class CheatWeapons(BaseModel):
     count: int = Field(default=1,ge=1,le=100,strict=True)
-    level: int = Field(default=0,ge=0,le=weapon_max_level('longsword'),strict=True)
+    level: int = Field(default=0,ge=0,le=BALANCE['max_level'],strict=True)
+    branch: Literal['longsword','rapier','greatsword'] = 'longsword'
     quality: Literal['普通','精良'] = '普通'
 
 class CheatWeaponEdit(BaseModel):
@@ -301,6 +307,10 @@ def create_app(db_path=None, demo=None):
             player['registered_at']=account['created'] if account else None
             player['role']=account['role'] if account else 'player'
             player['can_cheat']=demo_enabled and player['role']=='tester'
+            mail_counts=mailbox.counts(db,address)
+            player['mail_count']=mail_counts['total']
+            player['mail_unread']=mail_counts['unread']
+            player['mail_notice_count']=mail_counts['noticeCount']
             weapons = [dict(w) for w in db.execute("SELECT * FROM weapons WHERE owner=? AND status IN ('active','sealed') ORDER BY created DESC", (address,)).fetchall()]
         player['can_claim'] = player['claim_day'] != datetime.now(timezone.utc).date().isoformat()
         for w in weapons:
@@ -313,6 +323,42 @@ def create_app(db_path=None, demo=None):
             w['strike_materials'] = strike_material_cost(w['level'], w['branch'])
             w['branch_locked'] = w['branch'] != 'longsword'
         return {'player': player, 'weapons': weapons,'can_rescue':demo_enabled and player['daily_swords_remaining']==0 and not any(w['status']=='active' for w in weapons)}
+
+    @app.get('/api/mail')
+    def mail_list(response:Response, authorization: str | None = Header(default=None), offset: int = Query(0,ge=0), limit: int = Query(30,ge=1,le=100)):
+        address=authenticated(authorization)
+        response.headers['Cache-Control']='no-store'
+        with store.connection() as db:return mailbox.inbox(db,address,offset,limit)
+
+    @app.post('/api/mail/claim-all')
+    def mail_claim_all(authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address=authenticated(authorization)
+        return mutate(address,idempotency_key,'mail_claim_all',{},lambda db:mailbox.claim_rewards(db,address))
+
+    @app.post('/api/mail/{mail_id}/read')
+    def mail_read(mail_id:str,authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address=authenticated(authorization)
+        return mutate(address,idempotency_key,'mail_read:'+mail_id,{},lambda db:mailbox.read_mail(db,address,mail_id))
+
+    @app.post('/api/mail/{mail_id}/dismiss')
+    def mail_dismiss(mail_id:str,authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address=authenticated(authorization)
+        return mutate(address,idempotency_key,'mail_dismiss:'+mail_id,{},lambda db:mailbox.dismiss_notice(db,address,mail_id))
+
+    @app.post('/api/mail/{mail_id}/claim')
+    def mail_claim(mail_id:str,authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address=authenticated(authorization)
+        return mutate(address,idempotency_key,'mail_claim:'+mail_id,{},lambda db:mailbox.claim_rewards(db,address,mail_id))
+
+    @app.post('/api/cheats/mail')
+    def test_reward_mail(body:TestRewardMail,authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
+        address=authenticated(authorization)
+        def run(db):
+            require_tester(db,address)
+            mail_id=mailbox.deliver_reward(db,address,kind='test',reward_day=datetime.now(timezone.utc).date().isoformat(),source_key=str(uuid.uuid4()),coins=body.coins)
+            return {'mailId':mail_id,'message':'测试奖励邮件已送达，请到奖励邮箱领取。'}
+        with store.connection() as db:require_tester(db,address)
+        return mutate(address,idempotency_key,'test_reward_mail',body.model_dump(),run)
 
     @app.post('/api/workshop/equip')
     def equip_weapon(body: WorkshopChoice, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
@@ -381,6 +427,19 @@ def create_app(db_path=None, demo=None):
         if not account or account['role']!='tester':
             raise HTTPException(403,'仅测试账号可以使用作弊菜单。')
 
+    @app.get('/api/chain/diagnostics')
+    def chain_diagnostics(response: Response, authorization: str | None = Header(default=None)):
+        if not demo_enabled:
+            raise HTTPException(404, '链上状态检查仅在测试模式开放。')
+        address = authenticated(authorization)
+        with store.connection() as db:
+            account = db.execute('SELECT role FROM accounts WHERE game_address=?', (address,)).fetchone()
+            if not account or account['role'] != 'tester':
+                raise HTTPException(403, '仅测试账号可以查看链上诊断。')
+        # Release the database transaction before making any network requests.
+        response.headers['Cache-Control'] = 'no-store'
+        return inspect_chain(settings, store)
+
     @app.post('/api/cheats/daily')
     def cheat_daily(authorization: str | None = Header(default=None),idempotency_key: str | None = Header(default=None)):
         address=authenticated(authorization)
@@ -412,11 +471,14 @@ def create_app(db_path=None, demo=None):
         address=authenticated(authorization)
         def run(db):
             require_tester(db,address)
+            limit=weapon_max_level(body.branch)
+            if body.level>limit:raise HTTPException(422,f'当前路线最高 +{limit}，不能设置更高等级。')
             ids=[]
             for _ in range(body.count):
                 wid=new_weapon(db,address,body.level,1);ids.append(wid)
-                db.execute("UPDATE weapons SET quality=?,source='cheat' WHERE id=?",(body.quality,wid))
-            return {'weapon_id':ids[0],'message':f'已刷出 {body.count} 把 +{body.level} {body.quality}剑。'}
+                db.execute("UPDATE weapons SET branch=?,quality=?,source='cheat' WHERE id=?",(body.branch,body.quality,wid))
+            route=next(item for item in SWORD_BRANCHES if item['id']==body.branch)
+            return {'weapon_id':ids[0],'message':f"已生成 {body.count} 把 +{body.level} {route['name']}。"}
         with store.connection() as db:require_tester(db,address)
         return mutate(address,idempotency_key,'cheat_weapons',body.model_dump(),run)
 

@@ -11,6 +11,8 @@ import time
 from web3 import Web3
 from .rpc import ChainReader, ChainSettings
 from backend.storage import Store
+from backend.staking_rewards import settle_all
+from backend.market import record_sale, settle_sales
 
 
 class IndexFailure(Exception):
@@ -132,10 +134,11 @@ class RpcSource:
 
 
 class Indexer:
-    def __init__(self, store, source, batch_size=500):
+    def __init__(self, store, source, batch_size=500, staking=None):
         if not 1 <= batch_size <= 2000:
             raise ValueError('FORGE_INDEX_BATCH must be between 1 and 2000')
         self.store, self.source, self.batch_size = store, source, batch_size
+        self.staking = staking
 
     def status(self, state, message='', **fields):
         with self.store.connection() as db:
@@ -228,7 +231,9 @@ class Indexer:
                        (args['seller'], str(args['price']), block, tx, token))
         elif name == 'Unlisted':
             db.execute("UPDATE chain_nfts SET seller=NULL,price_wei='0',updated_block=?,updated_transaction=? WHERE token_id=?", (block, tx, token))
-        # Purchased is history only: a buyer callback may transfer/relist before it.
+        elif name == 'Purchased':
+            # Notify the seller without overwriting callback transfers/relistings.
+            record_sale(db, event)
 
     def process(self):
         with self.store.connection() as db:
@@ -236,6 +241,7 @@ class Indexer:
             for event in events:
                 self.apply_event(db, event)
                 db.execute('UPDATE chain_events SET processed=1 WHERE block_hash=? AND log_index=?', (event['block_hash'], event['log_index']))
+            settle_sales(db)
             scan = db.execute('SELECT * FROM chain_scan WHERE id=1').fetchone()
             pending = db.execute('SELECT MIN(block_number) FROM chain_events WHERE processed=0').fetchone()[0]
             processed = pending - 1 if pending is not None else scan['scanned_block']
@@ -252,7 +258,9 @@ class Indexer:
                     raise IndexHalt(saved['message'])
             self.initialize(self.source.open())
             self.scan()
-            return self.process()
+            indexed = self.process()
+            rewards = self.staking.tick() if self.staking is not None else settle_all(self.store)
+            return indexed and rewards
         except IndexHalt as error:
             self.status('halted', str(error), rpc_ok=0)
             raise
@@ -278,7 +286,11 @@ def main():
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise IndexFailure('这个环境已有监听进程在运行。') from None
-        indexer = Indexer(Store(settings.directory / 'game.sqlite3', settings.network), RpcSource(settings), int(os.getenv('FORGE_INDEX_BATCH', '500')))
+        from .staking_indexer import StakingIndexer, RpcStakingSource
+        store = Store(settings.directory / 'game.sqlite3', settings.network)
+        batch_size = int(os.getenv('FORGE_INDEX_BATCH', '500'))
+        staking = StakingIndexer(store, RpcStakingSource(settings), batch_size)
+        indexer = Indexer(store, RpcSource(settings), batch_size, staking=staking)
         interval = int(os.getenv('FORGE_INDEX_INTERVAL', '5'))
         if not 1 <= interval <= 30:
             raise IndexFailure('FORGE_INDEX_INTERVAL 必须为 1–30 秒。')

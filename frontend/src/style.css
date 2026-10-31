@@ -82,3 +82,10 @@ body.forge-mouse-captured,body.forge-mouse-captured *{cursor:none!important}
 .workshop-storage-actions button{padding:10px 14px;font-size:12px}
 .warehouse-summary{color:#a5a793;font-size:13px;line-height:1.7;margin:0 0 20px}
 @media(max-width:700px){.workshop-storage{align-items:stretch;flex-direction:column;padding:16px}.workshop-storage-actions{display:grid;grid-template-columns:1fr 1fr}.workshop-storage-actions button{padding:11px 8px}.warehouse-summary{font-size:12px}}
+
+.pending-progress{flex-basis:100%;display:block;line-height:1.6;color:#c8c5ac}
+
+.confirmation-dialog p{overflow-wrap:anywhere}
+
+.wallet-connected { display: block; margin-top: 7px; }
+.wallet-connected code { overflow-wrap: anywhere; }

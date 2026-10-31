@@ -21,7 +21,7 @@ def guest(tmp_path, demo=True):
 
 
 def credentials():
-    return {'username':'tester_'+uuid.uuid4().hex[:8],'password':uuid.uuid4().hex}
+    return {'username':'tester_'+uuid.uuid4().hex[:8],'password':uuid.uuid4().hex[:20]}
 
 
 def test_register_preserves_progress_and_login_restores(tmp_path):
@@ -51,7 +51,7 @@ def test_invalid_password_does_not_switch_archive(tmp_path):
     c,address=guest(tmp_path);data=credentials()
     c.post('/api/account/register',json=data)
     cookie=c.cookies.get('forge_session')
-    wrong={**data,'password':uuid.uuid4().hex}
+    wrong={**data,'password':uuid.uuid4().hex[:20]}
     assert c.post('/api/account/login',json=wrong).status_code==401
     assert c.cookies.get('forge_session')==cookie
     assert c.post('/api/session').json()['address']==address
@@ -240,3 +240,13 @@ def test_daily_allowance_precedes_demo_rescue(tmp_path):
     assert not c.get('/api/state').json()['can_rescue']
     assert post(c,'/test/supply',{}).status_code==409
     assert c.get('/api/state').json()['player']['daily_swords_remaining']==3
+
+
+@pytest.mark.parametrize('length,expected', [(7,422),(8,200),(20,200),(21,422)])
+def test_password_length_boundaries_for_registration_and_login(tmp_path,length,expected):
+    c,_=guest(tmp_path)
+    data={**credentials(),'password':'a'*length}
+    assert c.post('/api/account/register',json=data).status_code==expected
+    if expected==200:
+        c.post('/api/account/logout')
+    assert c.post('/api/account/login',json=data).status_code==expected

@@ -153,3 +153,12 @@
   .weapon-card:hover { transform: none; }
   .weapon-card:hover .weapon-reference { scale: none; }
 }
+
+.nft-custody-note, .nft-action-feedback { margin: 0 0 6px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.nft-custody-note { color: #b0b5a1; }
+.nft-action-feedback { padding: 10px 12px; background: #282e23; border-left: 2px solid #b5bd92; color: #e8e3c9; }
+.nft-action-feedback.error, .market-sync-error { color: #f0b29a; }
+.nft-action-feedback.error { border-color: #ce8e6b; background: #37271f; }
+
+.market-views { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.market-views button[aria-pressed="true"] { border-color: #c4ad78; background: #333626; color: #f0e3bc; }

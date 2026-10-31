@@ -65,6 +65,7 @@ test('Chinese and English UI, runtime messages, weapon identities and saved pref
         ['加热需要 2 铁块，当前剩余 0。请领取每日补给或补充铁块。', 'Heating requires 2 iron; you have 0. Claim daily supplies or buy more iron.'],
         ['已放入熔炉，加热 3 秒后可敲击 5 次。', 'Weapon placed in the furnace. After 3 seconds, it will be ready for 5 strikes.'],
         ['已刷出 3 把 +50 精良剑。', 'Spawned 3 +50 Refined swords.'],
+        ['已生成 3 把 +70 巨剑。', 'Spawned 3 +70 Greatsword weapons.'],
         ['已选择巨剑路线。该路线已固定，无法再更换。', 'Selected the Greatsword route. This choice is permanent.'],
         ['刺剑路线最高 +80，当前等级过高，无法切换。', 'The Rapier route is capped at +80. Your current level is too high to switch.'],
         ['铭刻 NFT已提交，等待链上确认：0x123…abcd', 'Mint NFT submitted. Waiting for confirmation: 0x123…abcd'],
@@ -104,12 +105,13 @@ test('Chinese and English UI, runtime messages, weapon identities and saved pref
         assert.ok(en.includes('data-branch='), tier.id);
       }
     });
-    await t.test('English test menu retains canonical API quality values', () => {
+    await t.test('English test menu retains route IDs and displays their level caps', () => {
       const html = page('en', React.createElement(CheatPanel, { busy: false, maxLevel: 100, heatStrikes: 5, weapon: { id: 'test', name: catalog[0].name, level: 0, status: 'active' }, onAction: async () => {} }));
       assert.doesNotMatch(text(html), /\p{Script=Han}/u);
-      assert.match(html, /value="普通"/);
-      assert.match(html, /value="精良"/);
-      assert.match(text(html), /Refined/);
+      for (const [route,label,limit] of [['longsword','Knight Sword',90],['rapier','Rapier',80],['greatsword','Greatsword',70]]) {
+        assert.ok(html.includes(`value="${route}"`));
+        assert.ok(text(html).includes(`${label} · Max +${limit}`));
+      }
     });
     await t.test('currency amounts and confirmation controls follow the language', () => {
       for (const locale of ['zh', 'en']) {

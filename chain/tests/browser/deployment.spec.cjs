@@ -341,3 +341,20 @@ test('Sepolia UI waits for finality, displays explorer links and disables stale 
   await expect(page.getByRole('status')).toHaveText('Unable to verify deployment status');
   await expect(page.getByRole('button', { name: 'Download deployment record' })).toHaveCount(0);
 });
+
+test('staking deployment UI shows the linked NFT and mailbox handoff in both languages', async ({ page, rehearsal }) => {
+  const response=(await rehearsal.status()).body;
+  response.plan={...response.plan,module:'forge-staking',contractName:'ForgeStaking',nftAddress:other};
+  response.healthy=true;
+  response.state={phase:'confirmed',transactionHash:'0x'+'a'.repeat(64),manifest:{address:deployer,deploymentBlock:20}};
+  await page.route('**/api/deploy/status',route=>route.fulfill({json:response}));
+  await page.goto(rehearsal.origin+'/deploy');
+  await expect(page.getByTestId('staking-nft-address')).toHaveText(other);
+  await expect(page.getByText('部署 NFT 质押合约。持有人可随时取回；游戏金币由服务器按有效质押时长结算到奖励邮箱。')).toBeVisible();
+  await expect(page.getByText('质押配置已保存。设定每日游戏金币奖励并重启监听后，服务器会补扫质押记录并投递奖励邮件。')).toBeVisible();
+  await expect(page.getByTestId('mint-signer')).toHaveCount(0);
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button',{name:'Switch to English'}).click();
+  expect((await page.locator('main section').allInnerTexts()).join('\n')).not.toMatch(/\p{Script=Han}/u);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});

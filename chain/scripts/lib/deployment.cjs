@@ -32,7 +32,7 @@ async function prepare({ artifact, args, deployer, network, module, deploymentId
 }
 
 function createService({ plan, provider, directory, origin, hooks = {}, server = http.createServer() }) {
-  if (plan.module === 'forge-of-fate' && ['checkReady', 'verifyContract', 'publishManifest'].some(key => typeof hooks[key] !== 'function')) {
+  if (['forge-of-fate', 'forge-staking'].includes(plan.module) && ['checkReady', 'verifyContract', 'publishManifest'].some(key => typeof hooks[key] !== 'function')) {
     fail('NFT 部署必须配置授权核验和游戏清单保存。');
   }
   if (![31338, 11155111].includes(plan.network.chainId)

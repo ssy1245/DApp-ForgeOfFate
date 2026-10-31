@@ -50,3 +50,10 @@ test('foreign network, epoch, sender or transaction cannot complete a saved oper
 test('invalid or contradictory terminal states cannot complete a saved operation',()=>{
  const data=response();assert.throws(()=>finalReceipt({...data,state:'failed'},p));assert.throws(()=>finalReceipt({...data,receipt:{...data.receipt,status:2}},p));
 });
+
+test('optional NFT identity survives recovery without losing large token precision',()=>{
+ const storage=new Storage(),tokenId='70040015053319833925070134247553094792372603883471276971352987907260594856800';
+ assert.ok(writePending({...p,tokenId},storage));
+ assert.equal(readPending(storage,new Storage())[0].tokenId,tokenId);
+ for(const value of [42,'-1','42x','', '9'.repeat(79)])assert.equal(writePending({...p,tokenId:value},storage),false);
+});

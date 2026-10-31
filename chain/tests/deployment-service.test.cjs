@@ -10,6 +10,7 @@ const { loadPlan, nftHooks, selectModule } = require('../scripts/lib/deployment-
 const { network } = require('../scripts/lib/sepolia.cjs');
 const hash = char => '0x' + char.repeat(64);
 async function fixture(t, nft = false) {
+  const staking = nft === 'staking';
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-sepolia-check-'));
   const txHash = hash('a'), from = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
   const data = { finalized: 10, chainId: 11155111, receipt: null, fail: false, wrongSigner: false, wrongEpoch: false, publishFail: false };
@@ -24,12 +25,19 @@ async function fixture(t, nft = false) {
       assert.equal(tx.blockTag, 20);
       const abi = new Interface(plan.abi);
       const method = abi.parseTransaction({ data: tx.data }).name;
+      if (staking) return abi.encodeFunctionResult(method, [method === 'nft'
+        ? data.wrongCollection ? from : plan.nftAddress
+        : tx.to.toLowerCase() === plan.nftAddress.toLowerCase() ? plan.nftDeploymentId : plan.deploymentId]);
       return abi.encodeFunctionResult(method, [method === 'mintSigner'
         ? data.wrongSigner ? from : plan.mintSigner : data.wrongEpoch ? hash('e') : plan.deploymentId]);
     },
   };
   const gameDirectory = path.join(directory, 'game');
-  const options = { root: path.resolve(__dirname, '../..'), directory, gameDirectory, deployer: from, provider, network, module: 'forge-of-fate', compile: async () => {} };
+  if (staking) {
+    fs.mkdirSync(gameDirectory);
+    fs.writeFileSync(path.join(gameDirectory, 'deployment.json'), JSON.stringify({manifestVersion:2,chainId:11155111,address:'0x'+'1'.repeat(40),deploymentId:hash('c')}));
+  }
+  const options = { root: path.resolve(__dirname, '../..'), directory, gameDirectory, deployer: from, provider, network, module: staking ? 'forge-staking' : 'forge-of-fate', compile: async () => {} };
   const plan = nft ? await loadPlan(options) : await prepare({ artifact: { contractName: 'DeploymentProbe', abi: [], bytecode: '0x60016000' }, args: [], deployer: from, network, module: 'deployment-probe', deploymentId: hash('d'), provider });
   const origin = 'http://127.0.0.1:5174';
   let server;
@@ -208,4 +216,42 @@ test('NFT: preexisting or modified game manifests are never overwritten', async 
   const status = (await f.request()).value;
   assert.equal(status.healthy, false); assert.match(status.warning, /清单与核验结果不同/);
   assert.deepEqual(JSON.parse(fs.readFileSync(target)), changed);
+});
+
+test('staking: fixed collection plan uses no mint key and survives restart', async t => {
+  assert.equal(selectModule(['--module','forge-staking']),'forge-staking');
+  const f=await fixture(t,'staking');
+  assert.equal(f.plan.contractName,'ForgeStaking');
+  assert.deepEqual(f.plan.constructorArgs,[f.plan.nftAddress,f.plan.deploymentId]);
+  assert.equal(fs.existsSync(path.join(f.gameDirectory,'mint-key')),false);
+  assert.deepEqual(await f.reloadPlan(),f.plan);
+});
+test('staking: finalized deployment publishes a separate manifest without changing NFT config', async t => {
+  const f=await fixture(t,'staking');
+  const original=fs.readFileSync(path.join(f.gameDirectory,'deployment.json'),'utf8');
+  await f.begin();f.mine();await f.record();
+  assert.equal(fs.existsSync(path.join(f.gameDirectory,'staking-deployment.json')),false);
+  f.data.finalized=20;
+  const status=(await f.request()).value;assert.equal(status.state.phase,'confirmed');
+  const manifest=JSON.parse(fs.readFileSync(path.join(f.gameDirectory,'staking-deployment.json')));
+  assert.equal(manifest.nftAddress,f.plan.nftAddress);assert.equal(manifest.nftDeploymentId,f.plan.nftDeploymentId);
+  assert.equal(fs.readFileSync(path.join(f.gameDirectory,'deployment.json'),'utf8'),original);
+  await f.restart();assert.equal((await f.request()).value.state.phase,'confirmed');
+  assert.deepEqual(await f.reloadPlan(),f.plan);
+});
+test('staking: changed collection or mismatched deployed collection prevents handoff', async t => {
+  const f=await fixture(t,'staking');await f.begin();f.mine();f.data.finalized=20;f.data.wrongCollection=true;
+  assert.equal((await f.record()).status,409);
+  assert.equal(fs.existsSync(path.join(f.gameDirectory,'staking-deployment.json')),false);
+  f.data.wrongCollection=false;
+  fs.writeFileSync(path.join(f.gameDirectory,'deployment.json'),JSON.stringify({manifestVersion:2,chainId:11155111,address:'0x'+'2'.repeat(40),deploymentId:hash('c')}));
+  await assert.rejects(f.reloadPlan,/NFT 部署不匹配/);
+  assert.equal((await f.request()).value.healthy,false);
+});
+test('staking: missing NFT configuration or modified build cannot create a replacement plan', async t => {
+  const f=await fixture(t,'staking');
+  fs.writeFileSync(path.join(f.directory,'build-info.json'),'{}');
+  await assert.rejects(f.reloadPlan,/编译资料/);
+  fs.unlinkSync(path.join(f.gameDirectory,'deployment.json'));
+  await assert.rejects(f.reloadPlan,/NFT 部署清单/);
 });

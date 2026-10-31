@@ -21,7 +21,7 @@ async function login(page, username) {
   await page.getByRole('button', { name: '账号登录 / 注册', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.locator('input').nth(0).fill(username);
-  await dialog.locator('input').nth(1).fill('test-only-password-2026');
+  await dialog.locator('input').nth(1).fill('test-password-2026');
   await dialog.locator('button.primary').click();
   await expect(page.locator('.account-name')).toContainText(username);
 }

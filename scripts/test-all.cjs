@@ -15,6 +15,7 @@ const suites=[
  ['build-and-models',['run','test:models','-w','frontend']],
  ['browser',['run','test:browser']],
  ['game-chain-integration',['run','verify:game']],
+ ['staking-integration',['run','test:staking']],
 ];
 (async()=>{
  const results=[];

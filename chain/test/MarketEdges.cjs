@@ -115,4 +115,16 @@ describe('ForgeOfFate transaction boundaries', function(){
   const before=await ethers.provider.getBalance(a.address);const receipt=await(await c.connect(a).withdraw()).wait();
   assert.equal(await ethers.provider.getBalance(a.address),before+301n-receipt.fee);assert.equal(await balance(),0n);assert.equal(await c.proceeds(b.address),0n);
  });
+ it('direct gift rejection preserves ownership and listing; successful receipt cannot be revoked by the former owner',async()=>{
+  const id=await mint();await c.connect(a).list(id,100n);
+  await configure('0x','0x',0n,true,false);
+  for(const recipient of [actor.target,ethers.ZeroAddress]){
+   await assert.rejects(c.connect(a)['safeTransferFrom(address,address,uint256)'](a.address,recipient,id));
+   assert.equal(await c.ownerOf(id),a.address);assert.equal((await c.listings(id)).price,100n);
+  }
+  await(await c.connect(a)['safeTransferFrom(address,address,uint256)'](a.address,b.address,id)).wait();
+  assert.equal(await c.ownerOf(id),b.address);assert.equal((await c.listings(id)).price,0n);
+  await assert.rejects(c.connect(a)['safeTransferFrom(address,address,uint256)'](b.address,a.address,id),/ERC721InsufficientApproval/);
+  assert.equal(await c.ownerOf(id),b.address);
+ });
 });

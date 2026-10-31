@@ -90,6 +90,7 @@ quote-key.*
 /sepolia-deployment-*.json
 # Console runtime/build exports: originals live under .local/sepolia/.
 # Only ignore root-level copies; keep source manifests and empty templates.
+# Public reviewed manifests under deployments/ are intentionally versioned.
 /plan.json
 /state.json
 /build-info.json

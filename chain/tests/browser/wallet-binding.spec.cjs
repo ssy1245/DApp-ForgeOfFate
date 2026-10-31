@@ -70,15 +70,23 @@ test('rejected signature leaves wallet unbound and account intact', async ({ pag
 });
 
 test('second account cannot bind a wallet owned by another account', async ({ page, game }) => {
-  await installWallet(page, Wallet.createRandom());
+  const wallet=Wallet.createRandom();
+  await installWallet(page, wallet);
   await register(page, false, game);
   await page.getByRole('button', { name: '绑定钱包', exact: true }).click();
   await expect(page.locator('.wallet-status')).toContainText('已验证，钱包已就绪');
   await page.getByRole('button', { name: '退出账号', exact: true }).click();
   await register(page, false, game);
+  await expect(page.locator('.wallet-status')).toContainText('尚未绑定钱包');
+  await expect(page.locator('.wallet-connected')).toContainText(wallet.address);
   await page.getByRole('button', { name: '绑定钱包', exact: true }).click();
   await expect(page.locator('.notice')).toContainText('此钱包已绑定其他账号');
   expect((await state(page)).player.wallet_address).toBeNull();
+  const nextWallet=Wallet.createRandom().address;
+  await page.evaluate(address=>window.changeWallet(address),nextWallet);
+  await expect(page.locator('.wallet-connected')).toContainText(nextWallet);
+  await expect(page.locator('.wallet-status')).toContainText('尚未绑定钱包');
+  await expect(page.locator('.notice')).not.toContainText('此钱包已绑定其他账号');
 });
 
 test('wallet changes during signature never bind the wrong account', async ({ page, game }) => {
@@ -115,7 +123,7 @@ test('verified wallet mismatch disables NFT actions while ordinary game stays av
   await expect(page.getByRole('button',{name:'挂牌出售',exact:true})).toBeEnabled();
   await page.evaluate(address=>window.changeWallet(address),Wallet.createRandom().address);
   await expect(page.getByRole('button',{name:'挂牌出售',exact:true})).toBeDisabled();
-  await expect(page.getByRole('button',{name:'直接转移',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'直接转移',exact:true})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'领取每日补给',exact:false})).toBeEnabled();
   expect(await page.evaluate(()=>window.testWallet.transactions)).toBe(0);
 });

@@ -38,7 +38,7 @@ def test_iron_alone_can_pay_for_forging_heating_and_striking(client, monkeypatch
 def test_retiring_old_ap_column_preserves_accounts_sessions_and_progress(client):
     client.post('/api/session')
     registered = client.post('/api/account/register', json={
-        'username': 'migration_player', 'password': 'migration_password_123',
+        'username': 'migration_player', 'password': 'migration_pass_123',
     })
     assert registered.status_code == 200
     assert post(client, '/claim', {}).status_code == 200

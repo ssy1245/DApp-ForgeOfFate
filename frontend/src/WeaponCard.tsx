@@ -13,6 +13,7 @@ type Props = {
   statusTone?: 'active' | 'sealed' | 'listed';
   nft?: boolean;
   detail?: ReactNode;
+  showValue?: boolean;
   valueLabel: string;
   value: ReactNode;
   valueUnit?: string;
@@ -21,7 +22,7 @@ type Props = {
 
 const cleanName = (name = '') => name.replace(/^\[DEMO\]\s*/i, '').replace(/\s*\+\d+\s*$/, '').trim();
 
-export default function WeaponCard({ weapon, serial, status, statusTone = 'active', nft = false, detail, valueLabel, value, valueUnit, children }: Props) {
+export default function WeaponCard({ weapon, serial, status, statusTone = 'active', nft = false, detail, showValue = true, valueLabel, value, valueUnit, children }: Props) {
   const {t, name, locale} = useI18n();
   const tier = artworkTier(weapon);
   const route = swordBranches.find(item => item.id === (weapon.branch || tier?.branch));
@@ -40,7 +41,7 @@ export default function WeaponCard({ weapon, serial, status, statusTone = 'activ
       {locale === 'zh' && englishName && <p className="card-english" lang="en">{englishName}</p>}
       <WeaponLore weapon={weapon}/>
       {detail && <div className="card-detail">{detail}</div>}
-      <div className="card-valuation"><span>{valueLabel}</span><div><strong>{value}</strong>{valueUnit && <small>{valueUnit}</small>}</div></div>
+      {showValue && <div className="card-valuation"><span>{valueLabel}</span><div><strong>{value}</strong>{valueUnit && <small>{valueUnit}</small>}</div></div>}
       <div className="card-actions">{children}</div>
     </div>
   </article>;

@@ -80,6 +80,8 @@ def create_app(db_path=None, demo=None):
     app = FastAPI(title='Forge of Fate', version='0.1.0')
     settings = ChainSettings.from_env()
     reader = ChainReader(settings)
+    from chain.server.staking_reader import StakingReader
+    staking_reader = StakingReader(settings)
     chain = reader.connect
     store = Store(db_path or str(settings.directory / 'game.sqlite3'), network=settings.network)
     demo_enabled = os.getenv('DEMO_MODE', '0') == '1' if demo is None else demo
@@ -236,13 +238,37 @@ def create_app(db_path=None, demo=None):
 
     @app.get('/api/config')
     def config():
-        result = {'balance': BALANCE, 'demo_mode': demo_enabled, 'network': settings.public(), 'chain': None, 'chain_error': None}
+        result = {'balance': BALANCE, 'demo_mode': demo_enabled, 'network': settings.public(), 'chain': None, 'chain_error': None, 'staking': None, 'staking_error': None}
         try:
             info, _, _ = chain()
             result['chain'] = {k: info[k] for k in ['address', 'chainId', 'deploymentId', 'abi']}
         except HTTPException as e:
             result['chain_error'] = e.detail
+        if result['chain']:
+            try:
+                staking = staking_reader.public_config(result['chain'])
+                if staking:
+                    with store.connection() as db:
+                        source=db.execute('SELECT daily_coins FROM staking_sources WHERE chain_id=? AND contract=? COLLATE NOCASE AND deployment=?',
+                            (staking['chainId'],staking['address'],staking['deploymentId'])).fetchone()
+                    staking['dailyCoins']=source['daily_coins'] if source else None
+                result['staking']=staking
+            except HTTPException as e:
+                result['staking_error']=e.detail
         return result
+
+    @app.get('/api/chain/staking')
+    def staking_holdings(authorization: str | None = Header(default=None)):
+        address=authenticated(authorization)
+        with store.connection() as db:
+            player=identity(db,address)
+        if not player['wallet_verified']:
+            raise HTTPException(403,'请先绑定钱包，再查看质押。')
+        return staking_reader.holdings(player['wallet_address'])
+
+    @app.get('/api/chain/staking/receipts/{tx_hash}')
+    def staking_receipt(tx_hash: str):
+        return staking_reader.receipt(tx_hash)
 
     @app.get('/api/chain/nfts')
     def nfts(account: str | None = None, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100), block: int | None = Query(None, ge=0)):

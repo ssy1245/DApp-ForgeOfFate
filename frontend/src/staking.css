@@ -1,0 +1,9 @@
+.staking-panel { margin-top: 22px; border: 1px solid #434631; background: #1b2118; border-radius: 8px; padding: 22px; line-height: 1.7; }
+.staking-panel h3, .staking-panel h4 { color: #eadbb3; }
+.staking-panel>small { color: #b6baa8; }
+.staking-rate { color: #e0c788; }
+.staking-item { display: grid; gap: 10px; padding: 18px; margin: 12px 0; border: 1px solid #4b4e3a; border-radius: 6px; background: #171c15; }
+.staking-item small { overflow-wrap: anywhere; color: #a4ab96; }
+.staking-item button { justify-self: start; }
+.staking-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.staking-item[data-selected] { border-color: #cf9e70; outline: 1px solid #cf9e70; outline-offset: 2px; }

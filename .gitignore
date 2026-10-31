@@ -63,6 +63,7 @@ blob-report/
 .auth/
 browser-profiles/
 storage-state*.json
+storageState*.json
 # Root-level manual network/trace exports; public assets remain versioned.
 /*.har
 /trace*.zip
@@ -86,6 +87,7 @@ quote-key
 quote-key.*
 # Local deployment and cleanup exports, if copied into the project root.
 /deployment.json
+/staking-deployment.json
 /local-deployment-*.json
 /sepolia-deployment-*.json
 # Console runtime/build exports: originals live under .local/sepolia/.
@@ -95,19 +97,24 @@ quote-key.*
 /state.json
 /build-info.json
 /nft-inventory.json
+/staking-inventory.json
 /cleanup-summary.json
 # Interrupted atomic writes, if runtime files were placed in the project root.
-/deployment.json.*.tmp
-/plan.json.*.tmp
-/state.json.*.tmp
-/build-info.json.*.tmp
+/deployment.json*.tmp
+/staking-deployment.json*.tmp
+/plan.json*.tmp
+/state.json*.tmp
+/build-info.json*.tmp
 backend/data/
 *.sqlite
 *.sqlite-*
 *.sqlite3
 *.sqlite3-*
+*.sqlite.backup*
+*.sqlite3.backup*
 *.db
 *.db-*
+*.db.backup*
 *.log
 *.pid
 *.pid.lock

@@ -1,5 +1,5 @@
 // Browser recovery records are hints. Completion must come from the matching chain receipt.
-export type Pending = {hash:string; account:string; contract:string; epoch:string; chainId:number; label:string; tokenId?:string};
+export type Pending = {hash:string; account:string; contract:string; epoch:string; chainId:number; label:string; tokenId?:string; target?:'staking'};
 const PREFIX = 'forge:transaction:';
 const hashPattern = /^0x[0-9a-fA-F]{64}$/;
 const addressPattern = /^0x[0-9a-fA-F]{40}$/;
@@ -7,6 +7,7 @@ function valid(value:any): value is Pending {
   return !!value && hashPattern.test(value.hash) && addressPattern.test(value.account)
     && addressPattern.test(value.contract) && hashPattern.test(value.epoch)
     && Number.isSafeInteger(value.chainId) && value.chainId > 0
+    && (value.target === undefined || value.target === 'staking')
     && (value.tokenId === undefined || (typeof value.tokenId === 'string' && /^(0|[1-9][0-9]{0,77})$/.test(value.tokenId)))
     && typeof value.label === 'string' && value.label.length > 0 && value.label.length < 100;
 }

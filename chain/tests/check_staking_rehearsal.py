@@ -29,6 +29,24 @@ indexer=Indexer(store,RpcSource(settings),2,staking=staking)
 for _ in range(30):
     if indexer.tick():break
 else:raise AssertionError('Failed to catch up')
+config=client.get('/api/config').json()
+assert config['staking']['dailyCoins']==100,config
+holdings=client.get('/api/chain/staking')
+assert holdings.status_code==200,holdings.text
+holdings=holdings.json()
+assert holdings['account'].lower()==os.environ['REHEARSAL_WALLET'].lower()
+if stage=='before':
+    assert len(holdings['positions'])==1 and holdings['positions'][0]['positionId']=='1'
+    assert holdings['available']==[]
+else:
+    assert holdings['positions']==[] and len(holdings['available'])==1
+    assert not holdings['available'][0]['approved']
+source=RpcStakingSource(settings);manifest=source.open()
+logs=source.logs(manifest['deploymentBlock'],source.w3.eth.block_number)
+for event in logs:
+    receipt=client.get('/api/chain/staking/receipts/'+event['transaction_hash'])
+    assert receipt.status_code==200,receipt.text
+    assert receipt.json()['state']=='confirmed' and receipt.json()['deploymentId']==manifest['deploymentId']
 mail=client.get('/api/mail').json()
 if stage=='before':
     assert mail['total']==0,mail

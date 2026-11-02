@@ -8,7 +8,7 @@
 
 **三张公开图片已接入 NFT 元数据。** 来源为 [ssy1245/NFT_image 的 Image_Dapp 目录](https://github.com/ssy1245/NFT_image/tree/main/Image_Dapp)，固定提交版本为 `658de5dd69600b126345f028a7c7f30d7a7b63ed`。2026-10-28 已在不登录、不带凭据的情况下验证三张原图，均返回 HTTP 200、`image/png`；远端文件与本目录原图一致。
 
-公共配置是 [`manifest.json`](manifest.json)，直接随源码提交 GitHub。老师克隆、换钱包或重新部署合约时共用这些链接，不需要上传自己的图片，也不需要在 `.env.sepolia` 填图片地址或 GitHub 凭据。
+公共配置是 [`manifest.json`](manifest.json)，直接随源码提交 GitHub。克隆、换钱包或重新部署合约时共用这些链接，不需要上传自己的图片，也不需要在 `.env.sepolia` 填图片地址或 GitHub 凭据。
 
 | 武器路线 | 本地原图 | NFT 的固定公开原图 |
 |---|---|---|

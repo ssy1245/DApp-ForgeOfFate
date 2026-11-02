@@ -11,7 +11,7 @@ const assets = path.resolve(root, '../assets/3d');
 const references = path.resolve(root, '../assets/reference_page');
 const displayAssets = path.resolve(root, '../assets/display');
 const configuredTiers = [...tiers, ...branches.flatMap(branch => branch.tiers ?? [])];
-const models = [...new Set(configuredTiers.map(tier => `${tier.model}.glb`)), 'hammer.glb', 'anvil.glb'];
+const models = [...new Set(configuredTiers.map(tier => `${tier.model}.glb`)), 'hammer.glb', 'anvil.glb', 'weapon storage.glb'];
 const portraits = [...new Set(configuredTiers.map(tier => tier.reference).filter((name): name is string => !!name))];
 const displays = [...new Set(configuredTiers.map(tier => tier.display).filter((name): name is string => !!name))];
 // Allows isolated browser tests to use their own API without touching a running game.

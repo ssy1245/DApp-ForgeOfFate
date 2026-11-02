@@ -98,7 +98,7 @@ test('buying a ward updates stock, enables Q and disables the shop when gold is 
   await expect(hud(page)).toContainText('剩余 0 张');
   await expect(hudWard(page)).toBeDisabled();
   const buy=page.getByRole('button',{name:/购买 1 张保护符/});
-  await expect(buy).toBeEnabled();await expect(buy).toContainText('2,500');
+  await expect(buy).toBeEnabled();await expect(page.locator('.supply-product-ward .supply-product-price')).toContainText('2,500');
   const response=page.waitForResponse(r=>r.url().endsWith('/api/shop/wards')&&r.request().method()==='POST');
   await buy.click();expect((await response).status()).toBe(200);await idle(page);
   await expect(hud(page)).toContainText('剩余 1 张');

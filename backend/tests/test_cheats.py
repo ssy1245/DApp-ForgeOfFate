@@ -197,12 +197,12 @@ def test_cheat_levels_respect_weapon_route_caps(tester):
     wid=spawned.json()['weapon_id']
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':91}).status_code==409
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':60}).status_code==200
-    assert post(c,f'/weapons/{wid}/branch',{}, {'branch':'greatsword'}).status_code==200
+    assert post(c,f'/weapons/{wid}/branch',{}, {'branch':'greatsword'}).status_code==409
+    wid=post(c,'/cheats/weapons',{}, {'count':1,'level':60,'branch':'greatsword'}).json()['weapon_id']
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':71}).status_code==409
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':70}).status_code==200
     assert post(c,f'/weapons/{wid}/branch',{}, {'branch':'rapier'}).status_code==409
-    wid=post(c,'/cheats/weapons',{}, {'count':1,'level':60}).json()['weapon_id']
-    assert post(c,f'/weapons/{wid}/branch',{}, {'branch':'rapier'}).status_code==200
+    wid=post(c,'/cheats/weapons',{}, {'count':1,'level':60,'branch':'rapier'}).json()['weapon_id']
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':80}).status_code==200
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':81}).status_code==409
 

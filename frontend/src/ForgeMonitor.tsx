@@ -2,7 +2,7 @@ import {useEffect,useMemo} from 'react';
 import {CanvasTexture,SRGBColorSpace} from 'three';
 import {ANVIL_POSITION} from './workshopLayout';
 
-export type MonitorData={title:string;weapon:string;level:string;priceLabel:string;price:string;next:string;rows:{label:string;value:string;tone?:'success'|'danger'}[];status:string};
+export type MonitorData={title:string;weapon:string;level:string;priceLabel:string;price:string;next:string;rows:{label:string;value:string;tone?:'success'|'danger'}[];status:string;mutation?:string};
 // One immutable display snapshot feeds both the world screen and its readable HTML view.
 export default function ForgeMonitor({data}:{data:MonitorData}){
  const encoded=JSON.stringify(data);
@@ -26,7 +26,8 @@ export default function ForgeMonitor({data}:{data:MonitorData}){
   line(750,174,750,540);
   text(d.next,806,205,32,'#c8b68f',660);
   d.rows.forEach((r,i)=>{const color=r.tone==='danger'?'#f0a08d':r.tone==='success'?'#b6d99f':undefined;text(r.label,806,270+i*58,30,color||'#c4c5b1',470,"'Noto Sans SC', sans-serif");text(r.value,1300,270+i*58,38,color||'#e9d4ab',170);});
-  line(66,580,1470,580);diamond(80,627,5);text(d.status,103,637,30,'#b8b6a5',1360,"'Noto Sans SC', sans-serif");
+  if(d.mutation)text(d.mutation,66,567,24,'#d3b793',1400,"'Noto Sans SC', sans-serif");
+  line(66,d.mutation?592:580,1470,d.mutation?592:580);diamond(80,627,5);text(d.status,103,637,30,'#b8b6a5',1360,"'Noto Sans SC', sans-serif");
   texture.needsUpdate=true;
  },[encoded,texture]);
  useEffect(()=>()=>texture.dispose(),[texture]);

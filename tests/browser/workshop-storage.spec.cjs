@@ -32,6 +32,10 @@ async function take(page, id) {
   await expect(scene(page)).toHaveAttribute('data-weapon-id', id);
   await idle(page);
 }
+async function atWorkshop(page) {
+  await expect(page.locator('.scene[tabindex]')).toBeFocused();
+  await expect.poll(async()=>Math.round((await scene(page).boundingBox()).y)).toBe(16);
+}
 async function position(page, location) {
   if (location==='held'||location==='cabinet-1') {
     await page.getByRole('button',{name:'拿起长剑',exact:true}).click();
@@ -46,11 +50,16 @@ async function position(page, location) {
 test('store A, take B, preserve empty workshop and selected weapon across reloads', async ({page,game}) => {
   const user=await prepare(page,game,{level:35});
   const before=await state(page);
+  await panel(page).getByRole('button',{name:'打开武器仓库',exact:false}).click();
+  await card(page,user.a).getByRole('button',{name:'返回工坊',exact:true}).click();
+  await atWorkshop(page);
+  await page.getByRole('button',{name:'环绕查看',exact:true}).click();
   await position(page,'held');
   await panel(page).getByRole('button',{name:'存入仓库',exact:true}).click(); await empty(page);
   await page.reload(); await empty(page);
   expect((await state(page)).player.workshop_weapon_id).toBeNull();
   await take(page,user.b);
+  await atWorkshop(page);
   await expect(scene(page)).toHaveAttribute('data-place','anvil');
   await page.reload(); await expect(scene(page)).toHaveAttribute('data-weapon-id',user.b);
   await take(page,user.a);
@@ -204,6 +213,10 @@ test('warehouse controls fit mobile width and switch language', async ({page,gam
   await page.getByRole('button',{name:/Open warehouse/}).click();
   await card(page,user.b).getByRole('button',{name:'Take out and forge',exact:true}).click();
   await expect(scene(page)).toHaveAttribute('data-weapon-id',user.b);
+  await atWorkshop(page);
+  await page.getByRole('button',{name:/Open warehouse/}).click();
+  await card(page,user.b).getByRole('button',{name:'Return to workshop',exact:true}).click();
+  await atWorkshop(page);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
 
@@ -219,7 +232,8 @@ test('in-game warehouse stores and retrieves without leaving the expanded scene'
   await expect(dialog.locator('.scene-warehouse-current')).toContainText('工坊空闲');
   await expect(scene(page)).toHaveAttribute('data-place','empty');
   await storedItem(dialog,user.b).getByRole('button',{name:'取出武器',exact:true}).click();
-  await expect(storedItem(dialog,user.b)).toContainText('工坊中');
+  await expect(dialog.locator('.scene-warehouse-current')).toHaveAttribute('data-weapon-id',user.b);
+  await expect(storedItem(dialog,user.b)).toHaveCount(0);
   await expect(scene(page)).toHaveAttribute('data-weapon-id',user.b);
   const after=await consistent(page,game,user.address);
   expect(after.weapons).toEqual(before.weapons);
@@ -273,11 +287,59 @@ test('in-game warehouse is usable in English on mobile and keeps keyboard focus 
   await page.keyboard.press('Shift+Tab');
   expect(await dialog.evaluate(element=>element.contains(document.activeElement))).toBe(true);
   await storedItem(dialog,user.b).getByRole('button',{name:'Take out weapon',exact:true}).click();
-  await expect(storedItem(dialog,user.b)).toContainText('In workshop');
+  await expect(dialog.locator('.scene-warehouse-current')).toHaveAttribute('data-weapon-id',user.b);
+  await expect(storedItem(dialog,user.b)).toHaveCount(0);
   expect(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
   await expect.poll(()=>dialog.locator('img').evaluateAll(images=>images.every(img=>img.complete&&img.naturalWidth>0))).toBe(true);
   await page.screenshot({path:'test-results/in-game-warehouse-mobile.png'});
   await dialog.getByRole('button',{name:'Back to game'}).click();
   await expect(scene(page)).toHaveAttribute('data-weapon-id',user.b);
   await consistent(page,game,user.address);
+});
+
+
+test('warehouse shows the current weapon once and ignores unrelated forge feedback',async({page,game})=>{
+ const user=await prepare(page,game,{level:21,second:false});
+ await page.getByRole('button',{name:/领取每日补给/}).click();await idle(page);
+ await scene(page).getByRole('button',{name:'打开场景仓库'}).click();const dialog=inGameStorage(page);
+ await expect(dialog.locator('.scene-warehouse-current')).toHaveAttribute('data-weapon-id',user.a);
+ await expect(storedItem(dialog,user.a)).toHaveCount(0);await expect(dialog.locator('.scene-warehouse-list')).toContainText('仓库里没有其他武器');
+ await expect(dialog.getByRole('status')).toHaveText('仓库中的武器保留等级、热量和保护进度。');
+ await dialog.getByRole('button',{name:'存入仓库',exact:true}).click();
+ await expect(dialog.locator('.scene-warehouse-current')).toContainText('工坊空闲');await expect(storedItem(dialog,user.a)).toHaveCount(1);
+ await expect(dialog.getByRole('status')).toContainText('已存入仓库');
+ await storedItem(dialog,user.a).getByRole('button',{name:'取出武器',exact:true}).click();
+ await expect(storedItem(dialog,user.a)).toHaveCount(0);
+ await expect(dialog.getByRole('button',{name:'返回游玩'})).toBeFocused();
+ await dialog.screenshot({path:'test-results/browser/warehouse-single-current.png'});
+});
+
+test('daily swords arrive in hand, preserve the previous sword and move normally to the furnace or anvil',async({page,game})=>{
+ const user=await prepare(page,game,{level:21,second:false});
+ const original=(await state(page)).weapons.find(w=>w.id===user.a);
+ const response=page.waitForResponse(r=>r.url().endsWith('/api/supply/sword'));
+ await page.getByRole('button',{name:'领取一把',exact:true}).click();const id=(await(await response).json()).weapon_id;
+ await expect(scene(page)).toHaveAttribute('data-weapon-id',id);await expect(scene(page)).toHaveAttribute('data-place','held');
+ let current=await state(page);expect(current.weapons.find(w=>w.id===user.a)).toEqual(original);
+ await page.getByRole('button',{name:'放回锻造台',exact:true}).click();await expect(scene(page)).toHaveAttribute('data-place','anvil');
+ await page.getByRole('button',{name:'拿起长剑',exact:true}).click();await expect(scene(page)).toHaveAttribute('data-place','held');
+ await page.getByRole('button',{name:'放入熔炉',exact:true}).click();await expect(scene(page)).toHaveAttribute('data-place','furnace');
+ const warming=(await state(page)).weapons.find(w=>w.id===id);
+ const second=page.waitForResponse(r=>r.url().endsWith('/api/supply/sword'));
+ await page.getByRole('button',{name:'领取一把',exact:true}).click();const next=(await(await second).json()).weapon_id;
+ await expect(scene(page)).toHaveAttribute('data-weapon-id',next);await expect(scene(page)).toHaveAttribute('data-place','held');
+ current=await consistent(page,game,user.address);expect(current.weapons.find(w=>w.id===id)).toEqual(warming);
+ expect(current.weapons).toHaveLength(3);expect(current.player.daily_swords_remaining).toBe(1);
+});
+
+test('lost daily handoff response retries once without creating a second sword or putting it on the anvil',async({page,game})=>{
+ await register(page,false,game);await page.getByRole('button',{name:'环绕查看',exact:true}).click();const keys=[];
+ await page.route('**/api/supply/sword',async route=>{
+  keys.push(route.request().headers()['idempotency-key']);const response=await route.fetch();
+  if(keys.length===1)await route.abort('connectionreset');else await route.fulfill({response});
+ });
+ await page.getByRole('button',{name:'领取一把',exact:true}).click();
+ await expect(scene(page)).toHaveAttribute('data-place','held');expect(keys).toHaveLength(2);expect(keys[0]).toBe(keys[1]);
+ const current=await state(page);expect(current.weapons).toHaveLength(1);expect(current.player.daily_swords_remaining).toBe(2);
+ expect(current.player.workshop_weapon_id).toBe(current.weapons[0].id);
 });

@@ -70,9 +70,18 @@ storageState*.json
 # Local UI captures kept outside .local; weapon reference images stay tracked.
 /screenshots/
 /previews/
-# Manual forge-screen/route UI captures; source textures and game art stay tracked.
+# Manual UI capture copies; source textures and game art stay tracked.
 /forge-monitor-*.png
+/forge-actions-*.png
 /weapon-routes-*.png
+/weapon-route-prompt-*.png
+/workshop-storage-*.png
+/warehouse-*.png
+/in-game-warehouse*.png
+/mobile-inventory.png
+/supplies-*.png
+/staking-*.png
+/chain-history-*.png
 # Manual copies of recharge / admin UI test captures, not game artwork.
 /recharge-admins-*.png
 /recharge-treasury-*.png
@@ -84,11 +93,16 @@ storageState*.json
 /*-preview.webp
 
 # Runtime data, local credentials, deployment state and logs
-# Covers live saves, test-runs/, browser-tests-* / verify-game-* runs and backups.
+# Covers live saves, UI previews, withdrawal checks, isolated test runs and backups.
 .local/
-# Known local credentials and manually suffixed copies, in any directory.
-test-accounts.md
-test-accounts.md.*
+# Local withdrawal verification snapshots copied out of .local/.
+/withdrawal-check/
+# Local account handoff files and dated exports; public setup instructions stay tracked.
+test-accounts*.md
+test-accounts*.md.*
+test-accounts*.txt
+test-accounts*.json
+test-accounts*.csv
 mint-key
 mint-key.*
 quote-key

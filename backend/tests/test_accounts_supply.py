@@ -79,6 +79,9 @@ def test_daily_swords_concurrent_and_next_day(tmp_path):
     state=c.get('/api/state').json()
     ids={w['id'] for w in state['weapons']}
     assert len(ids)==3 and state['player']['daily_swords_remaining']==0
+    successes=[r.json() for r in results if r.status_code==200]
+    assert len({r['workshop_revision'] for r in successes})==3
+    assert state['player']['workshop_weapon_id']==max(successes,key=lambda r:r['workshop_revision'])['weapon_id']
     assert all(w['level']==0 and w['quality']=='普通' and w['source']=='daily' for w in state['weapons'])
     assert state['player']['sword_day']==datetime.now(timezone.utc).date().isoformat()
     with c.app.state.store.connection() as db:
@@ -250,3 +253,22 @@ def test_password_length_boundaries_for_registration_and_login(tmp_path,length,e
     if expected==200:
         c.post('/api/account/logout')
     assert c.post('/api/account/login',json=data).status_code==expected
+
+
+def test_daily_handoff_stores_previous_weapon_and_old_retry_cannot_reselect_it(tmp_path):
+    c,address=guest(tmp_path)
+    key=str(uuid.uuid4())
+    first=post(c,'/supply/sword',{},key=key).json()
+    with c.app.state.store.connection() as db:
+        db.execute("UPDATE weapons SET branch='rapier',level=21,heat_charges=3,protected_left=2 WHERE id=?",(first['weapon_id'],))
+    before=c.get('/api/state').json()
+    previous=next(w for w in before['weapons'] if w['id']==first['weapon_id'])
+    second=post(c,'/supply/sword',{}).json()
+    current=c.get('/api/state').json()
+    assert second['workshop_revision']==first['workshop_revision']+1
+    assert current['player']['workshop_weapon_id']==second['weapon_id']
+    assert next(w for w in current['weapons'] if w['id']==first['weapon_id'])==previous
+    assert post(c,'/supply/sword',{},key=key).json()==first
+    assert c.get('/api/state').json()==current
+    for field in ['coins','materials','shields']:
+        assert current['player'][field]==before['player'][field]

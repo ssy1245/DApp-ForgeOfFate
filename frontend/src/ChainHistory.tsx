@@ -31,7 +31,9 @@ export default function ChainHistory({deploymentId}:{deploymentId?:string}) {
   const mismatch=!!deploymentId&&!!status?.deployment&&status.deployment.deploymentId!==deploymentId;
   const explorer=status?.deployment?.chainId===11155111?'https://sepolia.etherscan.io':null;
   return <section className="chain-history" aria-label={t('链上记录与同步')}>
-    <header><h3>{t('链上记录与同步')}</h3><span role="status">{t(failed?'暂时无法读取同步状态':mismatch?'部署配置已变化，请检查监听环境':status?phases[status.state]||'正在准备监听':'正在读取同步状态')}</span></header>
+    <details>
+    <summary><h3>{t('链上记录与同步')}</h3><span role="status">{t(failed?'暂时无法读取同步状态':mismatch?'部署配置已变化，请检查监听环境':status?phases[status.state]||'正在准备监听':'正在读取同步状态')}</span><span className="chain-history-toggle"><span className="when-closed">{t('展开')}</span><span className="when-open">{t('收起')}</span><i aria-hidden="true"/></span></summary>
+    <div className="chain-history-body">
     <p>{t('市场显示最新链上状态；这里保存确认后的历史，服务器重新启动时会补查。')}</p>
     {status?.deployment&&<p className="chain-history-contract">{t('监听合约')} {explorer?<a href={`${explorer}/address/${status.deployment.address}`} target="_blank" rel="noreferrer">{status.deployment.address}</a>:<code>{status.deployment.address}</code>}</p>}
     {status?.scannedBlock!==undefined&&<dl>{[['节点高度',status.headBlock],['确认边界',status.confirmedBlock],['已扫描',status.scannedBlock],['已处理',status.processedBlock]].map(([label,value])=><div key={label}><dt>{t(String(label))}</dt><dd>{value===undefined?'—':value}</dd></div>)}</dl>}
@@ -39,5 +41,7 @@ export default function ChainHistory({deploymentId}:{deploymentId?:string}) {
     {status?.message&&status.state!=='not_started'&&<p role="alert">{t(status.message)}</p>}
     {!mismatch&&data?.items.length? <ol>{data.items.map(event=><li key={`${event.block_hash}:${event.log_index}`}><span>{t(names[event.name]||'链上事件')} <small>#{event.block_number}</small></span>{explorer?<a href={`${explorer}/tx/${event.transaction_hash}`} target="_blank" rel="noreferrer" title={event.transaction_hash}>{event.transaction_hash.slice(0,10)}…{event.transaction_hash.slice(-6)} ↗</a>:<code title={event.transaction_hash}>{event.transaction_hash.slice(0,10)}…{event.transaction_hash.slice(-6)}</code>}</li>)}</ol>:null}
     {status?.deployment?.confirmationPolicy==='finalized'&&<small>{t('Sepolia 记录等待最终确认；确认之前不会计入这份历史。')}</small>}
+    </div>
+    </details>
   </section>;
 }

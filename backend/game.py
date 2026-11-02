@@ -9,6 +9,34 @@ BALANCE['visual_tiers'] = SWORD_TIERS
 SWORD_BRANCHES = json.loads((Path(__file__).resolve().parents[1] / 'assets/3d/sword-branches.json').read_text())
 BALANCE['sword_branches'] = SWORD_BRANCHES
 
+def passed_mutation_level(level):
+    return max([0, *[r['unlock_level'] for r in SWORD_BRANCHES if r['id'] != 'longsword' and level >= r['unlock_level']]])
+
+def next_mutation(weapon):
+    # Route identity, not the current appearance, is authoritative after downgrades.
+    if weapon.get('branch', 'longsword') != 'longsword' or weapon.get('status', 'active') != 'active':
+        return None
+    checked = weapon.get('mutation_checked_level', 0)
+    for route in SWORD_BRANCHES:
+        level = route['unlock_level']
+        if route['id'] != 'longsword' and checked < level and weapon['level'] < level:
+            return {'branch': route['id'], 'level': level, 'chance': BALANCE['route_mutation_chances'][route['id']]}
+    return None
+
+def apply_mutation(weapon, result, random_roll):
+    result['mutation'] = None
+    result['mutation_checked_level'] = max(weapon.get('mutation_checked_level', 0), passed_mutation_level(weapon['level']))
+    candidate = next_mutation(weapon)
+    if not candidate or result['status'] != 'active' or result['level'] < candidate['level']:
+        return result
+    changed = random_roll() < candidate['chance']
+    result['mutation_checked_level'] = candidate['level']
+    result['mutation'] = {**candidate, 'changed': changed, 'reached_level': result['level']}
+    if changed:
+        result['branch'] = candidate['branch']
+        result['level'] = candidate['level']
+    return result
+
 def weapon_max_level(branch='longsword'):
     route=next((b for b in SWORD_BRANCHES if b['id']==branch),SWORD_BRANCHES[0])
     return min(BALANCE['max_level'],route['max_level'])

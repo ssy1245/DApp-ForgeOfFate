@@ -5,6 +5,7 @@
   "daily_shields": 5,
   "forge_materials": 10,
   "strike_materials": 2,
+  "route_mutation_chances": {"rapier": 0.3, "greatsword": 0.3},
   "weapon_economy": {
     "longsword": {
       "strike_materials": 4,

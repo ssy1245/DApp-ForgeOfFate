@@ -15,7 +15,7 @@ import WarehouseChest from './WarehouseChest';
 import WarehousePanel, { type StoredWeapon } from './WarehousePanel';
 import { ANVIL_POSITION, CABINETS, CABINET_SCALE, CABINET_FRAME, CABINET_INTERIOR, CABINET_ROTATION, isCabinet, type CabinetId, CRATE_POSITION, FURNACE_POSITION, FURNACE_RAISE, FURNACE_WIDTH_SCALE } from './workshopLayout';
 import { IMPACT_MS, SWING_MS, IMPACT_GRIP, IMPACT_ROTATION, WINDUP_GRIP, WINDUP_ROTATION, smooth } from './forgeMotion';
-import { swordTiers, swordTier, nextSwordTier, branchTiers, pendingSwordLevels, type SwordTier } from './swordTiers';
+import { swordBranches, swordTiers, swordTier, nextSwordTier, branchTiers, pendingSwordLevels, type SwordTier } from './swordTiers';
 import { modelUrl } from './modelAssets';
 import { IronAmount } from './IronIcon';
 import WardIcon from './WardIcon';
@@ -88,7 +88,7 @@ function Hammer({hit,equipped}:{hit:number;equipped:boolean}) {
 function Embers(){const ref=useRef<Group>(null);useFrame(({clock})=>{if(ref.current){ref.current.rotation.y=clock.elapsedTime*0.08;ref.current.position.y=(clock.elapsedTime*0.2)%0.7;}});return <group ref={ref}>{Array.from({length:22},(_,i)=><mesh key={i} position={[Math.sin(i*7)*2.7,0.2+(i%7)*0.45,Math.cos(i*5)*1.8]}><sphereGeometry args={[0.012+(i%3)*0.008,4,4]}/><meshBasicMaterial color={i%2?'#e79838':'#d74a24'}/></mesh>)}</group>;}
 type SwordPlace = 'anvil' | 'held' | CabinetId | 'furnace' | 'empty';
 type DisplaySlots = Partial<Record<CabinetId,string>>;
-export type SceneWeapon={recycle_price?:number;branch?:string;id:string;level:number;status:string;heat_charges:number;heat_ready_at:number;protected_left:number};
+export type SceneWeapon={next_mutation?:{branch:string;level:number;chance:number}|null;recycle_price?:number;branch?:string;id:string;level:number;status:string;heat_charges:number;heat_ready_at:number;protected_left:number};
 function HeldSword({level,heat}:{level:number;heat:number}) {
   const ref=useRef<Group>(null);
   const tier=swordTier(level,useContext(UpgradeContext));
@@ -190,9 +190,9 @@ function World({level,hit,place,heat,result,hammerEquipped,onStation,roomView,di
 </>;}
 function SceneUnavailable(){const {t}=useI18n();return <div className="scene-fallback">⚒<span>{t('命运锻造台 · 3D 暂不可用，游戏操作仍可继续')}</span></div>;}
 class Fallback extends Component<{children:ReactNode},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return{failed:true};}render(){return this.state.failed?<SceneUnavailable/>:this.props.children;}}
-export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,storageFeedback,onStoreWeapon,workshopKey,onSelectWeapon,supplyRemaining,supplyTotal,onClaimSword,result,busy,probabilities,shield,canToggleShield,shields,onShield,onPlacement,onHeat,onStrike,visualTiers=swordTiers,maxLevel,heatSeconds,heatStrikes,strikeMaterials,heatWarning='',strikeWarning='',feedback=''}: {
+export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,storageFeedback,onStoreWeapon,handOff,onStorageOpen,workshopKey,onSelectWeapon,supplyRemaining,supplyTotal,onClaimSword,result,busy,paused=false,probabilities,shield,canToggleShield,shields,onShield,onPlacement,onHeat,onStrike,visualTiers=swordTiers,maxLevel,heatSeconds,heatStrikes,strikeMaterials,heatWarning='',strikeWarning='',feedback=''}: {
   level:number;hit:number;weapon?:SceneWeapon;weapons:SceneWeapon[];workshopKey:string;onSelectWeapon:(id:string)=>void;result:string;busy:boolean;probabilities:Record<string,number>;
-  storageWeapons:StoredWeapon[];storageFeedback:string;onStoreWeapon:()=>void;
+  storageWeapons:StoredWeapon[];storageFeedback:string;onStoreWeapon:()=>void;paused?:boolean;handOff?:{id:string;key:string}|null;onStorageOpen:()=>void;
   onPlacement:(place:string)=>void;
   supplyRemaining:number|null;supplyTotal:number;onClaimSword:()=>void;
   shield:boolean;canToggleShield:boolean;shields:number;onShield:(value:boolean)=>void;onHeat:()=>void;onStrike:()=>void;visualTiers?:SwordTier[];maxLevel:number;heatSeconds:number;heatStrikes:number;
@@ -201,7 +201,9 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
  const {t, name, locale} = useI18n();
   const appearanceTiers=branchTiers(weapon?.branch,visualTiers);
   const valid=!!weapon&&weapon.status==='active';
-  const monitor:MonitorData={title:t('锻造实时屏'),weapon:weapon?name(swordTier(level,appearanceTiers)):t('等待一把新武器'),level:weapon?`+${level}`:'—',priceLabel:t('游戏内回收价'),price:weapon?.recycle_price!==undefined?`${weapon.recycle_price.toLocaleString(locale==='en'?'en-GB':'zh-CN')} ${t('游戏金币')}`:'—',next:t('下一锤 · 结果概率'),
+  const mutation=weapon?.next_mutation;
+  const mutationText=mutation?t`首次达到或跨过 +${mutation.level}：${Math.round(mutation.chance*100)}% 突变为${name(swordBranches.find(route=>route.id===mutation.branch)!)}，只判定一次。`:undefined;
+  const monitor:MonitorData={mutation:mutationText,title:t('锻造实时屏'),weapon:weapon?name(swordTier(level,appearanceTiers)):t('等待一把新武器'),level:weapon?`+${level}`:'—',priceLabel:t('游戏内回收价'),price:weapon?.recycle_price!==undefined?`${weapon.recycle_price.toLocaleString(locale==='en'?'en-GB':'zh-CN')} ${t('游戏金币')}`:'—',next:t('下一锤 · 结果概率'),
    rows:[['double',t`大成功 → +${Math.min(maxLevel,level+2)}`],['up',t`成功 → +${Math.min(maxLevel,level+1)}`],['down',t`降级 → +${Math.max(0,level-1)}`],['destroy',t('损毁 → 永久消失')],...(probabilities.saved?[['saved',t`保护生效 → +${level}`]]:[])].map(([key,label])=>({label,value:valid&&level<maxLevel?`${((probabilities[key]||0)*100).toFixed(1)}%`:'—',tone:key==='double'?'success':key==='destroy'?'danger':undefined})),
    status:t(busy?'正在结算，请稍候。':!weapon?'先取出武器，再加热锻造。':level>=maxLevel?'已达到路线等级上限':weapon.protected_left>0?'阶段保护中，不耗符':shield?'保护符已开启 · Q 取消':'概率按当前等级与保护状态更新。')};
 
@@ -223,7 +225,7 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
   const [placement,setPlacement]=useState<{id:string;key:string;place:SwordPlace}|null>(null);
   const displaySlots:DisplaySlots=Object.fromEntries(Object.entries(savedDisplaySlots).filter(([,id])=>id!==deselectedId&&weapons.some(w=>w.id===id&&w.status==='active')&&!(id===weapon?.id&&placement?.key!==workshopKey)));
   const displayedAt=weapon&&CABINETS.find(cabinet=>displaySlots[cabinet.id]===weapon.id)?.id;
-  const place:SwordPlace=!weapon?'empty':displayedAt||(placement?.id===weapon.id&&placement.key===workshopKey?placement.place:'anvil');
+  const place:SwordPlace=!weapon?'empty':displayedAt||(placement?.id===weapon.id&&placement.key===workshopKey?placement.place:handOff?.id===weapon.id&&handOff.key===workshopKey?'held':'anvil');
   const moveWeapon=useCallback((id:string,next:SwordPlace)=>{
     setDisplaySlots(slots=>{
       const updated={...slots};
@@ -254,6 +256,8 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
   const [reset,setReset]=useState(0);
   const [viewAnvil,setViewAnvil]=useState(false);
   const [hint,setHint]=useState('点击画面进入：鼠标移动转头，WASD 移动，E 拿放，Q 开关保护符；按 Esc 暂停并释放鼠标。');
+  useEffect(()=>{if(handOff?.id===weapon?.id&&handOff?.key===workshopKey)setHint('基础剑已拿到手上。可带到熔炉加热，或放回锻造台。');},[handOff,weapon?.id,workshopKey]);
+  const openWarehouse=()=>{onStorageOpen();setWarehouseOpen(true);};
   const startHeating=useCallback(()=>{if(weapon&&weapon.level>=maxLevel){setHint(`已达到当前路线最高等级 +${maxLevel}。`);return;}if(heatWarning){setHint(heatWarning);return;}onHeat();},[heatWarning,onHeat,weapon?.level,maxLevel]);
   const heatingMessage=heatWarning||strikeWarning||feedback;
   const [expanded,setExpanded]=useState(false);
@@ -262,7 +266,7 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
     if(mode==='walk'&&!active)return;
     if(busy||warehouseOpen)return;
     if(mode==='walk'&&target!==near){setHint('再走近一些，就可以交互。');return;}
-    if(target==='warehouse'){setWarehouseOpen(true);return;}
+    if(target==='warehouse'){openWarehouse();return;}
     if(target==='supply'){
       if(supplyRemaining===null){setHint('正在查询今日领剑额度，请稍候。');return;}
       if(supplyRemaining<=0){setHint('今天的基础剑已领完，UTC 零点刷新额度。');return;}
@@ -297,7 +301,7 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
       <div className="view-modes"><button aria-pressed={mode==='orbit'} onClick={()=>changeMode('orbit')}>{t('环绕查看')}</button><button aria-pressed={mode==='walk'} onClick={()=>changeMode('walk')}>{t('第一人称')}</button></div>
       <div className="view-tools">
         <button onClick={()=>{setViewAnvil(true);setMode('walk');setReset(r=>r+1);}}>{t('查看锻造屏')}</button>
-        <button aria-label={t('打开场景仓库')} aria-haspopup="dialog" onClick={()=>{setWarehouseOpen(true);}}>{t('仓库')}</button>
+        <button aria-label={t('打开场景仓库')} aria-haspopup="dialog" onClick={openWarehouse}>{t('仓库')}</button>
         <details className="view-settings"><summary>{t('视角设置')}</summary><div className="view-settings-panel">
           <label className="look-sensitivity">{t('视角灵敏度 ')}<input aria-label={t('视角灵敏度')} type="range" min="0.2" max="2.5" step="0.1" value={sensitivity} onChange={e=>setSensitivity(Number(e.target.value))}/><output>{sensitivity.toFixed(1)}×</output></label>
           <button onClick={()=>{setViewAnvil(false);setReset(r=>r+1);}}>{t('复位')}</button>
@@ -305,9 +309,9 @@ export default function ForgeScene({level,hit,weapon,weapons,storageWeapons,stor
         <button aria-pressed={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded?t('收起'):t('展开')}</button>
       </div>
     </div>
-    <details className="forge-monitor-readable"><summary>{t('放大锻造屏')}</summary><section className="forge-monitor-copy" aria-label={t('锻造实时屏')} data-level={weapon?level:''} data-price={weapon?.recycle_price??''}><h3>{monitor.weapon} {monitor.level}</h3><dl><div><dt>{monitor.priceLabel}</dt><dd>{monitor.price}</dd></div></dl><strong>{monitor.next}</strong><dl>{monitor.rows.map((row,i)=><div key={i} data-tone={row.tone}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl><p>{monitor.status}</p></section></details>
+    <details className="forge-monitor-readable"><summary>{t('放大锻造屏')}</summary><section className="forge-monitor-copy" aria-label={t('锻造实时屏')} data-level={weapon?level:''} data-price={weapon?.recycle_price??''}><h3>{monitor.weapon} {monitor.level}</h3><dl><div><dt>{monitor.priceLabel}</dt><dd>{monitor.price}</dd></div></dl><strong>{monitor.next}</strong><dl>{monitor.rows.map((row,i)=><div key={i} data-tone={row.tone}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>{monitor.mutation&&<p className="monitor-mutation">{monitor.mutation}</p>}<p>{monitor.status}</p></section></details>
     <Canvas shadows camera={{position:[6.6,6.3,9.3],fov:44}} dpr={[1,1.6]}>
-      <WorkshopControls mode={mode} reset={reset} viewAnvil={viewAnvil} suspended={warehouseOpen} sensitivity={sensitivity} onNear={setNear} onActiveChange={setActive} onError={setHint} onPrimary={strikeNow} onInteract={()=>interact(near)}/>
+      <WorkshopControls mode={mode} reset={reset} viewAnvil={viewAnvil} suspended={warehouseOpen||paused} sensitivity={sensitivity} onNear={setNear} onActiveChange={setActive} onError={setHint} onPrimary={strikeNow} onInteract={()=>interact(near)}/>
       <ForgeMonitor data={monitor}/><Suspense fallback={null}><World supplyRemaining={supplyRemaining} supplyTotal={supplyTotal} displaySlots={displaySlots} weapons={weapons} roomView={mode} level={level} hit={hit} place={place} heat={heat} result={result} hammerEquipped={hammerEquipped} onStation={station=>{if(mode==='orbit')interact(station);}}/></Suspense>
     </Canvas>
     {mode==='walk'&&!active&&!busy&&<div className="workshop-entry"><strong>{t("点击画面进入工坊")}</strong></div>}

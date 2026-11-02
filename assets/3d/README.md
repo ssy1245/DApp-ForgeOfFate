@@ -2,7 +2,7 @@
 
 [← 返回项目总览](../../README.md)
 
-更新日期：2026-10-28。当前配置 **23 个武器阶段**：共用初始剑 1 阶、骑士剑 8 阶、刺剑 8 阶、巨剑 6 阶；实际已接入 **23 套独立剑模型 + 1 把锻造锤**。巨剑 +40“熔脉龙骸”独立模型与参考图已补齐，所有路线待补外观列表为空。
+更新日期：2026-11-02。当前配置 **23 个武器阶段**：共用初始剑 1 阶、骑士剑 8 阶、刺剑 8 阶、巨剑 6 阶；实际已接入 **23 套独立剑模型 + 1 把锻造锤 + 1 个武器宝箱**。巨剑 +40“熔脉龙骸”独立模型与参考图已补齐，所有路线待补外观列表为空。
 
 `tools/Fe.png` 保留为铁材料的原始参考图；`tools/Fe-icon.png` 是去白底后的透明 UI 图标，由前端 `IronIcon.tsx` 引用，使用暗色底框并适当放大；它不属于三维模型清单，也不加载到场景。顶部余额、每日补给、锻造与强化消耗、铁块购买入口共用这张图，数量仍由后端 `materials` 记录。
 
@@ -22,14 +22,14 @@
 
 ## 当前可以玩的路线
 
-基础剑达到 **+5** 后可主动选择刺剑；达到 **+10** 后可主动选择巨剑，也可继续骑士剑路线。不会自动变成巨剑。切换免费，要求当前等级达到目标路线门槛、未超过目标路线最高等级，且武器尚未封存。骑士剑按 +0 / +10 / +20 / +30 / +40 / +50 / +60 / +70 / +80 升级，刺剑额外包含 +5 基础形态，巨剑从 +10 起每十级进入下一阶段，六阶均使用独立模型。骑士剑最高 **+90**、巨剑最高 **+70**，刺剑最高 **+80**；NFT 封存门槛仍为 +50。骑士剑 +70／+80 模型及参考图均已接入，待补外观列表已清空；+80 正式名称为“最后的黎明 / The Last Dawn”。巨剑 +60～+70、刺剑 +70～+80 保持各自最终外观。
+骑士剑首次达到或跨过 **+5** 时以 **30%** 概率突变为刺剑 +5；仍是骑士剑时，首次达到或跨过 **+10** 以 **30%** 概率突变为巨剑 +10。失败保留实际强化等级，两个门槛各判定一次；降级、重试或重启不能重抽。刺剑和巨剑永久保留路线，不再参与突变判定。骑士剑最高 **+90**、巨剑最高 **+70**、刺剑最高 **+80**；只有达到各路线最终形态（骑士剑 +80、刺剑 +70、巨剑 +60）才能封存并铭刻 NFT。
 
 同一路线在相邻节点之间沿用前一阶段外观；超过路线最高等级的节点记为“—”。
 
 | 等级节点 | 骑士剑路线 | 刺剑路线 | 巨剑路线 |
 |---|---|---|---|
 | +0 | 余烬长剑 | 共用余烬长剑 | 共用余烬长剑 |
-| +5 | 余烬长剑 | 精铁刺剑 | 共用余烬长剑，尚未开放巨剑选择 |
+| +5 | 余烬长剑 | 精铁刺剑 | 共用余烬长剑，尚未达到巨剑突变门槛 |
 | +10 | 精铁骑士剑 | 银锋刺剑 | 铁匠大剑 |
 | +20 | 银誓长剑 | 宫廷细剑 | 烬炉大剑 |
 | +30 | 王国卫剑 | 鸢尾刺剑 | 渊角龙骸 |
@@ -125,15 +125,15 @@ flowchart TD
 
 ## 当前程序规则
 
-- 在锻造页的“武器路线”选择框切换骑士剑／刺剑／巨剑，每个选项显示自己的解锁等级和最高等级。骑士剑／刺剑选择门槛沿用 +5，巨剑为 +10，封存后全部不可切换；默认继续骑士剑路线。
-- 默认骑士剑可免费选定刺剑或巨剑，但选定后路线固定，不能转回或改走另一条路线；当前等级超过目标路线最高等级时拒绝选择并保留原路线与等级。强化概率仍共用，铁块消耗和系统回收等级曲线已按路线区分。
+- 锻造页展示三条路线、突变概率和门槛；服务器在强化事务中自动判定，仅突变成功时弹窗展示结果，未触发则继续锻造，不提供手动切换。
+- 新剑默认骑士剑；已有高等级武器与测试直接生成的高等级武器不补抽已通过的门槛。强化概率仍共用，铁块消耗和系统回收等级曲线按路线区分。
 - 剑种存入数据库，刷新、重新登录、强化和降级都保留。默认新剑属于骑士剑路线。
 - 刺剑降至 +5 以下、巨剑降至 +10 以下时恢复共用余烬长剑外观，剑种选择仍保留；升回门槛后自动恢复对应路线。巨剑降级后仍固定为巨剑路线，不能趁基础外观阶段重新选择其他路线。其余节点的升级和降级也跟随当前等级切换。
 - 铁砧、手持、熔炉、展示柜和背包使用同一条路线与当前阶段；骑士剑从 +0～+90 使用完整升级外观，+80～+90 共用最后的黎明；巨剑 +60～+70、刺剑 +70～+80 的最终外观不再变化。
 - 刺剑八阶依次采用 3.5 / 3.5 / 3.55 / 3.6 / 3.7 / 3.85 / 4.0 / 4.15 的场景长度。+60 赤蔷誓约延续红宝石皇冠与赤星纹章，+70 炽翼天使加入白银羽翼护手，为 +70～+80 的终阶外观；设计描述已同步至配置，八阶双语描述与故事已接入前端。
 - 巨剑六阶场景长度依次为 4.2 / 4.5 / 4.8 / 4.95 / 5.1 / 5.4，均使用对应独立模型。铁砧保留完整尺寸；手持长度最多 1.3，炉内长度最多 2.5，均按比例适配。展示柜沿用上下至少 10% 总余量的适配规则。
 - 封存后不可切换剑种。新铸造 NFT 的名称及 `Weapon Type` 属性记录当前路线；已有 NFT 元数据不重写。
-- 最高等级按路线结算：骑士剑 +90、巨剑 +70、刺剑 +80。单次 +1／+2 均不能越过上限；满级拒绝加热和敲击，不消耗资源。测试刷剑默认骑士剑、最高 +90，调整已有武器按其路线限高。强化概率、保护机制与 +50 封存门槛保持现有配置；每锤铁块为巨剑 7、骑士剑 4、刺剑 3，低于本路线第一阶外观时为共同基础剑的 2。三条路线系统回收价每一级变化，等级节点间线性递增；骑士剑+70 为 30,000,000、+80 为 60,000,000、+90 为 100,000,000 金币，+80～+90 沿用最后的黎明外观，巨剑 +70 满级为 300,000,000 金币，刺剑 +80 满级为 80,000,000 金币。巨剑 +60～+70、刺剑 +70～+80 沿用终阶模型时也逐级涨价。详细价格与消耗估算见主 README“铁块消耗与路线回收价”。
+- 最高等级按路线结算：骑士剑 +90、巨剑 +70、刺剑 +80。单次 +1／+2 均不能越过上限；满级拒绝加热和敲击，不消耗资源。测试刷剑默认骑士剑、最高 +90，调整已有武器按其路线限高。强化概率与保护机制保持现有配置；封存门槛为各路线最终形态；每锤铁块为巨剑 7、骑士剑 4、刺剑 3，低于本路线第一阶外观时为共同基础剑的 2。三条路线系统回收价每一级变化，等级节点间线性递增；骑士剑+70 为 30,000,000、+80 为 60,000,000、+90 为 100,000,000 金币，+80～+90 沿用最后的黎明外观，巨剑 +70 满级为 300,000,000 金币，刺剑 +80 满级为 80,000,000 金币。巨剑 +60～+70、刺剑 +70～+80 沿用终阶模型时也逐级涨价。详细价格与消耗估算见主 README“铁块消耗与路线回收价”。
 
 ## 配置与维护
 
@@ -202,12 +202,16 @@ Blender 导出 glTF 时会把四边面和多边面转换为三角面：[Blender 
 
 展示柜、房间背墙、结构木梁与地面网格已由程序生成，目前不需要额外生成这些模型。已支持工坊环绕视角、第一人称移动与长剑拿放；现有长剑模型可直接用于台面、手持和柜内展示。
 
+## 已接入的武器宝箱
+
+`weapon storage.glb` 位于工坊左侧仓库入口，保留原始木质 / 金属贴图和比例，底部贴地，正面朝向过道。比原先占位宝箱放大约 25%，碰撞范围与招牌同步调整。点击或靠近按 E 打开现有武器仓库；资源加载失败时保留可交互的备用箱体。开发服务与生产打包均包含该模型，参考图为 `assets/reference_page/Fantasy Weapon Chest Orthographic Turnaround.png`。
+
 ## 已接入的锻造锤
 
 用户提供的 `fantasy+hammer+3d+model.glb` 已改名为 `hammer.glb` 并接入。模型约 396 KB、2,418 个三角面。锤子不再作为场景中的悬浮物；第一人称走近铁砧且剑位于台面时自动取出，拿起剑、离开铁砧、将剑放入展示柜或切换环绕模式时自动收起，取用与收起有短暂过渡动画。
 
 ## Runtime asset checks
 
-All 22 sword GLBs and the forging hammer are connected. Sword geometry ranges from 1,771 to 7,246 triangles; textures are embedded, with no external image or buffer dependencies. The supplied assets use Y as their longest axis. Greatswords point toward +Y and declare `tip_direction: positive_y`; imported models are aligned before the shared placement rotations are applied.
+All 23 sword GLBs, the forging hammer and the weapon-storage chest are connected. Sword geometry ranges from 1,771 to 7,246 triangles; textures are embedded, with no external image or buffer dependencies. The supplied assets use Y as their longest axis. Greatswords point toward +Y and declare `tip_direction: positive_y`; imported models are aligned before the shared placement rotations are applied.
 
 The catalog is authoritative for names, models, stage thresholds and normalized lengths. Knight stages include +0 / +10 / +20 / +30 / +40 / +50 / +60 / +70 / +80. Rapier adds a +5 mutation stage before +10 / +20 / +30 / +40 / +50 / +60 / +70, sharing the initial sword below +5. Greatsword unlocks at +10 and has stages at +10 / +20 / +30 / +40 / +50 / +60. All six stages use independent GLBs, including the new +40 Moltenvein Dragonbone. The +50 and +60 stages are Abyssal Furnace and Sovereign of Ash, sharing the initial sword below +10. Route caps are +90 for knight swords, +70 for greatswords and +80 for rapiers. All knight stages and reference images are connected, with a distinct final model at +80 (officially named The Last Dawn) that remains through +90. No +90 model is required. No knight visual levels remain pending. Greatsword +60 remains through +70, and rapier +70 remains through +80. The player's selected branch survives downgrades, and sealed weapons remain fixed.

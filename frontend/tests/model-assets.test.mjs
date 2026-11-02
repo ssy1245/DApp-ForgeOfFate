@@ -17,6 +17,7 @@ const models = [...new Set([
   ...catalog.map(tier => tier.model),
   ...branches.flatMap(branch => branch.tiers ?? []).map(tier => tier.model),
   'hammer',
+  'weapon storage',
 ])];
 
 for (const mode of ['development', 'preview']) {

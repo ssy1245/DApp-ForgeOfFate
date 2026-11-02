@@ -4,6 +4,8 @@ test('chain history distinguishes a stopped listener, saved progress and a chain
   await register(page,false,game);
   await page.getByRole('button',{name:'命运集市',exact:false}).click();
   const panel=page.getByRole('region',{name:'链上记录与同步'});
+  await expect(panel.locator('details')).not.toHaveAttribute('open','');
+  await expect(panel.locator('.chain-history-body')).not.toBeVisible();
   await expect(panel.getByRole('status')).toHaveText('监听尚未启动');
   const manifest={address:'0x'+'11'.repeat(20),chainId:11155111,deploymentId:'fixture',deploymentBlock:1,confirmationPolicy:'finalized'};
   game.sql('INSERT INTO chain_environment VALUES(1,?,?)',['fixture',JSON.stringify(manifest)]);
@@ -12,6 +14,7 @@ test('chain history distinguishes a stopped listener, saved progress and a chain
   game.sql('INSERT INTO chain_events VALUES(?,?,?,?,?,?,?,?,?)',['0x'+'22'.repeat(32),0,100,tx,0,manifest.address,'Transfer',JSON.stringify({tokenId:(2n**255n).toString(),to:manifest.address}),1]);
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await expect(panel.getByRole('status')).toHaveText('已同步确认记录');
+  await panel.locator('summary').focus();await page.keyboard.press('Enter');
   await expect(panel.getByText('NFT 转移',{exact:false})).toBeVisible();
   await expect(panel.locator('a').last()).toHaveAttribute('href','https://sepolia.etherscan.io/tx/'+tx);
   await expect(panel.locator('dd')).toHaveText(['110','100','100','100']);
@@ -23,4 +26,7 @@ test('chain history distinguishes a stopped listener, saved progress and a chain
   await expect(page.getByRole('region',{name:'On-chain history and sync'}).getByRole('alert')).toContainText('Indexing is paused');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.getByRole('region',{name:'On-chain history and sync'}).screenshot({path:'test-results/chain-history.png'});
+  const english=page.getByRole('region',{name:'On-chain history and sync'});
+  await english.locator('summary').click();await expect(english.locator('.chain-history-body')).not.toBeVisible();
+  await expect(english.getByRole('status')).toContainText('paused');
 });

@@ -24,7 +24,7 @@ from chain.server.wallets import identity, create_challenge, bind_wallet, check_
 from chain.server.rpc import ChainSettings, ChainReader
 from chain.server.nft import mint_authorization
 from chain.server.diagnostics import inspect_chain
-from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, weapon_mint_level, weapon_can_mint, SWORD_BRANCHES
+from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, weapon_mint_level, weapon_can_mint, SWORD_BRANCHES, next_mutation, apply_mutation, passed_mutation_level
 
 LOCAL = ChainSettings.from_env().directory
 
@@ -182,7 +182,7 @@ def create_app(db_path=None, demo=None):
 
     def new_weapon(db, address, level=0, demo_flag=0):
         wid = '0x' + secrets.token_hex(32)
-        db.execute('INSERT INTO weapons(id,owner,level,demo,created) VALUES(?,?,?,?,?)', (wid, address, level, demo_flag, time.time_ns()))
+        db.execute('INSERT INTO weapons(id,owner,level,demo,created,mutation_checked_level) VALUES(?,?,?,?,?,?)', (wid, address, level, demo_flag, time.time_ns(), passed_mutation_level(level)))
         if workshop(db, address)['workshop_weapon_id'] is None:
             db.execute('UPDATE players SET workshop_weapon_id=?,workshop_revision=workshop_revision+1 WHERE address=?', (wid, address))
         return wid
@@ -413,6 +413,7 @@ def create_app(db_path=None, demo=None):
             w['recycle_price'] = recycle_price(w['level'], w['branch'])
             w['strike_materials'] = strike_material_cost(w['level'], w['branch'])
             w['branch_locked'] = w['branch'] != 'longsword'
+            w['next_mutation'] = next_mutation(w)
         return {'player': player, 'weapons': weapons,'can_rescue':demo_enabled and player['daily_swords_remaining']==0 and not any(w['status']=='active' for w in weapons)}
 
     @app.get('/api/mail')
@@ -487,8 +488,12 @@ def create_app(db_path=None, demo=None):
             wid=new_weapon(db,address)
             db.execute("UPDATE weapons SET source='daily' WHERE id=?",(wid,))
             db.execute('UPDATE players SET sword_day=?,daily_swords_claimed=? WHERE address=?',(day,claimed+1,address))
+            # Claiming a sword equips that exact instance; the previous weapon
+            # remains intact in storage. Retries return this same handoff record.
+            db.execute('UPDATE players SET workshop_revision=workshop_revision+CASE WHEN workshop_weapon_id IS ? THEN 0 ELSE 1 END,workshop_weapon_id=? WHERE address=?',(wid,wid,address))
+            revision=db.execute('SELECT workshop_revision FROM players WHERE address=?',(address,)).fetchone()[0]
             remaining=BALANCE['daily_swords']-claimed-1
-            return {'weapon_id':wid,'daily_swords_remaining':remaining,'message':f'已领取一把 +0 普通剑，今日还可领 {remaining} 把。'}
+            return {'weapon_id':wid,'workshop_revision':revision,'daily_swords_remaining':remaining,'message':f'基础剑已拿到手上，原武器已存回仓库；今日还可领 {remaining} 把。'}
         return mutate(address,idempotency_key,'daily_sword',{},run)
 
     @app.post('/api/claim')
@@ -584,7 +589,7 @@ def create_app(db_path=None, demo=None):
             if body.level is not None:
                 limit=weapon_max_level(w['branch'])
                 if body.level>limit:raise HTTPException(409,f'当前路线最高 +{limit}，不能设置更高等级。')
-                db.execute('UPDATE weapons SET level=? WHERE id=?',(body.level,wid))
+                db.execute('UPDATE weapons SET level=?,mutation_checked_level=MAX(mutation_checked_level,?) WHERE id=?',(body.level,passed_mutation_level(body.level),wid))
             if body.protected_left is not None:db.execute('UPDATE weapons SET protected_left=? WHERE id=?',(body.protected_left,wid))
             if body.heated is not None:db.execute('UPDATE weapons SET heat_ready_at=0,heat_charges=? WHERE id=?',(BALANCE['heat_strikes'] if body.heated else 0,wid))
             db.execute("UPDATE weapons SET demo=1,source='cheat' WHERE id=?",(wid,))
@@ -640,25 +645,9 @@ def create_app(db_path=None, demo=None):
     @app.post('/api/weapons/{wid}/branch')
     def choose_branch(wid: str, body: BranchChoice, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None)):
         address = authenticated(authorization)
-        def run(db):
-            w = owned(db, address, wid)
-            branch = next(b for b in SWORD_BRANCHES if b['id'] == body.branch)
-            if ((body.expected_level is not None and body.expected_level != w['level'])
-                    or (body.expected_branch is not None and body.expected_branch != w['branch'])):
-                raise HTTPException(409, '武器等级或路线已变化，请刷新后重新确认转路线。')
-            if w['branch'] != 'longsword' and body.branch != w['branch']:
-                raise HTTPException(409, '已选定刺剑或巨剑路线，无法再更换；降级不会解除路线锁定。')
-            if w['level'] < branch['unlock_level']:
-                raise HTTPException(409, f"强化至 +{branch['unlock_level']} 后可选择突变路线。")
-            if w['level'] > weapon_max_level(w['branch']):
-                raise HTTPException(409, '武器等级超过当前路线上限，请刷新后重试。')
-            if w['branch'] == body.branch:
-                return {'weapon_id':wid,'branch':body.branch,'level':w['level'],'message':'武器已在该路线，无需重复切换。'}
-            level = branch['unlock_level']
-            db.execute('UPDATE weapons SET branch=?,level=? WHERE id=?', (body.branch, level, wid))
-            return {'weapon_id': wid, 'branch': body.branch, 'level':level,
-                    'message': f"已转为{branch['name']}，等级重置为 +{level}。该路线已固定，无法再更换。"}
-        return mutate(address, idempotency_key, 'branch/' + wid, body.model_dump(), run)
+        with store.connection() as db:
+            owned(db, address, wid)
+        raise HTTPException(409, '武器路线由强化时的概率突变决定，无法再更换或手动切换。')
 
     @app.post('/api/weapons/{wid}/heat')
     def heat(wid: str, authorization: str | None = Header(default=None), idempotency_key: str | None = Header(default=None), x_forge_workshop_revision: int | None = Header(default=None, ge=0)):
@@ -701,8 +690,9 @@ def create_app(db_path=None, demo=None):
                 if db.execute('SELECT shields FROM players WHERE address=?', (address,)).fetchone()['shields'] < 1:
                     raise HTTPException(409, '保护符不足，请补充保护符或关闭保护后再敲击。')
             result = strike(w, secrets.randbelow(1_000_000) / 1_000_000, body.shield)
+            apply_mutation(dict(w), result, lambda: secrets.randbelow(1_000_000) / 1_000_000)
             charge(db, address, materials=cost, shields=int(result['shield_used']))
-            db.execute('UPDATE weapons SET level=?,strikes=?,protected_left=?,status=?,heat_charges=heat_charges-1 WHERE id=?', (result['level'], result['strikes'], result['protected_left'], result['status'], wid))
+            db.execute('UPDATE weapons SET level=?,branch=?,mutation_checked_level=?,strikes=?,protected_left=?,status=?,heat_charges=heat_charges-1 WHERE id=?', (result['level'], result['branch'], result['mutation_checked_level'], result['strikes'], result['protected_left'], result['status'], wid))
             if result['status'] == 'destroyed':
                 clear_workshop(db, address, wid)
             result['heat_charges'] = w['heat_charges']-1

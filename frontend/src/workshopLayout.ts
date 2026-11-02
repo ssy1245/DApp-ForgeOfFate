@@ -22,7 +22,7 @@ export function isCabinet(station:string|null):station is CabinetId {
 export const CRATE_POSITION = [-8.8, -0.35, 8.55] as const;
 // Back edge sits just inside the left wall; the interaction point faces the aisle.
 export const WAREHOUSE_POSITION = [-8.95, -0.75, 0.4] as const;
-export const WAREHOUSE_FOOTPRINT = {halfDepth:0.78,halfWidth:1.36,clearance:0.3};
+export const WAREHOUSE_FOOTPRINT = {halfDepth:0.975,halfWidth:1.7,clearance:0.3};
 export const SWORD_SUPPLY_POSITION = [-8.9, -0.75, 5] as const;
 export const SWORD_SUPPLY_FOOTPRINT = {halfDepth:0.65,halfWidth:1.6,clearance:0.3};
 export const FURNACE_POSITION = [-7.1, -0.75, -5.2] as const;

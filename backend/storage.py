@@ -2,7 +2,7 @@
 import sqlite3
 from pathlib import Path
 from contextlib import contextmanager
-from .game import BALANCE
+from .game import BALANCE, passed_mutation_level
 from chain.server.store import migrate_chain
 from chain.server.wallets import migrate_wallets
 from .mailbox import migrate_mailbox
@@ -35,6 +35,11 @@ class Store:
             for table,column,definition in [('accounts','role',"TEXT NOT NULL DEFAULT 'player'"),('weapons','heat_ready_at','REAL DEFAULT 0'),('weapons','heat_charges','INTEGER DEFAULT 0'),('players','guest','INTEGER DEFAULT 0'),('challenges','guest_owner','TEXT'),('players','sword_day','TEXT'),('weapons','quality',"TEXT DEFAULT '普通'"),('weapons','source',"TEXT DEFAULT 'forge'"),('weapons','branch',"TEXT NOT NULL DEFAULT 'longsword'")]:
                 if column not in {row['name'] for row in db.execute(f'PRAGMA table_info({table})')}:
                     db.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
+            if 'mutation_checked_level' not in {row['name'] for row in db.execute('PRAGMA table_info(weapons)')}:
+                db.execute('ALTER TABLE weapons ADD COLUMN mutation_checked_level INTEGER NOT NULL DEFAULT 0')
+                # Preserve existing weapons. Older milestones are consumed, never rerolled.
+                for row in db.execute('SELECT id,level FROM weapons').fetchall():
+                    db.execute('UPDATE weapons SET mutation_checked_level=? WHERE id=?', (passed_mutation_level(row['level']), row['id']))
             if 'daily_swords_claimed' not in {row['name'] for row in db.execute('PRAGMA table_info(players)')}:
                 db.execute('ALTER TABLE players ADD COLUMN daily_swords_claimed INTEGER NOT NULL DEFAULT 0')
                 # Earlier versions delivered the entire allowance when state was read.

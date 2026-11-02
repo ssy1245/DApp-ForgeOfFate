@@ -33,16 +33,18 @@ test('forge monitor matches server price and per-strike odds, protection, cap an
  game.sql("UPDATE weapons SET status='destroyed' WHERE id=?",[sword.id]);await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
  await expect(monitor).toHaveAttribute('data-price','');await expect(monitor).toContainText('等待一把新武器');
 });
-test('route cards explain unlocks, reset confirmation, irreversible choice and bilingual mobile layout',async({page,game})=>{
- await register(page,true,game);const sword=await spawn(page,4);const routes=page.getByRole('region',{name:'选择武器路线'});
- await expect(routes).toContainText('骑士剑是起点');await expect(routes.getByRole('button',{name:'转为刺剑',exact:true})).toBeDisabled();
- await expect(routes.locator('[data-route=rapier]')).toContainText('还需强化 1 级');
- game.sql('UPDATE weapons SET level=5 WHERE id=?',[sword.id]);await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
- await expect(routes.getByRole('button',{name:'转为刺剑',exact:true})).toBeEnabled();await expect(routes.getByRole('button',{name:'转为巨剑',exact:true})).toBeDisabled();
- await routes.getByRole('button',{name:'转为刺剑',exact:true}).click();await agree(page);
- await expect(routes.locator('[data-route=rapier]')).toHaveAttribute('data-current','true');await expect(routes).toContainText('不能转回骑士剑');
- await expect(routes.locator('[data-route=greatsword] button')).toBeDisabled();
+test('route cards explain mutation odds, irreversible routes and bilingual mobile layout',async({page,game})=>{
+ await register(page,true,game);const sword=await spawn(page,4);const routes=page.getByRole('region',{name:'武器突变路线'});
+ await expect(routes).toContainText('骑士剑首次达到或跨过 +5');await expect(routes.locator('button')).toHaveCount(0);
+ await expect(routes).toContainText('每把武器最多判定两次');await expect(routes).toContainText('降级、重试和重启不会重抽');
+ await expect(routes.locator('[data-route=rapier]')).toContainText('突变成功率 30%');
+ await page.getByText('放大锻造屏',{exact:true}).click();
+ await expect(page.getByRole('region',{name:'锻造实时屏'})).toContainText('首次达到或跨过 +5：30% 突变为刺剑');
+ game.sql("UPDATE weapons SET branch='rapier',level=5,mutation_checked_level=5 WHERE id=?",[sword.id]);await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await expect(routes.locator('[data-route=rapier]')).toHaveAttribute('data-current','true');await expect(routes).toContainText('此后不再参与任何路线突变判定');
+ await expect(routes.locator('[data-route=greatsword]')).toContainText('不会再次判定');
+ await expect(page.locator('.monitor-mutation')).toHaveCount(0);
  await page.getByRole('button',{name:'Switch to English',exact:true}).click();await page.setViewportSize({width:390,height:844});
- const english=page.getByRole('region',{name:'Choose a weapon route'});await expect(english).toContainText('Your route is fixed');
+ const english=page.getByRole('region',{name:'Weapon mutation routes'});await expect(english).toContainText('Your route is fixed');
  expect(await english.evaluate(el=>el.scrollWidth<=el.clientWidth+2)).toBe(true);await english.screenshot({path:'test-results/browser/weapon-routes-mobile.png'});
 });

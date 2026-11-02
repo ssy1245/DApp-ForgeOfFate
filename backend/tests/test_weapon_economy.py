@@ -158,14 +158,14 @@ def test_selected_route_stays_locked_after_downgrades_and_restart(client,source,
     assert restored.get('/api/state',headers=h).json()==before
 
 
-def test_competing_route_choices_only_commit_one(client):
+def test_competing_manual_route_requests_are_both_rejected(client):
     h,*_=login(client);wid=forge(client,h)
     with client.app.state.store.connection() as db:
         db.execute('UPDATE weapons SET level=10 WHERE id=?',(wid,))
     with ThreadPoolExecutor(max_workers=2) as pool:
         codes=list(pool.map(lambda branch:post(client,f'/weapons/{wid}/branch',h,{'branch':branch}).status_code,['rapier','greatsword']))
-    assert sorted(codes)==[200,409]
-    assert weapon(client,h)['branch_locked']
+    assert sorted(codes)==[409,409]
+    assert weapon(client,h)['branch']=='longsword'
 
 
 def test_economy_config_drives_display_and_deduction(client,monkeypatch):

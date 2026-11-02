@@ -191,8 +191,7 @@ async function main() {
     await tester.request('/cheats/resources', { resource: 'all', amount: 100000 });
     const routes = [];
     for (const branch of ['longsword', 'rapier', 'greatsword']) {
-      const spawned = await tester.request('/cheats/weapons', { count: 1, level: 20 });
-      if (branch !== 'longsword') await tester.request(`/weapons/${spawned.weapon_id}/branch`, { branch });
+      const spawned = await tester.request('/cheats/weapons', { count: 1, level: branch === 'longsword' ? 20 : branch === 'rapier' ? 5 : 10, branch });
       routes.push({ branch, id: spawned.weapon_id });
     }
     const routeBefore = await tester.state();

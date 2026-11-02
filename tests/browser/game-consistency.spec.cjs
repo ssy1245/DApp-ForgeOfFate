@@ -58,9 +58,9 @@ test('real heating, protected strike, shops and recycle stay consistent', async 
   const after = await consistent(page, game, user.address);
   expect(after.player.materials).toBe(before.player.materials - 4);
   expect(after.weapons[0].heat_charges).toBe(4);
-  await expect(page.locator('.level-line').first()).toContainText(`+${after.weapons[0].level}`);
+  await expect(page.locator('.forge-current-level')).toContainText(`+${after.weapons[0].level}`);
   const shopButton = page.getByRole('button', { name: /购买 \+0 普通剑/ });
-  await expect(shopButton).toContainText('2,500');
+  await expect(page.locator('.supply-product-sword .supply-product-price')).toContainText('2,500');
   await clickAction(page, shopButton, '/shop/sword');
   const bought = (await state(page)).weapons.find(w => w.source === 'coin_shop');
   expect(bought).toMatchObject({ level: 0, quality: '普通', recycle_price: 1000 });
@@ -77,12 +77,12 @@ test('real heating, protected strike, shops and recycle stay consistent', async 
   expect(recycled.player.coins).toBe(snapshot.player.coins + snapshot.weapons[0].recycle_price);
 });
 
-test('route choice, seal and language switching preserve the same weapon', async ({ page, game }) => {
+test('mutated route, seal and language switching preserve the same weapon', async ({ page, game }) => {
   const user = await register(page, true, game);
-  const sword = await spawnSword(page, 70);
-  await page.getByRole('button',{name:'转为刺剑',exact:true}).click(); await agree(page); await idle(page);
-  await expect(page.locator('[data-route=rapier] button')).toBeDisabled();
-  expect(game.sql('SELECT level FROM weapons WHERE id=?',[sword.id])[0].level).toBe(5);
+  await page.getByRole('combobox',{name:/基础武器/}).selectOption('rapier');
+  const sword = await spawnSword(page, 5);
+  await expect(page.locator('[data-route=rapier]')).toHaveAttribute('data-current','true');
+  await expect(page.locator('.weapon-routes button')).toHaveCount(0);
   game.sql('UPDATE weapons SET level=70 WHERE id=?',[sword.id]);
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await bag(page);
@@ -99,20 +99,12 @@ test('route choice, seal and language switching preserve the same weapon', async
   await expect(page.locator('.card-status')).toHaveText('Permanently sealed');
 });
 
-for(const [branch,start,label] of [['rapier',5,'刺剑'],['greatsword',10,'巨剑']])test(`${branch} warns before resetting a high-level sword and locks the chosen route`,async({page,game})=>{
+test('high-level swords keep their current route and cannot select another manually',async({page,game})=>{
   await register(page,true,game);const sword=await spawnSword(page,90);
-  const selector=page.locator(`[data-route=${branch}] button`);
-  await selector.click();
-  const dialog=page.getByRole('alertdialog');
-  await expect(dialog).toContainText(`转为${label}后，当前 +90 将重置为 +${start}`);
-  await dialog.getByRole('button',{name:'取消',exact:true}).click();
-  expect(game.sql('SELECT branch,level FROM weapons WHERE id=?',[sword.id])[0]).toEqual({branch:'longsword',level:90});
+  await expect(page.locator('.weapon-routes button')).toHaveCount(0);
   await expect(page.locator('[data-route=longsword]')).toHaveAttribute('data-current','true');
-  await selector.click();await agree(page);await idle(page);
-  await expect(selector).toBeDisabled();
-  expect(game.sql('SELECT branch,level FROM weapons WHERE id=?',[sword.id])[0]).toEqual({branch,level:start});
-  await bag(page);
-  await expect(page.locator(`[data-weapon-id="${sword.id}"]`).getByRole('button',{name:/^封存/})).toBeDisabled();
+  await expect(page.locator('.weapon-routes')).toContainText('每把武器最多判定两次，不能手动切换');
+  expect(game.sql('SELECT branch,level,mutation_checked_level FROM weapons WHERE id=?',[sword.id])[0]).toEqual({branch:'longsword',level:90,mutation_checked_level:10});
 });
 
 for(const [branch,minimum] of [['longsword',80],['rapier',70],['greatsword',60]])test(`${branch} final form gates sealing while recycling stays available`,async({page,game})=>{
@@ -254,8 +246,8 @@ test('mobile inventory and language switch keep database values unchanged', asyn
   await consistent(page, game, user.address);
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await consistent(page, game, user.address);
-  await page.locator('.weapon-reference').scrollIntoViewIfNeeded();
-  await expect.poll(() => page.locator('.weapon-reference').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+  await page.locator('.weapon-card .weapon-reference').scrollIntoViewIfNeeded();
+  await expect.poll(() => page.locator('.weapon-card .weapon-reference').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/mobile-inventory.png', fullPage: true });
 });

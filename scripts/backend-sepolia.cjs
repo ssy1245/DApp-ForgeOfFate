@@ -11,7 +11,7 @@ try {
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw Error();
   if (process.argv.slice(2).some(arg => arg !== '--demo')) throw Error();
   const child = spawn(path.join(root, '.venv/bin/python'), ['-m', 'uvicorn', 'backend.app:app', '--host', '127.0.0.1', '--port', '8000', '--reload', '--reload-dir', 'backend', '--reload-dir', 'chain/server', '--reload-dir', 'assets/3d', '--reload-include', 'balance.json', '--reload-include', 'sword-tiers.json', '--reload-include', 'sword-branches.json'], {
-    cwd: root, stdio: 'inherit', env: { ...process.env, FORGE_NETWORK: 'sepolia', FORGE_LOCAL_DIR: path.join(root, '.local/sepolia'), FORGE_RPC_URL: rpc, DEMO_MODE: process.argv.includes('--demo') ? '1' : '0' },
+    cwd: root, stdio: 'inherit', env: { ...process.env, FORGE_RECHARGE_WEI_PER_UNIT:config.FORGE_RECHARGE_WEI_PER_UNIT||'10000000000000000',FORGE_RECHARGE_COINS_PER_UNIT:config.FORGE_RECHARGE_COINS_PER_UNIT||'10000',FORGE_NETWORK: 'sepolia', FORGE_LOCAL_DIR: path.join(root, '.local/sepolia'), FORGE_RPC_URL: rpc, DEMO_MODE: process.argv.includes('--demo') ? '1' : '0' },
   });
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
   child.on('exit', code => { process.exitCode = code || 0; });

@@ -79,9 +79,12 @@ test('real heating, protected strike, shops and recycle stay consistent', async 
 
 test('route choice, seal and language switching preserve the same weapon', async ({ page, game }) => {
   const user = await register(page, true, game);
-  const sword = await spawnSword(page, 50);
-  await page.getByLabel('武器路线 · 按等级解锁', { exact: true }).selectOption('rapier'); await agree(page); await idle(page);
-  await expect(page.getByLabel('武器路线 · 按等级解锁', { exact: true })).toBeDisabled();
+  const sword = await spawnSword(page, 70);
+  await page.getByRole('button',{name:'转为刺剑',exact:true}).click(); await agree(page); await idle(page);
+  await expect(page.locator('[data-route=rapier] button')).toBeDisabled();
+  expect(game.sql('SELECT level FROM weapons WHERE id=?',[sword.id])[0].level).toBe(5);
+  game.sql('UPDATE weapons SET level=70 WHERE id=?',[sword.id]);
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await bag(page);
   await page.getByRole('button', { name: '封存', exact: true }).click(); await agree(page);
   await expect(page.locator('.card-status')).toHaveText('已永久封存');
@@ -94,6 +97,40 @@ test('route choice, seal and language switching preserve the same weapon', async
   await expect(page.locator('html')).toBeVisible();
   await page.locator('.nav-item').filter({ hasText: 'Weapon warehouse' }).click();
   await expect(page.locator('.card-status')).toHaveText('Permanently sealed');
+});
+
+for(const [branch,start,label] of [['rapier',5,'刺剑'],['greatsword',10,'巨剑']])test(`${branch} warns before resetting a high-level sword and locks the chosen route`,async({page,game})=>{
+  await register(page,true,game);const sword=await spawnSword(page,90);
+  const selector=page.locator(`[data-route=${branch}] button`);
+  await selector.click();
+  const dialog=page.getByRole('alertdialog');
+  await expect(dialog).toContainText(`转为${label}后，当前 +90 将重置为 +${start}`);
+  await dialog.getByRole('button',{name:'取消',exact:true}).click();
+  expect(game.sql('SELECT branch,level FROM weapons WHERE id=?',[sword.id])[0]).toEqual({branch:'longsword',level:90});
+  await expect(page.locator('[data-route=longsword]')).toHaveAttribute('data-current','true');
+  await selector.click();await agree(page);await idle(page);
+  await expect(selector).toBeDisabled();
+  expect(game.sql('SELECT branch,level FROM weapons WHERE id=?',[sword.id])[0]).toEqual({branch,level:start});
+  await bag(page);
+  await expect(page.locator(`[data-weapon-id="${sword.id}"]`).getByRole('button',{name:/^封存/})).toBeDisabled();
+});
+
+for(const [branch,minimum] of [['longsword',80],['rapier',70],['greatsword',60]])test(`${branch} final form gates sealing while recycling stays available`,async({page,game})=>{
+  await register(page,true,game);
+  const sword=await spawnSword(page,minimum-1);
+  game.sql('UPDATE weapons SET branch=? WHERE id=?',[branch,sword.id]);
+  await page.reload();await bag(page);
+  const card=page.locator(`[data-weapon-id="${sword.id}"]`);
+  await expect(card.getByRole('button',{name:`封存（最终形态需 +${minimum}）`,exact:true})).toBeDisabled();
+  await expect(card.getByRole('button',{name:'系统回收',exact:true})).toBeEnabled();
+  game.sql('UPDATE weapons SET level=? WHERE id=?',[minimum,sword.id]);
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(card.getByRole('button',{name:'封存',exact:true})).toBeEnabled();
+  game.sql("UPDATE weapons SET level=?,status='sealed' WHERE id=?",[minimum-1,sword.id]);
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(card.getByRole('button',{name:`铭刻 NFT ↗（最终形态需 +${minimum}）`,exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Switch to English',exact:true}).click();
+  await expect(card).toContainText(`Final form requires +${minimum}`);
 });
 
 test('two immediate UI clicks spend only once', async ({ page, game }) => {

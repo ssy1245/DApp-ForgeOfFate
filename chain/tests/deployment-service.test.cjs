@@ -10,7 +10,7 @@ const { loadPlan, nftHooks, selectModule } = require('../scripts/lib/deployment-
 const { network } = require('../scripts/lib/sepolia.cjs');
 const hash = char => '0x' + char.repeat(64);
 async function fixture(t, nft = false) {
-  const staking = nft === 'staking';
+  const staking = nft === 'staking', recharge = nft === 'recharge';
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-sepolia-check-'));
   const txHash = hash('a'), from = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
   const data = { finalized: 10, chainId: 11155111, receipt: null, fail: false, wrongSigner: false, wrongEpoch: false, publishFail: false };
@@ -25,6 +25,7 @@ async function fixture(t, nft = false) {
       assert.equal(tx.blockTag, 20);
       const abi = new Interface(plan.abi);
       const method = abi.parseTransaction({ data: tx.data }).name;
+      if (recharge) return abi.encodeFunctionResult(method,[method==='isAdmin'?!data.wrongAdmin:method==='getAdmins'?[plan.treasury]:method==='treasury' ? data.wrongSigner ? '0x'+'1'.repeat(40) : plan.treasury : data.wrongEpoch ? hash('e') : plan.deploymentId]);
       if (staking) return abi.encodeFunctionResult(method, [method === 'nft'
         ? data.wrongCollection ? from : plan.nftAddress
         : tx.to.toLowerCase() === plan.nftAddress.toLowerCase() ? plan.nftDeploymentId : plan.deploymentId]);
@@ -37,7 +38,7 @@ async function fixture(t, nft = false) {
     fs.mkdirSync(gameDirectory);
     fs.writeFileSync(path.join(gameDirectory, 'deployment.json'), JSON.stringify({manifestVersion:2,chainId:11155111,address:'0x'+'1'.repeat(40),deploymentId:hash('c')}));
   }
-  const options = { root: path.resolve(__dirname, '../..'), directory, gameDirectory, deployer: from, provider, network, module: staking ? 'forge-staking' : 'forge-of-fate', compile: async () => {} };
+  const options = { root: path.resolve(__dirname, '../..'), directory, gameDirectory, deployer: from, provider, network, module: staking ? 'forge-staking' : recharge ? 'forge-recharge' : 'forge-of-fate', compile: async () => {} };
   const plan = nft ? await loadPlan(options) : await prepare({ artifact: { contractName: 'DeploymentProbe', abi: [], bytecode: '0x60016000' }, args: [], deployer: from, network, module: 'deployment-probe', deploymentId: hash('d'), provider });
   const origin = 'http://127.0.0.1:5174';
   let server;
@@ -254,4 +255,31 @@ test('staking: missing NFT configuration or modified build cannot create a repla
   await assert.rejects(f.reloadPlan,/编译资料/);
   fs.unlinkSync(path.join(f.gameDirectory,'deployment.json'));
   await assert.rejects(f.reloadPlan,/NFT 部署清单/);
+});
+
+
+test('recharge: pins treasury, has no mint key, publishes only after finality, and resumes',async t=>{
+ const f=await fixture(t,'recharge');
+ assert.equal(selectModule(['--module','forge-recharge']),'forge-recharge');
+ assert.equal(f.plan.contractName,'ForgeRecharge');
+ assert.deepEqual(f.plan.constructorArgs,[f.plan.deployer,f.plan.deploymentId]);
+ assert.equal(fs.existsSync(path.join(f.gameDirectory,'mint-key')),false);
+ await f.begin();f.mine();await f.record();
+ const target=path.join(f.gameDirectory,'recharge-deployment.json');
+ assert.equal(fs.existsSync(target),false);
+ f.data.finalized=20;assert.equal((await f.request()).value.state.phase,'confirmed');
+ const manifest=JSON.parse(fs.readFileSync(target));
+ assert.equal(manifest.treasury,f.plan.deployer);assert.equal(manifest.module,'forge-recharge');
+ assert.equal(fs.existsSync(path.join(f.gameDirectory,'deployment.json')),false);
+ await f.restart();assert.equal((await f.request()).value.state.phase,'confirmed');
+ assert.deepEqual(await f.reloadPlan(),f.plan);
+});
+test('recharge: wrong treasury or epoch blocks publication; fixed plan cannot be silently replaced',async t=>{
+ const f=await fixture(t,'recharge');await f.begin();f.mine();f.data.finalized=20;
+ for(const field of ['wrongSigner','wrongEpoch','wrongAdmin']){
+  f.data[field]=true;assert.equal((await f.record()).status,409);
+  assert.equal(fs.existsSync(path.join(f.gameDirectory,'recharge-deployment.json')),false);f.data[field]=false;
+ }
+ fs.writeFileSync(path.join(f.directory,'build-info.json'),'{}');
+ await assert.rejects(f.reloadPlan,/编译资料/);
 });

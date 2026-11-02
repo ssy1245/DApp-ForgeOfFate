@@ -17,13 +17,14 @@ from web3 import Web3
 
 from .storage import Store
 from . import mailbox
+from .recharge import rate as recharge_rate
 from chain.server.store import index_status, event_history
 from .accounts import normalize_username, hash_password, verify_password
 from chain.server.wallets import identity, create_challenge, bind_wallet, check_available
 from chain.server.rpc import ChainSettings, ChainReader
 from chain.server.nft import mint_authorization
 from chain.server.diagnostics import inspect_chain
-from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, SWORD_BRANCHES
+from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, weapon_mint_level, weapon_can_mint, SWORD_BRANCHES
 
 LOCAL = ChainSettings.from_env().directory
 
@@ -42,6 +43,8 @@ class StrikeBody(BaseModel):
 
 class BranchChoice(BaseModel):
     branch: Literal['longsword','rapier','greatsword']
+    expected_level: int | None = Field(default=None,ge=0,strict=True)
+    expected_branch: Literal['longsword','rapier','greatsword'] | None = None
 
 class WorkshopChoice(BaseModel):
     weapon_id: str = Field(min_length=1, max_length=128)
@@ -82,6 +85,8 @@ def create_app(db_path=None, demo=None):
     reader = ChainReader(settings)
     from chain.server.staking_reader import StakingReader
     staking_reader = StakingReader(settings)
+    from chain.server.recharge_indexer import RechargeReader
+    recharge_reader = RechargeReader(settings)
     chain = reader.connect
     store = Store(db_path or str(settings.directory / 'game.sqlite3'), network=settings.network)
     demo_enabled = os.getenv('DEMO_MODE', '0') == '1' if demo is None else demo
@@ -255,7 +260,65 @@ def create_app(db_path=None, demo=None):
                 result['staking']=staking
             except HTTPException as e:
                 result['staking_error']=e.detail
+        result['recharge']=None;result['recharge_error']=None
+        try:
+            recharge=recharge_reader.public_config()
+            if recharge:
+                wei,coins=recharge_rate()
+                with store.connection() as db:
+                    source=db.execute('SELECT * FROM recharge_sources WHERE chain_id=? AND contract=? COLLATE NOCASE AND deployment=?',
+                        (recharge['chainId'],recharge['address'],recharge['deploymentId'])).fetchone()
+                recharge.update(weiPerUnit=str(wei),coinsPerUnit=coins,ready=bool(source
+                    and source['wei_per_unit']==str(wei) and source['coins_per_unit']==coins
+                    and source['state']=='ready' and time.time()-source['updated_at']<=120))
+            result['recharge']=recharge
+        except (HTTPException,ValueError):
+            result['recharge_error']='充值配置暂时不可用，请检查部署和兑换比例。'
         return result
+
+    @app.get('/api/chain/recharge/receipts/{tx_hash}')
+    def recharge_receipt(tx_hash: str):
+        result=recharge_reader.receipt(tx_hash)
+        result['credit']=None
+        if result.get('state')=='confirmed' and (result.get('receipt') or {}).get('status')==1:
+            with store.connection() as db:
+                entry=db.execute('''SELECT d.coins,d.credited_at FROM recharge_deposits d
+                    JOIN recharge_sources s ON s.source=d.source
+                    WHERE d.tx_hash=? AND d.wallet=? AND s.chain_id=? AND s.deployment=?''',
+                    (tx_hash.lower(),result['receipt']['from'].lower(),result['chainId'],result['deploymentId'])).fetchone()
+            if entry:
+                result['credit']={'state':'credited' if entry['credited_at'] is not None else 'pending',
+                                  'coins':entry['coins'],'creditedAt':entry['credited_at']}
+        return result
+
+    @app.get('/api/chain/recharge/treasury')
+    def recharge_treasury(response:Response, authorization: str | None = Header(default=None)):
+        address=authenticated(authorization)
+        with store.connection() as db:
+            player=identity(db,address)
+        if not player['wallet_verified']:
+            raise HTTPException(403,'请先验证绑定钱包，再检查充值管理权限。')
+        info=recharge_reader.public_config()
+        if not info:
+            raise HTTPException(503,'充值合约尚未部署。')
+        response.headers['Cache-Control']='no-store'
+        return recharge_reader.treasury_status(player['wallet_address'])
+
+    @app.get('/api/chain/recharge')
+    def recharge_history(authorization: str | None = Header(default=None), offset:int=Query(0,ge=0), limit:int=Query(20,ge=1,le=100)):
+        address=authenticated(authorization)
+        with store.connection() as db:
+            player=identity(db,address)
+            if not player['wallet_verified']:
+                raise HTTPException(403,'请先绑定钱包，再查看充值记录。')
+            wallet=player['wallet_address'].lower()
+            rows=db.execute('''SELECT deposit_id,amount_wei,coins,tx_hash,block_number,credited_at
+                FROM recharge_deposits WHERE wallet=? ORDER BY block_number DESC,log_index DESC LIMIT ? OFFSET ?''',
+                (wallet,limit,offset)).fetchall()
+            total=db.execute('SELECT COUNT(*) FROM recharge_deposits WHERE wallet=?',(wallet,)).fetchone()[0]
+            remainder=db.execute('SELECT remainder FROM recharge_remainders WHERE wallet=?',(wallet,)).fetchone()
+        return {'account':wallet,'total':total,'remainder':remainder['remainder'] if remainder else '0',
+                'items':[dict(r) for r in rows]}
 
     @app.get('/api/chain/staking')
     def staking_holdings(authorization: str | None = Header(default=None)):
@@ -344,6 +407,8 @@ def create_app(db_path=None, demo=None):
             w['name_en'] = weapon_name(w['level'], w['branch'], 'en')
             w['tier_id'] = weapon_tier(w['level'], w['branch'])['id']
             w['max_level'] = weapon_max_level(w['branch'])
+            w['mint_level'] = weapon_mint_level(w['branch'])
+            w['can_mint'] = weapon_can_mint(w['level'], w['branch'])
             w['probabilities'] = probabilities(w['level'], w['protected_left'] > 0)
             w['recycle_price'] = recycle_price(w['level'], w['branch'])
             w['strike_materials'] = strike_material_cost(w['level'], w['branch'])
@@ -578,14 +643,21 @@ def create_app(db_path=None, demo=None):
         def run(db):
             w = owned(db, address, wid)
             branch = next(b for b in SWORD_BRANCHES if b['id'] == body.branch)
+            if ((body.expected_level is not None and body.expected_level != w['level'])
+                    or (body.expected_branch is not None and body.expected_branch != w['branch'])):
+                raise HTTPException(409, '武器等级或路线已变化，请刷新后重新确认转路线。')
             if w['branch'] != 'longsword' and body.branch != w['branch']:
                 raise HTTPException(409, '已选定刺剑或巨剑路线，无法再更换；降级不会解除路线锁定。')
             if w['level'] < branch['unlock_level']:
                 raise HTTPException(409, f"强化至 +{branch['unlock_level']} 后可选择突变路线。")
-            if w['level']>weapon_max_level(body.branch):
-                raise HTTPException(409,f"{branch['name']}路线最高 +{weapon_max_level(body.branch)}，当前等级过高，无法切换。")
-            db.execute('UPDATE weapons SET branch=? WHERE id=?', (body.branch, wid))
-            return {'weapon_id': wid, 'branch': body.branch, 'message': f"已选择{branch['name']}路线。" + ('该路线已固定，无法再更换。' if body.branch != 'longsword' else '')}
+            if w['level'] > weapon_max_level(w['branch']):
+                raise HTTPException(409, '武器等级超过当前路线上限，请刷新后重试。')
+            if w['branch'] == body.branch:
+                return {'weapon_id':wid,'branch':body.branch,'level':w['level'],'message':'武器已在该路线，无需重复切换。'}
+            level = branch['unlock_level']
+            db.execute('UPDATE weapons SET branch=?,level=? WHERE id=?', (body.branch, level, wid))
+            return {'weapon_id': wid, 'branch': body.branch, 'level':level,
+                    'message': f"已转为{branch['name']}，等级重置为 +{level}。该路线已固定，无法再更换。"}
         return mutate(address, idempotency_key, 'branch/' + wid, body.model_dump(), run)
 
     @app.post('/api/weapons/{wid}/heat')
@@ -656,8 +728,8 @@ def create_app(db_path=None, demo=None):
         address = authenticated(authorization)
         def run(db):
             w = owned(db, address, wid)
-            if w['level'] < BALANCE['mint_level']:
-                raise HTTPException(409, '尚未达到上链门槛。')
+            if not weapon_can_mint(w['level'], w['branch']):
+                raise HTTPException(409, f"需达到本路线最终形态 +{weapon_mint_level(w['branch'])} 且不超过等级上限，才能封存上链。")
             db.execute("UPDATE weapons SET status='sealed' WHERE id=?", (wid,))
             clear_workshop(db, address, wid)
             return {'message': '武器已永久封存，可以铸造 NFT。'}
@@ -672,8 +744,8 @@ def create_app(db_path=None, demo=None):
             if not player['wallet_verified']:
                 raise HTTPException(403, '铭刻 NFT 前请登录游戏账号并签名绑定钱包。')
             recipient = player['wallet_address']
-            if w['level'] < BALANCE['mint_level']:
-                raise HTTPException(409, f"当前铭刻门槛为 +{BALANCE['mint_level']}。")
+            if not weapon_can_mint(w['level'], w['branch']):
+                raise HTTPException(409, f"需达到本路线最终形态 +{weapon_mint_level(w['branch'])} 且不超过等级上限，才能封存上链。")
         info, _, contract = chain()
         return mint_authorization(settings, info, contract, w, recipient)
 

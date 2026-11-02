@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from chain.server.nft import metadata
-from backend.game import BALANCE, SWORD_BRANCHES, weapon_tier
+from backend.game import BALANCE, SWORD_BRANCHES, weapon_tier, weapon_mint_level
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,7 +38,7 @@ def test_public_manifest_is_complete_pinned_and_has_no_credentials():
 @pytest.mark.parametrize('demo', [0, 1])
 def test_each_mintable_level_uses_branch_art_and_preserves_its_attributes(route, demo):
     branch = route['id']
-    for level in range(BALANCE['mint_level'], route['max_level'] + 1):
+    for level in range(weapon_mint_level(branch), route['max_level'] + 1):
         weapon = {'branch': branch, 'level': level, 'demo': demo}
         data = decode(metadata(weapon))
         tier = weapon_tier(level, branch)

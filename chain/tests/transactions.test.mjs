@@ -57,3 +57,20 @@ test('optional NFT identity survives recovery without losing large token precisi
  assert.equal(readPending(storage,new Storage())[0].tokenId,tokenId);
  for(const value of [42,'-1','42x','', '9'.repeat(79)])assert.equal(writePending({...p,tokenId:value},storage),false);
 });
+
+
+test('recharge receipts retain target across reload and stay separate from NFT transactions',()=>{
+ const storage=new Storage(),recharge={...p,contract:'0x'+'78'.repeat(20),target:'recharge',label:'Top up coins'};
+ assert.ok(writePending(p,storage));assert.ok(writePending(recharge,storage));
+ const saved=readPending(storage,new Storage());assert.deepEqual(saved,[p,recharge]);
+ assert.equal(matchesPending(recharge,chain,p.account),false);
+ assert.ok(removePending(recharge,storage));assert.deepEqual(readPending(storage,new Storage()),[p]);
+ assert.equal(writePending({...p,target:'arbitrary-route'},storage),false);
+});
+
+test('recharge progress retains amount and time while malformed display values cannot crash recovery',()=>{
+ const storage=new Storage(),record={...p,target:'recharge',amountWei:'10000000000000000',submittedAt:1793440000000};
+ assert.ok(writePending(record,storage));assert.deepEqual(readPending(storage,new Storage()),[record]);
+ for(const amountWei of ['-1','0','1.5',String(2n**256n),'9'.repeat(79)])assert.equal(writePending({...record,amountWei},storage),false);
+ for(const submittedAt of [0,-1,NaN,9007199254740991,'today'])assert.equal(writePending({...record,submittedAt},storage),false);
+});

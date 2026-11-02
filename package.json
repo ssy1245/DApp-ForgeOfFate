@@ -39,7 +39,9 @@
     "test": "node scripts/test-all.cjs",
     "test:client": "node --test chain/tests/transactions.test.mjs",
     "test:staking": "npm run compile -w chain && node chain/scripts/staking-rehearsal.cjs",
-    "deploy:staking": "node chain/scripts/deploy-console.cjs --module forge-staking"
+    "deploy:staking": "node chain/scripts/deploy-console.cjs --module forge-staking",
+    "deploy:recharge": "node chain/scripts/deploy-console.cjs --module forge-recharge",
+    "test:recharge": "npm run compile -w chain && node chain/scripts/recharge-rehearsal.cjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"

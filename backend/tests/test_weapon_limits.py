@@ -35,23 +35,27 @@ def test_reinforcement_stops_at_route_cap(client,monkeypatch,branch,limit,outcom
 @pytest.mark.parametrize('source,level,target',[
     ('longsword',71,'greatsword'),('longsword',80,'greatsword'),('longsword',81,'rapier'),
 ])
-def test_switching_to_lower_cap_does_not_erase_levels(client,source,level,target):
+def test_high_level_knight_sword_resets_to_target_start_instead_of_carrying_levels(client,source,level,target):
     h,*_=login(client);wid=forge(client,h)
     with client.app.state.store.connection() as db:
         db.execute('UPDATE weapons SET branch=?,level=? WHERE id=?',(source,level,wid))
     before=weapon(client,h)
     response=post(client,f'/weapons/{wid}/branch',h,{'branch':target})
-    assert response.status_code==409 and f'+{weapon_max_level(target)}' in response.json()['detail']
-    assert weapon(client,h)==before
+    assert response.status_code==200
+    after=weapon(client,h)
+    assert after['branch']==target and after['level']==({'rapier':5,'greatsword':10}[target])
+    assert not after['can_mint']
+    for field in ('id','owner','heat_charges','heat_ready_at','strikes','protected_left'):
+        assert after[field]==before[field]
 
 
-def test_switching_at_target_cap_is_allowed(client):
+def test_switching_at_target_cap_resets_and_cannot_switch_back(client):
     h,*_=login(client);wid=forge(client,h)
     with client.app.state.store.connection() as db:db.execute('UPDATE weapons SET level=70 WHERE id=?',(wid,))
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'}).status_code==200
     assert weapon(client,h)['max_level']==70
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==409
-    assert weapon(client,h)['level']==70 and weapon(client,h)['max_level']==70
+    assert weapon(client,h)['level']==10 and weapon(client,h)['max_level']==70
 
 
 def test_pure_strikes_retain_the_route_between_turns():

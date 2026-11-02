@@ -16,6 +16,7 @@ const suites=[
  ['browser',['run','test:browser']],
  ['game-chain-integration',['run','verify:game']],
  ['staking-integration',['run','test:staking']],
+ ['recharge-integration',['run','test:recharge']],
 ];
 (async()=>{
  const results=[];

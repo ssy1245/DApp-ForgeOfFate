@@ -91,6 +91,51 @@ def test_rounding_remainder_and_finalized_boundary_not_server_clock(tester):
     assert rows(store, 'staking_positions')[0]['remainder'] == 0
 
 
+@pytest.mark.parametrize('begin,end,expected', [
+    (0,DAY,[('2026-10-01',1000)]),
+    (DAY,2*DAY,[('2026-10-02',1000)]),
+    (DAY-1,DAY+1,[]),
+    (DAY-87,DAY+87,[('2026-10-01',1),('2026-10-02',1)]),
+    (0,0,[]),
+    (DAY-1,2*DAY,[('2026-10-02',1000)]),
+])
+def test_utc_midnight_and_one_coin_boundaries_at_live_rate(tester,begin,end,expected):
+    _,store,source=setup(tester,rate=1000)
+    batch(store,source,2,3*DAY,[event(at=begin),event('unstake',at=end,block=2)])
+    assert settle_all(store)
+    assert sorted((r['reward_day'],r['coins']) for r in rows(store,'reward_mail'))==expected
+    position=rows(store,'staking_positions')[0]
+    assert int(position['total_coins'])*DAY+position['remainder']==(end-begin)*1000
+    assert position['settled_until']==BASE+end
+    assert settle_all(Store(store.path))
+    assert sorted((r['reward_day'],r['coins']) for r in rows(store,'reward_mail'))==expected
+
+
+def test_same_nft_restaked_by_new_owner_pays_each_wallet_only_its_own_time(tester):
+    c,store,source=setup(tester,rate=1000)
+    other_wallet='0x'+'ef'*20
+    with store.connection() as db:
+        db.execute("INSERT INTO players(address) VALUES('second-owner')")
+        db.execute("INSERT INTO accounts VALUES('second-account','second-name','unused-hash','second-owner',0,'player')")
+        db.execute('INSERT INTO wallet_bindings VALUES(?,?,?)',('second-account',other_wallet,BASE))
+    token=str(2**255+123)
+    batch(store,source,4,3*DAY,[event(token=token),
+        event('unstake',token=token,at=DAY//2,block=2),
+        event(position='p2',token=token,wallet=other_wallet,at=DAY//2,block=3),
+        event('unstake',position='p2',token=token,wallet=other_wallet,at=DAY+DAY//2,block=4)])
+    assert settle_all(store)
+    rewards=rows(store,'staking_daily_rewards')
+    assert sorted((r['wallet'],r['reward_day'],r['coins']) for r in rewards)==sorted([
+        (WALLET,'2026-10-01',500),(other_wallet,'2026-10-01',500),(other_wallet,'2026-10-02',500)])
+    foreign_mail=next(r['mail_id'] for r in rewards if r['wallet']==other_wallet)
+    assert post(c,f'/mail/{foreign_mail}/claim',{}).status_code==404
+    assert post(c,'/mail/claim-all',{}).json()['coinsAdded']==500
+    assert settle_all(Store(store.path))
+    assert post(c,'/mail/claim-all',{}).json()['coinsAdded']==0
+    assert len(rows(store,'reward_mail'))==3
+    assert all(r['token_id']==token for r in rows(store,'staking_positions'))
+
+
 def test_multiple_positions_aggregate_and_restaking_has_new_identity(tester):
     _, store, source = setup(tester, rate=100)
     batch(store, source, 4, 2*DAY, [event(),event(position='p2',token='2',log=1),

@@ -134,11 +134,12 @@ class RpcSource:
 
 
 class Indexer:
-    def __init__(self, store, source, batch_size=500, staking=None):
+    def __init__(self, store, source, batch_size=500, staking=None, recharge=None):
         if not 1 <= batch_size <= 2000:
             raise ValueError('FORGE_INDEX_BATCH must be between 1 and 2000')
         self.store, self.source, self.batch_size = store, source, batch_size
         self.staking = staking
+        self.recharge = recharge
 
     def status(self, state, message='', **fields):
         with self.store.connection() as db:
@@ -260,7 +261,8 @@ class Indexer:
             self.scan()
             indexed = self.process()
             rewards = self.staking.tick() if self.staking is not None else settle_all(self.store)
-            return indexed and rewards
+            deposits = self.recharge.tick() if self.recharge is not None else True
+            return indexed and rewards and deposits
         except IndexHalt as error:
             self.status('halted', str(error), rpc_ok=0)
             raise
@@ -287,10 +289,12 @@ def main():
         except BlockingIOError:
             raise IndexFailure('这个环境已有监听进程在运行。') from None
         from .staking_indexer import StakingIndexer, RpcStakingSource
+        from .recharge_indexer import RechargeIndexer, RpcRechargeSource
         store = Store(settings.directory / 'game.sqlite3', settings.network)
         batch_size = int(os.getenv('FORGE_INDEX_BATCH', '500'))
         staking = StakingIndexer(store, RpcStakingSource(settings), batch_size)
-        indexer = Indexer(store, RpcSource(settings), batch_size, staking=staking)
+        recharge = RechargeIndexer(store, RpcRechargeSource(settings), batch_size)
+        indexer = Indexer(store, RpcSource(settings), batch_size, staking=staking, recharge=recharge)
         interval = int(os.getenv('FORGE_INDEX_INTERVAL', '5'))
         if not 1 <= interval <= 30:
             raise IndexFailure('FORGE_INDEX_INTERVAL 必须为 1–30 秒。')

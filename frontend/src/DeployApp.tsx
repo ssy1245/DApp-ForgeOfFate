@@ -162,13 +162,14 @@ export default function DeployApp() {
   const sepolia = plan?.network.chainId === 11155111;
   const nft = plan?.module === 'forge-of-fate';
   const staking = plan?.module === 'forge-staking';
+  const recharge = plan?.module === 'forge-recharge';
   const noBalance = sepolia && snapshot?.balanceWei === '0';
   const matched = !!plan && !!account && same(account, plan.deployer);
   const correctChain = !!plan && chainId !== '' && BigInt(chainId) === BigInt(plan.network.chainId);
   return <main className="deployment-page">
     <header><div><span className="deployment-eyebrow">FORGE OF FATE · {sepolia || !plan ? 'SEPOLIA' : 'LOCAL TEST'}</span><h1>{t('合约部署工作台')}</h1></div><div className="deployment-navigation"><a href="http://127.0.0.1:5173/">{t('返回游戏')}</a><LanguageSwitch /></div></header>
     <p className="deployment-intro">{t(sepolia || !plan ? '使用 MetaMask 在 Ethereum Sepolia 部署合约。手续费从项目钱包的 Sepolia 测试 ETH 余额扣除。' : '先在本地走通钱包部署流程。测试 ETH 由本地节点提供，不消耗 Sepolia 余额。')}</p>
-    {plan && <div className="deployment-banner">{t(nft ? '部署武器 NFT 与 ETH 交易市场。卖家自行定价并提取成交收益；游戏币保留在服务器。' : staking ? '部署 NFT 质押合约。持有人可随时取回；游戏金币由服务器按有效质押时长结算到奖励邮箱。' : '本轮仅部署一个验证合约，不包含 NFT 或充值功能。')}</div>}
+    {plan && <div className="deployment-banner">{t(nft ? '部署武器 NFT 与 ETH 交易市场。卖家自行定价并提取成交收益；游戏币保留在服务器。' : staking ? '部署 NFT 质押合约。持有人可随时取回；游戏金币由服务器按有效质押时长结算到奖励邮箱。' : recharge ? '部署测试 ETH 充值合约。合约记录付款金额，后端按测试比例兑换游戏金币；不发行代币。' : '本轮仅部署一个验证合约，不包含 NFT 或充值功能。')}</div>}
     {(error || serviceError) && <div className="deployment-error" role="alert">{t(error || serviceError)}</div>}
     {!plan && <section><h2>{t('连接本地部署服务')}</h2><p>{t('在项目目录运行 npm run deploy:console，再打开终端显示的部署页面。')}</p><button onClick={() => void refresh()}>{t('重新检查')}</button></section>}
     {plan && <div className="deployment-grid">
@@ -183,8 +184,9 @@ export default function DeployApp() {
         {noBalance && <p>{t('项目钱包暂无 Sepolia 测试 ETH，请先补充测试币用于手续费。')}</p>}
       </section>
       <section><h2><span>02</span>{t('核对并部署')}</h2><dl>
-        <dt>{t(nft ? '武器 NFT / 市场合约' : staking ? 'NFT 质押合约' : '测试合约')}</dt><dd>{plan.contractName}</dd><dt>{t('发送金额')}</dt><dd>0 ETH</dd>
+        <dt>{t(nft ? '武器 NFT / 市场合约' : staking ? 'NFT 质押合约' : recharge ? '充值合约' : '测试合约')}</dt><dd>{plan.contractName}</dd><dt>{t('发送金额')}</dt><dd>0 ETH</dd>
         {nft && <><dt>{t('铸造授权地址')}</dt><dd className="deployment-code" data-testid="mint-signer">{plan.mintSigner}</dd></>}
+        {recharge && <><dt>{t('主管理员 / 固定收款钱包')}</dt><dd className="deployment-code">{plan.deployer}</dd><dt>{t('管理员权限')}</dt><dd>{t('项目钱包可增删管理员；管理员能提现，资金只进入固定项目钱包。')}</dd></>}
         {staking && <><dt>{t('关联 NFT 合约')}</dt><dd className="deployment-code" data-testid="staking-nft-address">{plan.nftAddress}</dd></>}
         <dt>{t('部署内容指纹')}</dt><dd className="deployment-code">{plan.dataHash}</dd>
       </dl>{nft && <p>{t('铸造授权密钥由本机保存，用于核准游戏武器。部署由你的 MetaMask 钱包确认，无需向服务器提供钱包私钥。')}</p>}

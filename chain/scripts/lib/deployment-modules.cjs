@@ -4,13 +4,13 @@ const path = require('node:path');
 const { Wallet, Contract, ContractFactory, hexlify, randomBytes, keccak256, isAddress } = require('ethers');
 const { prepare, save, PublicError } = require('./deployment.cjs');
 
-const modules = { 'forge-of-fate': 'ForgeOfFate', 'forge-staking': 'ForgeStaking', 'deployment-probe': 'DeploymentProbe' };
+const modules = { 'forge-of-fate': 'ForgeOfFate', 'forge-staking': 'ForgeStaking', 'forge-recharge': 'ForgeRecharge', 'deployment-probe': 'DeploymentProbe' };
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 const fail = message => { throw new PublicError(message, 409); };
 function selectModule(args, fallback = 'forge-of-fate') {
   if (!args.length) return fallback;
   if (args.length === 2 && args[0] === '--module' && Object.hasOwn(modules, args[1])) return args[1];
-  fail('模块无效。可用 --module forge-of-fate、--module forge-staking 或 --module deployment-probe。');
+  fail('模块无效。可用 --module forge-of-fate、--module forge-staking、--module forge-recharge 或 --module deployment-probe。');
 }
 function collection(gameDirectory, chainId) {
   let info;
@@ -50,8 +50,9 @@ async function loadPlan({ root, directory, gameDirectory, module, deployer, prov
   const planFile = path.join(directory, 'plan.json');
   const nft = module === 'forge-of-fate';
   const staking = module === 'forge-staking';
+  const recharge = module === 'forge-recharge';
   const reference = staking ? collection(gameDirectory, network.chainId) : null;
-  const target = path.join(gameDirectory, staking ? 'staking-deployment.json' : 'deployment.json');
+  const target = path.join(gameDirectory, staking ? 'staking-deployment.json' : recharge ? 'recharge-deployment.json' : 'deployment.json');
   if (fs.existsSync(planFile)) {
     const plan = JSON.parse(fs.readFileSync(planFile));
     if (plan.version !== 2 || plan.module !== module || plan.contractName !== modules[module]
@@ -66,10 +67,12 @@ async function loadPlan({ root, directory, gameDirectory, module, deployer, prov
         fail('铸造授权地址或构造参数与原计划不一致，请恢复匹配的密钥和计划。');
       }
     }
+    if (recharge && (!same(plan.treasury, deployer) || plan.constructorArgs.length !== 2
+        || !same(plan.constructorArgs[0], deployer) || plan.constructorArgs[1] !== plan.deploymentId)) fail('充值计划与收款钱包不匹配。');
     if (staking && (!same(plan.nftAddress, reference.address) || plan.nftDeploymentId !== reference.deploymentId
         || plan.constructorArgs.length !== 2 || !same(plan.constructorArgs[0], reference.address)
         || plan.constructorArgs[1] !== plan.deploymentId)) fail('质押计划与当前 NFT 部署不匹配，不能覆盖原计划。');
-    if (nft || staking) {
+    if (nft || staking || recharge) {
       await verifyBuild(plan, directory);
       if (fs.existsSync(target) && !fs.existsSync(path.join(directory, 'deployment.json'))) {
         fail('游戏已有部署清单，但工作台记录缺失，请恢复原部署记录。');
@@ -80,19 +83,20 @@ async function loadPlan({ root, directory, gameDirectory, module, deployer, prov
   if (['state.json', 'deployment.json'].some(file => fs.existsSync(path.join(directory, file)))) {
     fail('部署计划缺失，但已有交易记录。请恢复原 plan.json，不要重新部署。');
   }
-  if ((nft || staking) && fs.existsSync(target)) fail('游戏已有对应部署清单，请恢复对应计划，不能覆盖或重新部署。');
+  if ((nft || staking || recharge) && fs.existsSync(target)) fail('游戏已有对应部署清单，请恢复对应计划，不能覆盖或重新部署。');
   await compile();
   const contractName = modules[module];
   const artifactDirectory = path.join(root, 'chain/artifacts/contracts', contractName + '.sol');
   const artifact = JSON.parse(fs.readFileSync(path.join(artifactDirectory, contractName + '.json')));
   const deploymentId = hexlify(randomBytes(32));
   const signer = nft ? mintSigner(gameDirectory, true) : undefined;
-  const plan = await prepare({ artifact, args: nft ? [signer, deploymentId] : staking ? [reference.address, deploymentId] : [deploymentId],
+  const plan = await prepare({ artifact, args: nft ? [signer, deploymentId] : staking ? [reference.address, deploymentId] : recharge ? [deployer, deploymentId] : [deploymentId],
     deployer, deploymentId, module, provider, network });
   const debug = JSON.parse(fs.readFileSync(path.join(artifactDirectory, contractName + '.dbg.json')));
   const build = fs.readFileSync(path.resolve(artifactDirectory, debug.buildInfo));
   fs.writeFileSync(path.join(directory, 'build-info.json'), build, { mode: 0o600 });
   if (nft) Object.assign(plan, { mintSigner: signer, buildInfoHash: keccak256(build) });
+  if (recharge) Object.assign(plan, { treasury: deployer, buildInfoHash: keccak256(build) });
   if (staking) Object.assign(plan, { nftAddress: reference.address, nftDeploymentId: reference.deploymentId, buildInfoHash: keccak256(build) });
   save(planFile, plan);
   return plan;
@@ -100,19 +104,20 @@ async function loadPlan({ root, directory, gameDirectory, module, deployer, prov
 
 function nftHooks({ plan, provider, gameDirectory }) {
   const staking = plan.module === 'forge-staking';
-  if (plan.module !== 'forge-of-fate' && !staking) return {};
-  const target = path.join(gameDirectory, staking ? 'staking-deployment.json' : 'deployment.json');
+  const recharge = plan.module === 'forge-recharge';
+  if (plan.module !== 'forge-of-fate' && !staking && !recharge) return {};
+  const target = path.join(gameDirectory, staking ? 'staking-deployment.json' : recharge ? 'recharge-deployment.json' : 'deployment.json');
   const checkReady = () => {
     if (staking) {
       const info = collection(gameDirectory, plan.network.chainId);
       if (!same(info.address, plan.nftAddress) || info.deploymentId !== plan.nftDeploymentId) fail('NFT 部署已改变，不能继续质押部署。');
-    } else if (!same(mintSigner(gameDirectory), plan.mintSigner)) fail('铸造授权密钥与部署计划不匹配，不能继续。');
+    } else if (!recharge && !same(mintSigner(gameDirectory), plan.mintSigner)) fail('铸造授权密钥与部署计划不匹配，不能继续。');
     if (fs.existsSync(target)) {
       const old = JSON.parse(fs.readFileSync(target));
       if (old.manifestVersion !== 2 || old.module !== plan.module || old.deploymentId !== plan.deploymentId
           || old.chainId !== plan.network.chainId || (staking
             ? !same(old.nftAddress, plan.nftAddress) || old.nftDeploymentId !== plan.nftDeploymentId
-            : !same(old.mintSigner, plan.mintSigner))) {
+            : recharge ? !same(old.treasury, plan.treasury) : !same(old.mintSigner, plan.mintSigner))) {
         fail('游戏已有不同的 NFT 部署清单，不能覆盖。');
       }
     }
@@ -122,6 +127,11 @@ function nftHooks({ plan, provider, gameDirectory }) {
     async verifyContract(address, blockNumber) {
       checkReady();
       const contract = new Contract(address, plan.abi, provider);
+      if (recharge) {
+        const [treasury, epoch, rootAdmin, admins] = await Promise.all([contract.treasury({blockTag:blockNumber}),contract.deploymentId({blockTag:blockNumber}),contract.isAdmin(plan.treasury,{blockTag:blockNumber}),contract.getAdmins({blockTag:blockNumber})]);
+        if (!same(treasury,plan.treasury) || epoch !== plan.deploymentId || !rootAdmin || admins.length!==1 || !same(admins[0],plan.treasury)) fail('充值合约身份、收款钱包或初始管理员不匹配。');
+        return {manifestVersion:2,treasury:plan.treasury,buildInfoHash:plan.buildInfoHash};
+      }
       if (staking) {
         const [nft, epoch] = await Promise.all([contract.nft({ blockTag: blockNumber }), contract.deploymentId({ blockTag: blockNumber })]);
         const collectionContract = new Contract(plan.nftAddress, ['function deploymentId() view returns (bytes32)'], provider);
@@ -137,6 +147,7 @@ function nftHooks({ plan, provider, gameDirectory }) {
     },
     publishManifest(manifest) {
       checkReady();
+      fs.mkdirSync(gameDirectory, { recursive: true, mode: 0o700 });
       // Hard-link a complete temporary file: atomic publication without overwriting
       // an existing game deployment, even if another process writes concurrently.
       if (!fs.existsSync(target)) {

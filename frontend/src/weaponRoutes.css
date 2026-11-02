@@ -1,0 +1,26 @@
+.weapon-routes { margin:18px 16px; padding:14px; border:1px solid #514735; background:linear-gradient(145deg,#302e25,#181d18 65%); border-radius:3px; box-shadow:inset 0 0 0 3px #151713; }
+.weapon-routes h3 { margin:0 0 8px; color:#eee5d1; font:500 18px/1.5 'Songti SC','STSong','Noto Serif SC',serif; letter-spacing:1px; }
+.weapon-routes h3::before { content:'◆'; font-size:8px; color:#c8a56b; margin-right:9px; vertical-align:middle; }
+.weapon-routes p { color:#b7b9a3; font-size:12px; line-height:1.7; margin:8px 0 14px; }
+.route-options { display:grid; gap:10px; }
+.route-option { --route-accent:#c8a56b; --route-metal:#7b6644; padding:12px; border:1px solid #494637; border-radius:2px; min-width:0; background:linear-gradient(130deg,#292d25,#171d18); }
+.route-option[data-route=rapier] { --route-accent:#d4a1a5; --route-metal:#7e515a; }
+.route-option[data-route=greatsword] { --route-accent:#e0a06c; --route-metal:#8e573b; }
+.route-option.selected { border-color:var(--route-metal); box-shadow:inset 3px 0 var(--route-metal); background:linear-gradient(130deg,#373429,#1a211a); }
+.route-option>div { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+.route-option strong { color:var(--route-accent); font:600 16px/1.5 'Songti SC','STSong','Noto Serif SC',serif; letter-spacing:1px; }
+.route-option span { color:#b8b6a5; font-size:10px; text-align:right; }
+.route-option small { display:block; color:#9da890; font-size:11px; line-height:1.8; }
+.route-option button { margin-top:10px; width:100%; min-height:36px; border-radius:2px; border-color:var(--route-metal); color:#fff1df; background:linear-gradient(120deg,color-mix(in srgb,var(--route-metal) 75%,#d7bd8b),var(--route-metal)); box-shadow:inset 0 1px #f1dcaa24; letter-spacing:1px; }
+.route-option button:not(:disabled):hover { filter:brightness(1.12); }
+.weapon-routes .route-warning { margin-bottom:0; color:#d6b887; }
+.forge-monitor-readable { position:absolute; left:14px; top:72px; z-index:3; max-width:min(340px,calc(100% - 28px)); font-size:12px; color:#d4c9af; }
+.forge-monitor-readable summary { cursor:pointer; padding:8px 12px; background:linear-gradient(135deg,#302e25f5,#191e19f5); border:1px solid #7b6644; border-radius:2px; width:max-content; box-shadow:inset 0 0 0 2px #151713; }
+.forge-monitor-copy { padding:18px; background:linear-gradient(145deg,#2d363b,#1d252a); border:1px solid #85775b; border-radius:2px; line-height:1.8; box-shadow:inset 0 0 0 4px #151b1e,0 10px 25px #0006; }
+.forge-monitor-copy h3 { margin:0 0 12px; padding-bottom:12px; border-bottom:1px solid #b6a07440; font:500 20px/1.5 'Songti SC','STSong','Noto Serif SC',serif; color:#eee5d1; }
+.forge-monitor-copy dl { margin:8px 0; }
+.forge-monitor-copy dl>div { display:flex; justify-content:space-between; gap:12px; }
+.forge-monitor-copy dd { margin:0; color:#e9d4ab; font-variant-numeric:tabular-nums; }
+.forge-monitor-copy [data-tone=success],.forge-monitor-copy [data-tone=success] dd { color:#b6d99f; }
+.forge-monitor-copy [data-tone=danger],.forge-monitor-copy [data-tone=danger] dd { color:#f0a08d; }
+.forge-monitor-copy p { margin:12px 0 0; padding-top:10px; border-top:1px solid #b6a07440; color:#b8b6a5; }

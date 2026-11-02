@@ -139,14 +139,14 @@ def test_concurrent_seal_and_recycle_cannot_both_consume_the_same_weapon(client)
     h, *_ = login(client)
     wid = forge(client, h)
     with client.app.state.store.connection() as db:
-        db.execute('UPDATE weapons SET level=50 WHERE id=?', (wid,))
+        db.execute('UPDATE weapons SET level=80 WHERE id=?', (wid,))
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(lambda action: post(client, f'/weapons/{wid}/{action}', h).status_code, ['seal','recycle']))
     assert sorted(results) == [200,409]
     with client.app.state.store.connection() as db:
         status = db.execute('SELECT status FROM weapons WHERE id=?', (wid,)).fetchone()[0]
         player = db.execute('SELECT coins,workshop_weapon_id FROM players').fetchone()
-        assert player['coins'] == (recycle_price(50) if status == 'recycled' else 0)
+        assert player['coins'] == (recycle_price(80) if status == 'recycled' else 0)
         assert player['workshop_weapon_id'] is None
         assert status == ('sealed' if results[0] == 200 else 'recycled')
 

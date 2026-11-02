@@ -111,7 +111,7 @@ def test_stored_or_foreign_weapons_cannot_be_used_for_striking(setup):
 def test_terminal_action_clears_current_in_same_transaction(setup, endpoint):
     c, h, address, a, _ = setup
     with c.app.state.store.connection() as db:
-        db.execute('UPDATE weapons SET level=50 WHERE id=?', (a,))
+        db.execute('UPDATE weapons SET level=80 WHERE id=?', (a,))
     assert post(c, f'/weapons/{a}/{endpoint}', h).status_code == 200
     with c.app.state.store.connection() as db:
         assert db.execute('SELECT workshop_weapon_id FROM players WHERE address=?', (address,)).fetchone()[0] is None

@@ -188,7 +188,7 @@ test('external level, branch and heat changes update the selected weapon without
   game.sql("UPDATE weapons SET level=30,branch='rapier',heat_charges=3,heat_ready_at=0 WHERE id=?",[user.a]);
   await focus(page);
   await expect(panel(page)).toContainText('+30');
-  await expect(page.getByLabel('武器路线 · 按等级解锁',{exact:true})).toHaveValue('rapier');
+  await expect(page.locator('[data-route=rapier]')).toHaveAttribute('data-current','true');
   await expect(scene(page)).toHaveAttribute('data-weapon-id',user.a);
   await expect(page.getByRole('button',{name:'敲下命运之锤'})).toBeEnabled();
   await consistent(page,game,user.address);

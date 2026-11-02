@@ -9,7 +9,7 @@ from eth_account.messages import encode_typed_data
 from fastapi import HTTPException
 from web3 import Web3
 
-from backend.game import weapon_tier
+from backend.game import weapon_tier, weapon_can_mint
 
 ROOT = Path(__file__).resolve().parents[2]
 NFT_IMAGES = json.loads((ROOT / 'assets/NFT_Pic/manifest.json').read_text(encoding='utf-8'))['images']
@@ -34,6 +34,8 @@ def metadata(weapon):
 
 def mint_authorization(settings, info, contract, weapon, recipient):
     wid, w = weapon['id'], weapon
+    if not weapon_can_mint(w['level'], w.get('branch', 'longsword')):
+        raise HTTPException(409, '只有达到本路线最终形态且未超过等级上限的武器才能铭刻 NFT。')
     try:
         already_minted = contract.functions.exists(int(wid, 16)).call()
     except Exception:

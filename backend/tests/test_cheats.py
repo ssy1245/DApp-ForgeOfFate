@@ -98,7 +98,7 @@ def test_weapon_spawn_edit_seal_and_other_archive(tester):
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':10,'heated':True,'protected_left':100}).status_code==200
     w=next(w for w in c.get('/api/state').json()['weapons'] if w['id']==wid)
     assert w['level']==10 and w['heat_charges']==5 and w['heat_ready_at']==0 and w['protected_left']==100
-    assert post(c,f'/cheats/weapons/{wid}',{}, {'level':50,'heated':False,'protected_left':0}).status_code==200
+    assert post(c,f'/cheats/weapons/{wid}',{}, {'level':80,'heated':False,'protected_left':0}).status_code==200
     assert post(c,f'/weapons/{wid}/seal',{}).status_code==200
     assert post(c,f'/cheats/weapons/{wid}',{}, {'level':99}).status_code==409
     # Even a tester may only edit their own active swords.

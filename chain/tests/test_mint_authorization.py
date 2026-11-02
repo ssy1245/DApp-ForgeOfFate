@@ -17,7 +17,7 @@ def mint_setup(tmp_path):
             'deploymentId': '0x'+'aa'*32}
     contract = Mock()
     contract.functions.exists.return_value.call.return_value = False
-    weapon = {'id': '0x'+'bb'*32, 'level': 50, 'branch': 'longsword', 'demo': 0}
+    weapon = {'id': '0x'+'bb'*32, 'level': 80, 'branch': 'longsword', 'demo': 0}
     return SimpleNamespace(directory=tmp_path), info, contract, weapon, recipient
 
 
@@ -47,3 +47,13 @@ def test_mint_authorization_fails_closed_without_replacing_keys(mint_setup, fail
     with pytest.raises(HTTPException) as error: mint_authorization(*mint_setup)
     assert error.value.status_code == code and 'secret' not in error.value.detail
     assert (keyfile.read_bytes() if keyfile.exists() else None) == before
+
+
+@pytest.mark.parametrize('branch,level', [('longsword',79),('rapier',69),('greatsword',59),('longsword',91),('rapier',81),('greatsword',71),('unknown',80)])
+def test_signer_itself_rejects_ineligible_weapons_before_rpc_or_signing(mint_setup, branch, level):
+    _, _, contract, weapon, _ = mint_setup
+    weapon.update(branch=branch,level=level)
+    with pytest.raises(HTTPException) as error:
+        mint_authorization(*mint_setup)
+    assert error.value.status_code==409
+    contract.functions.exists.assert_not_called()

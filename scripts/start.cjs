@@ -50,6 +50,6 @@ async function main() {
   }
   launch(process.execPath, [path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js'), '--host', '127.0.0.1', '--port', '5173', '--strictPort', '--config', path.join(root, 'frontend/vite.config.ts'), path.join(root, 'frontend')], 'frontend', { FORGE_API_TARGET: 'http://127.0.0.1:8000' });
   await ready('http://127.0.0.1:5173/');
-  console.log(`游戏页面：http://127.0.0.1:5173/\n网络：Ethereum Sepolia（11155111）；存档：.local/sepolia/\n测试菜单：${cfg.demo_mode ? '开启' : '关闭'}。${cfg.chain ? '已读取 NFT 合约配置。' : '尚无可用 NFT 配置，请先完成部署。'}充值与质押暂未开放，启动不会自动部署。\n部署工作台请另行运行 npm run deploy:console。按 Ctrl+C 停止本次服务。`);
+  console.log(`游戏页面：http://127.0.0.1:5173/\n网络：Ethereum Sepolia（11155111）；存档：.local/sepolia/\n测试菜单：${cfg.demo_mode ? '开启' : '关闭'}。${cfg.chain ? '已读取 NFT 合约配置。' : '尚无可用 NFT 配置，请先完成部署。'}充值与质押按各自部署配置启用，启动不会自动部署。\n部署工作台请另行运行 npm run deploy:console。按 Ctrl+C 停止本次服务。`);
 }
 main().catch(error => { console.error(error.message); stop(1); });

@@ -19,8 +19,8 @@ export const STATIONS:Record<Exclude<Station,null>,Vector3> = {
 
 export { canStand } from './workshopLayout';
 
-export default function WorkshopControls({mode, reset, sensitivity, suspended=false, onNear, onInteract, onActiveChange, onError, onPrimary}: {
-  mode: ViewMode; reset: number; sensitivity: number;
+export default function WorkshopControls({mode, reset, sensitivity, viewAnvil=false, suspended=false, onNear, onInteract, onActiveChange, onError, onPrimary}: {
+  mode: ViewMode; reset: number; sensitivity: number; viewAnvil?:boolean;
   suspended?: boolean;
   onPrimary: () => void;
   onNear: (station: Station) => void; onInteract: () => void;
@@ -68,8 +68,8 @@ export default function WorkshopControls({mode, reset, sensitivity, suspended=fa
       return () => {control.dispose(); orbit.current = null;};
     }
     if (!preserveWalk) {
-      camera.position.set(0, 2.65, 6.5);
-      yaw.current = 0; pitch.current = -0.15;
+      camera.position.set(viewAnvil?ANVIL_POSITION[0]:0, 2.65, viewAnvil?1.2:6.5);
+      yaw.current = 0; pitch.current = viewAnvil?-0.1:-0.15;
       camera.quaternion.setFromEuler(new Euler(pitch.current, yaw.current, 0, 'YXZ'));
     }
     let touchLast: {x:number;y:number} | null = null;

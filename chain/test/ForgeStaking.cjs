@@ -67,6 +67,28 @@ describe('ForgeStaking custody and replay boundaries',function(){
   await assert.rejects(staking.connect(a).unstake(1),/Already withdrawn/);
   assert.equal(await nft.ownerOf(token),staking.target);
  });
+ it('withdrawing one NFT leaves other positions intact; restaking uses a new ID',async()=>{
+  const first=await mint(),second=await mint();await lock(first);await lock(second);
+  await staking.connect(a).unstake(1);
+  assert.equal(await nft.ownerOf(first),a.address);assert.equal(await staking.activePosition(first),0n);
+  assert.equal(await nft.ownerOf(second),staking.target);assert.equal(await staking.activePosition(second),2n);
+  assert.equal((await staking.positions(2)).endedAt,0n);
+  await lock(first);assert.equal(await staking.activePosition(first),3n);
+  await assert.rejects(staking.connect(a).unstake(1),/Already withdrawn/);
+  await assert.rejects(staking.connect(b).unstake(2),/Not staker/);
+  assert.equal(await nft.ownerOf(first),staking.target);assert.equal(await nft.ownerOf(second),staking.target);
+ });
+ it('a purchase between approval and staking invalidates the seller and requires fresh buyer approval',async()=>{
+  const token=await mint();await nft.connect(a).approve(staking.target,token);await nft.connect(a).list(token,100n);
+  await nft.connect(b).buy(token,a.address,100n,{value:100n});
+  await assert.rejects(staking.connect(a).stake(token),/Not owner/);
+  await assert.rejects(staking.connect(b).stake(token),/ERC721InsufficientApproval/);
+  assert.equal(await staking.nextPositionId(),1n);assert.equal(await staking.activePosition(token),0n);
+  await nft.connect(b).approve(staking.target,token);await staking.connect(b).stake(token);
+  assert.equal((await staking.positions(1)).staker,b.address);
+  await assert.rejects(staking.connect(a).unstake(1),/Not staker/);
+  await staking.connect(b).unstake(1);assert.equal(await nft.ownerOf(token),b.address);
+ });
  it('rejects unsolicited safe transfers and fake receiver calls',async()=>{
   const token=await mint();
   await assert.rejects(nft.connect(a)['safeTransferFrom(address,address,uint256)'](a.address,staking.target,token),/Unexpected NFT/);

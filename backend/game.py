@@ -86,3 +86,17 @@ def weapon_tier(level, branch='longsword'):
 def weapon_name(level, branch='longsword', locale='zh'):
     tier = weapon_tier(level, branch)
     return tier['name_en'] if locale == 'en' else tier['name']
+
+
+def weapon_mint_level(branch='longsword'):
+    return max(tier['min_level'] for tier in weapon_route_tiers(branch))
+
+
+def weapon_can_mint(level, branch='longsword'):
+    return (any(route['id'] == branch for route in SWORD_BRANCHES)
+            and type(level) is int and weapon_mint_level(branch) <= level <= weapon_max_level(branch))
+
+
+# Derived from final forms; the single value remains the default knight-sword threshold.
+BALANCE['mint_levels'] = {route['id']: weapon_mint_level(route['id']) for route in SWORD_BRANCHES}
+BALANCE['mint_level'] = weapon_mint_level()

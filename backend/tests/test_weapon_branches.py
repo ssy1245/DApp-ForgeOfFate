@@ -123,7 +123,8 @@ def test_greatsword_unlocks_at_ten_and_preserves_progress(client):
     w=weapon(client,h)
     assert w['name']=='铁匠大剑' and w['max_level']==70
     assert before['weapons'][0]['max_level']==90
-    assert {k:v for k,v in w.items() if k not in ['branch','name','name_en','tier_id','max_level','strike_materials','recycle_price','branch_locked']}=={k:v for k,v in before['weapons'][0].items() if k not in ['branch','name','name_en','tier_id','max_level','strike_materials','recycle_price','branch_locked']}
+    assert before['weapons'][0]['mint_level']==80 and w['mint_level']==60
+    assert {k:v for k,v in w.items() if k not in ['branch','name','name_en','tier_id','max_level','mint_level','can_mint','strike_materials','recycle_price','branch_locked']}=={k:v for k,v in before['weapons'][0].items() if k not in ['branch','name','name_en','tier_id','max_level','mint_level','can_mint','strike_materials','recycle_price','branch_locked']}
     restored=TestClient(create_app(client.app.state.store.path,demo=False))
     assert next(w for w in restored.get('/api/state',headers=h).json()['weapons'] if w['id']==wid)['branch']=='greatsword'
     set_level(client,wid,9)
@@ -141,6 +142,9 @@ def test_greatsword_authorization_sealing_and_metadata(client):
     other,*_=login(client)
     assert post(client,f'/weapons/{wid}/branch',other,{'branch':'greatsword'}).status_code==404
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword'}).status_code==200
+    assert weapon(client,h)['level']==10
+    assert post(client,f'/weapons/{wid}/seal',h).status_code==409
+    set_level(client,wid,60)
     assert post(client,f'/weapons/{wid}/seal',h).status_code==200
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'longsword'}).status_code==409
     w=weapon(client,h)
@@ -152,6 +156,8 @@ def test_greatsword_authorization_sealing_and_metadata(client):
 def test_rapier_final_stage_persists_and_seals_at_eighty(client):
     h,*_=login(client);wid=forge(client,h);set_level(client,wid,70)
     assert post(client,f'/weapons/{wid}/branch',h,{'branch':'rapier'}).status_code==200
+    assert weapon(client,h)['level']==5
+    set_level(client,wid,70)
     assert weapon(client,h)['name']=='炽翼天使'
     set_level(client,wid,69)
     assert weapon(client,h)['branch']=='rapier' and weapon(client,h)['name']=='赤蔷誓约'
@@ -165,3 +171,42 @@ def test_rapier_final_stage_persists_and_seals_at_eighty(client):
     data=json.loads(base64.b64decode(metadata(weapon(client,h)).split(',')[1]))
     assert '炽翼天使' in data['name']
     assert {'trait_type':'Weapon Type','value':'rapier'} in data['attributes']
+
+
+@pytest.mark.parametrize('branch,start', [('rapier',5),('greatsword',10)])
+@pytest.mark.parametrize('level', [10,60,70,80,90])
+def test_switch_always_resets_level_and_cannot_skip_to_final_form(client, branch, start, level):
+    h,*_=login(client);wid=forge(client,h);set_level(client,wid,level)
+    before=client.get('/api/state',headers=h).json()['player']
+    body={'branch':branch,'expected_level':level,'expected_branch':'longsword','level':80}
+    key=str(uuid.uuid4())
+    response=post(client,f'/weapons/{wid}/branch',h,body,key)
+    assert response.status_code==200 and response.json()['level']==start
+    assert weapon(client,h)['level']==start and not weapon(client,h)['can_mint']
+    assert post(client,f'/weapons/{wid}/seal',h).status_code==409
+    assert client.get('/api/state',headers=h).json()['player']==before
+    # Neither an exact replay nor a fresh same-route request may undo later upgrades.
+    set_level(client,wid,start+2)
+    assert post(client,f'/weapons/{wid}/branch',h,body,key).json()==response.json()
+    assert post(client,f'/weapons/{wid}/branch',h,{'branch':branch}).status_code==200
+    assert weapon(client,h)['level']==start+2
+    for other in ('longsword','greatsword' if branch=='rapier' else 'rapier'):
+        assert post(client,f'/weapons/{wid}/branch',h,{'branch':other}).status_code==409
+    assert weapon(client,h)['level']==start+2
+
+
+def test_stale_confirmation_cannot_reset_a_changed_weapon(client):
+    h,*_=login(client);wid=forge(client,h);set_level(client,wid,61)
+    r=post(client,f'/weapons/{wid}/branch',h,{'branch':'greatsword','expected_level':60,'expected_branch':'longsword'})
+    assert r.status_code==409
+    assert weapon(client,h)['level']==61 and weapon(client,h)['branch']=='longsword'
+
+
+def test_concurrent_route_choices_only_apply_one_reset(client):
+    from concurrent.futures import ThreadPoolExecutor
+    h,*_=login(client);wid=forge(client,h);set_level(client,wid,90)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses=list(pool.map(lambda branch:post(client,f'/weapons/{wid}/branch',h,{'branch':branch,'expected_level':90,'expected_branch':'longsword'}),['rapier','greatsword']))
+    assert sorted(r.status_code for r in responses)==[200,409]
+    w=weapon(client,h)
+    assert w['level']==({'rapier':5,'greatsword':10}[w['branch']])

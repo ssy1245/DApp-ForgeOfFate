@@ -203,7 +203,7 @@ async function main() {
     await delay((balance.heat_seconds + 0.2) * 1000);
     for (const route of routes) {
       await tester.request('/workshop/equip', { weapon_id: route.id, expected_revision: (await tester.state()).player.workshop_revision });
-      await tester.request(`/weapons/${route.id}/strike`, { shield: true, expected_level: 20, expected_strikes: 0, expected_protected_left: 0 });
+      await tester.request(`/weapons/${route.id}/strike`, { shield: true, expected_level: routeBefore.weapons.find(w => w.id === route.id).level, expected_strikes: 0, expected_protected_left: 0 });
     }
     const routeCost = routes.reduce((sum, route) => sum + balance.weapon_economy[route.branch].strike_materials, 0);
     assert.equal((await tester.state()).player.materials, routeBefore.player.materials - routes.length * balance.heat_materials - routeCost);
@@ -292,14 +292,13 @@ async function main() {
     // The reorg reverted a send; read the wallet nonce afresh for these mints.
     const artworkContract = new Contract(cfg.chain.address, cfg.chain.abi, new NonceManager(wa));
     for (const branch of ['rapier', 'greatsword']) {
-      const spawned = await tester.request('/cheats/weapons', { count: 1, level: balance.mint_level });
-      await tester.request(`/weapons/${spawned.weapon_id}/branch`, { branch });
+      const spawned = await tester.request('/cheats/weapons', { count: 1, branch, level: balance.mint_levels[branch] });
       await tester.request(`/weapons/${spawned.weapon_id}/seal`, {});
       const signed = await tester.request(`/weapons/${spawned.weapon_id}/voucher`, {});
       await (await artworkContract.mint(signed.voucher, signed.signature)).wait();
       const uri = await artworkContract.tokenURI(BigInt(spawned.weapon_id));
       assert.equal(uri, signed.voucher.uri);
-      verifyMetadata(uri, branch, balance.mint_level);
+      verifyMetadata(uri, branch, balance.mint_levels[branch]);
     }
     check('All three NFT routes store the fixed public artwork URLs and individual attributes');
     report.passed = true;

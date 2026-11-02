@@ -35,7 +35,7 @@ def inspect_chain(settings, store):
     sync['deploymentMatches'] = None
     result = dict(checkedAt=time.time(), network=network, contracts=[nft,
         inspect_staking(settings, store),
-        dict(id='recharge', name='充值合约', status='disabled', message='充值暂缓，当前未启用。', checks=[])], indexer=sync)
+        inspect_recharge(settings, store)], indexer=sync)
 
     w3 = None
     if not settings.rpc:
@@ -197,4 +197,29 @@ def inspect_staking(settings, store):
                              '质押已配置，请检查每日奖励设置和监听进度。')
     except Exception:
         result.update(status='error', message='质押核验失败，请检查部署配置和节点。')
+    return result
+
+
+def inspect_recharge(settings, store):
+    result=dict(id='recharge',name='充值合约',status='disabled',message='充值合约尚未部署。',checks=[])
+    if not (settings.directory/'recharge-deployment.json').exists(): return result
+    try:
+        from .recharge_indexer import RpcRechargeSource
+        from backend.recharge import rate
+        source=RpcRechargeSource(settings);manifest=source.open();_,confirmed=source.boundary()
+        result.update(address=manifest['address'],transactionHash=manifest['deploymentTransaction'],deploymentBlock=manifest['deploymentBlock'])
+        result['checks']=[dict(label='部署身份',status='ok'),dict(label='部署最终确认',status='ok' if confirmed>=manifest['deploymentBlock'] else 'waiting')]
+        with store.connection() as db:
+            saved=db.execute('SELECT * FROM recharge_sources LIMIT 1').fetchone()
+        status='waiting'
+        if saved:
+            matches=(saved['chain_id']==manifest['chainId'] and saved['contract'].lower()==manifest['address'].lower()
+                     and saved['deployment']==manifest['deploymentId'] and (int(saved['wei_per_unit']),saved['coins_per_unit'])==rate())
+            status='error' if not matches or saved['state'] in ('halted','error') else 'ok' if saved['state']=='ready' and time.time()-saved['updated_at']<=120 else 'waiting'
+        result['checks'].append(dict(label='充值监听与金币入账',status=status))
+        states={c['status'] for c in result['checks']}
+        result['status']='error' if 'error' in states else 'waiting' if 'waiting' in states else 'ok'
+        result['message']='充值合约与监听入账正常。' if result['status']=='ok' else '充值已配置，请检查兑换比例和监听进度。'
+    except Exception:
+        result.update(status='error',message='充值核验失败，请检查部署配置和节点。')
     return result

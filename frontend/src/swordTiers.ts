@@ -28,3 +28,7 @@ export function branchTiers(branch = 'longsword', main: SwordTier[] = swordTiers
   const tiers = route.tiers ?? catalog.filter(tier => tier.branch === route.id);
   return [main[0], ...tiers];
 }
+
+export function mintSwordLevel(branch = 'longsword'): number {
+  return Math.max(...branchTiers(branch).map(tier => tier.min_level));
+}

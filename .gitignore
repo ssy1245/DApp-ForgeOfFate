@@ -70,6 +70,14 @@ storageState*.json
 # Local UI captures kept outside .local; weapon reference images stay tracked.
 /screenshots/
 /previews/
+# Manual forge-screen/route UI captures; source textures and game art stay tracked.
+/forge-monitor-*.png
+/weapon-routes-*.png
+# Manual copies of recharge / admin UI test captures, not game artwork.
+/recharge-admins-*.png
+/recharge-treasury-*.png
+/recharge-desktop.png
+/recharge-mobile.png
 /*-preview.png
 /*-preview.jpg
 /*-preview.jpeg
@@ -88,11 +96,18 @@ quote-key.*
 # Local deployment and cleanup exports, if copied into the project root.
 /deployment.json
 /staking-deployment.json
+/recharge-deployment.json
+# Additional local copies; reviewed manifests under deployments/ remain tracked.
+/staking-deployment-*.json
+/recharge-deployment-*.json
 /local-deployment-*.json
 /sepolia-deployment-*.json
 # Console runtime/build exports: originals live under .local/sepolia/.
 # Only ignore root-level copies; keep source manifests and empty templates.
 # Public reviewed manifests under deployments/ are intentionally versioned.
+/deploy-console/
+# Archived unsigned deployment plans remain private when copied out of .local/.
+/deploy-console-archive/
 /plan.json
 /state.json
 /build-info.json
@@ -102,6 +117,7 @@ quote-key.*
 # Interrupted atomic writes, if runtime files were placed in the project root.
 /deployment.json*.tmp
 /staking-deployment.json*.tmp
+/recharge-deployment.json*.tmp
 /plan.json*.tmp
 /state.json*.tmp
 /build-info.json*.tmp

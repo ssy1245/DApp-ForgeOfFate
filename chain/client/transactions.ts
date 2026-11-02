@@ -13,7 +13,23 @@ function valid(value:any): value is Pending {
     && (value.tokenId === undefined || (typeof value.tokenId === 'string' && /^(0|[1-9][0-9]{0,77})$/.test(value.tokenId)))
     && typeof value.label === 'string' && value.label.length > 0 && value.label.length < 100;
 }
-function key(p:Pending) { return `${PREFIX}${p.chainId}:${p.contract.toLowerCase()}:${p.epoch.toLowerCase()}:${p.hash.toLowerCase()}`; }
+export function pendingKey(p:Pending) { return `${PREFIX}${p.chainId}:${p.contract.toLowerCase()}:${p.epoch.toLowerCase()}:${p.hash.toLowerCase()}`; }
+const key = pendingKey;
+// Staking moves the same NFTs as minting/trading; recharge has a separate lock.
+export function transactionGroup(target?:Pending['target']|'nft') { return target==='recharge'?'recharge':'nft'; }
+type Operation = {target?:Pending['target']|'nft'; tokenId?:string; label:string};
+export function conflictsWithPending(p:Pending,operation:Operation) {
+  if(transactionGroup(p.target)!==transactionGroup(operation.target))return false;
+  if(p.target==='recharge')return true;
+  if(p.tokenId!==undefined&&operation.tokenId!==undefined) {
+    // Game weapon IDs are hex; on-chain token IDs are decimal uint256 strings.
+    try{return BigInt(p.tokenId)===BigInt(operation.tokenId);}catch{return true;}
+  }
+  const proceeds=(value:Operation)=>value.tokenId===undefined&&value.label==='提取交易收益';
+  if(proceeds(p)&&operation.tokenId!==undefined||proceeds(operation)&&p.tokenId!==undefined)return false;
+  // Old records without an NFT identity must remain locked until checked.
+  return true;
+}
 export function samePending(a:Pending,b:Pending) { return key(a) === key(b); }
 export function matchesPending(p:Pending, chain:any, account?:string|null) {
   return !!chain && p.chainId === chain.chainId && p.contract.toLowerCase() === chain.address.toLowerCase()

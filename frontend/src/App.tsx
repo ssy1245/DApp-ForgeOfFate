@@ -16,7 +16,7 @@ import RechargePanel from './RechargePanel';
 import NFTActions from './NFTActions';
 import './workshopPage.css';
 import './forgeActions.css';
-import {type Pending, readPending, writePending, removePending, samePending, matchesPending, storageAvailable, finalReceipt} from '../../chain/client/transactions';
+import {type Pending, readPending, writePending, removePending, samePending, matchesPending, pendingKey, transactionGroup, conflictsWithPending, storageAvailable, finalReceipt} from '../../chain/client/transactions';
 import WeaponCard from './WeaponCard';
 import WeaponLore from './WeaponLore';
 import IronIcon, { IronAmount } from './IronIcon';
@@ -87,9 +87,16 @@ export default function App(){
  const strikeShortage=weapon?.status==='active'&&weapon.level<maxLevel&&(state?.player.materials??0)<strikeCost?`强化需要 ${strikeCost} 铁块，当前剩余 ${state?.player.materials??0}。`:'';
  const minted=new Set(nfts.map(n=>`0x${BigInt(n.id).toString(16).padStart(64,'0')}`));
  const chainFor=(p:Pending,cfg:any)=>p.target?cfg?.[p.target]:cfg?.chain;
- const pending=pendingRecords.find(p=>matchesPending(p,chainFor(p,config),session?.wallet_address));
- const activePending=!!pending;
- useEffect(()=>{const sync=()=>setPendingRecords(readPending());window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);},[]);
+ const pendingRecordsRef=useRef(pendingRecords);pendingRecordsRef.current=pendingRecords;
+ const activePendings=pendingRecords.filter(p=>matchesPending(p,chainFor(p,config),session?.wallet_address));
+ const nftPendings=activePendings.filter(p=>transactionGroup(p.target)==='nft');
+ const pendingForWeapon=(tokenId:string)=>nftPendings.find(p=>conflictsWithPending(p,{target:'nft',tokenId,label:''}));
+ const unknownNFTPending=nftPendings.some(p=>p.tokenId===undefined&&p.label!=='提取交易收益');
+ const proceedsPending=nftPendings.some(p=>conflictsWithPending(p,{target:'nft',label:'提取交易收益'}));
+ const rechargePending=activePendings.find(p=>transactionGroup(p.target)==='recharge');
+ const nftPendingSignature=nftPendings.map(pendingKey).sort().join('|');
+ const [pendingCheckVersion,setPendingCheckVersion]=useState(0);
+ useEffect(()=>{const sync=()=>{pendingRecordsRef.current=readPending();setPendingRecords(pendingRecordsRef.current);setPendingCheckVersion(v=>v+1);};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);},[]);
  const tell=(s:string,bad=false)=>{setNotice(s);setError(bad);};
  async function api(path:string,opts:RequestInit={},token=sessionRef.current?.token){
   const requestGeneration=generation.current, requestSession=sessionRef.current;
@@ -256,10 +263,15 @@ export default function App(){
  async function stakingAction(action:'approve'|'stake'|'unstake',tokenId:string,positionId?:string){
   const staking=config?.staking;if(!staking||!sessionRef.current?.wallet_verified)return;
   const g=generation.current,version=walletGeneration.current,owner=sessionRef.current.wallet_address;
-  const prompt=action==='approve'?'仅授权这一枚 NFT 给质押合约，此步骤尚不开始质押或发放奖励。继续？':action==='stake'?'NFT 将转入质押合约，已有挂单会取消。可随时取回，奖励按实际质押时间计算。确定质押？':'取回后停止计算新的质押收益，已产生的有效收益仍会按日结算到邮箱。确定取回？';
+  const prompt=action==='approve'?'仅授权这一枚 NFT 给质押合约，此步骤尚不开始质押或发放奖励。继续？':action==='stake'?'NFT 将转入质押合约，可随时取回，奖励按实际质押时间计算。确定质押？':'取回后停止计算新的质押收益，已产生的有效收益仍会按日结算到邮箱。确定取回？';
   if(!await askConfirmation(prompt))return;
   if(g!==generation.current||version!==walletGeneration.current){tell('钱包或登录账号已变化，请重新操作。',true);return;}
   await transact(action==='approve'?'授权质押 NFT':action==='stake'?'质押 NFT':'取回 NFT',async(c,guard)=>{
+   if(action!=='unstake'){
+    const nft=action==='approve'?c:new Contract(config.chain.address,config.chain.abi,c.runner);
+    const [,price]=await nft.listings(tokenId);guard();
+    if(price>0n)throw Error('请先撤销挂牌并等待确认，再质押此 NFT。');
+   }
    if(action==='approve'){
     if((await c.ownerOf(tokenId)).toLowerCase()!==owner?.toLowerCase())throw Error('持有人已变化，请刷新状态。');
     await c.approve.staticCall(staking.address,tokenId);guard();return c.approve(staking.address,tokenId);
@@ -343,61 +355,65 @@ export default function App(){
  }
  async function checkedSigner(target:'nft'|'staking'|'recharge'='nft'){if(!sessionRef.current||!config?.chain)throw Error('请先登录并确认合约已部署。');if(!window.ethereum)throw Error('未检测到钱包。');const p=new BrowserProvider(window.ethereum);const signer=await p.getSigner();if((await p.getNetwork()).chainId!==BigInt(config.chain.chainId))throw Error('钱包网络与当前游戏环境不一致，请重新连接钱包。');const current=await api('/session',{method:'POST'});if(current.address!==sessionRef.current.address)throw Error('当前登录账号已变化，请刷新后重新操作。');if(!current.wallet_verified||(await signer.getAddress()).toLowerCase()!==current.wallet_address?.toLowerCase())throw Error('当前钱包与账号绑定的钱包不一致，请切回已绑定钱包。');const info=target==='nft'?config.chain:config[target];if(!info)throw Error('部署信息已变化，请刷新页面。');const c=new Contract(info.address,info.abi,signer);if(await c.deploymentId()!==info.deploymentId)throw Error('部署信息已变化，请刷新页面。');if(target==='staking'&&(await c.nft()).toLowerCase()!==config.chain.address.toLowerCase())throw Error('部署信息已变化，请刷新页面。');if(target==='recharge'&&(await c.treasury()).toLowerCase()!==config.recharge.treasury.toLowerCase())throw Error('部署信息已变化，请刷新页面。');return c;}
  function savePending(p:Pending){
-  setPendingRecords(records=>[...records.filter(old=>!samePending(old,p)),p]);
+  pendingRecordsRef.current=[...pendingRecordsRef.current.filter(old=>!samePending(old,p)),p];
+  setPendingRecords(pendingRecordsRef.current);
   if(!writePending(p))throw Error(`交易已提交，但浏览器无法保存记录。请保存交易哈希：${p.hash}`);
  }
  function clearPending(p:Pending){
   if(!removePending(p))throw Error('浏览器无法更新交易记录，请保留当前页面并重试。');
-  setPendingRecords(records=>records.filter(old=>!samePending(old,p)));
+  pendingRecordsRef.current=pendingRecordsRef.current.filter(old=>!samePending(old,p));
+  setPendingRecords(pendingRecordsRef.current);
+  setPendingProgress(old=>{const next={...old};delete next[pendingKey(p)];return next;});
  }
- const [pendingProgress,setPendingProgress]=useState<{hash:string;message:string}|null>(null);
+ const [pendingProgress,setPendingProgress]=useState<Record<string,string>>({});
+ function reportPending(p:Pending,message:string){setPendingProgress(old=>({...old,[pendingKey(p)]:message}));}
+ const progressFor=(p?:Pending)=>p?pendingProgress[pendingKey(p)]:undefined;
  function showReceiptProgress(p:Pending,data:any){
   const message=data.taskMessage?data.taskMessage:data.state==='confirmed'&&p.target==='recharge'&&p.label==='充值游戏金币'&&data.credit?.state!=='credited'
    ?'链上已确认，正在等待金币入账；无需再次付款。':data.state==='confirming'
    ?data.receipt?.status===1?'链上执行成功，正在等待网络最终确认；无需再次付费。':'交易已打包但执行失败，等待最终确认后才能重试。'
    :'交易已提交，正在等待链上打包；页面会自动检查。';
-  setPendingProgress({hash:p.hash,message});
+  reportPending(p,message);
  }
  async function readReceipt(p:Pending,signal?:AbortSignal){
+  const g=generation.current;
   await queueChainTask(p.target||'nft',config,p.hash);
-  const g=generation.current,data=await api(`/chain/${p.target?`${p.target}/`:''}receipts/${p.hash}`,{signal}),receipt=finalReceipt(data,p);
+  if(g!==generation.current||signal?.aborted)return null;
+  const data=await api(`/chain/${p.target?`${p.target}/`:''}receipts/${p.hash}`,{signal}),receipt=finalReceipt(data,p);
   if(g===generation.current)showReceiptProgress(p,data);
   return receipt?{...receipt,credit:data.credit}:null;
  }
  useEffect(()=>{
-  if(!pending)return;
-  const record=pending,g=generation.current,controller=new AbortController();
+  if(!activePendings.length)return;
+  const g=generation.current,controller=new AbortController();
   let live=true,inFlight=false;
   const update=async()=>{
    if(!live||inFlight||document.hidden||lock.current)return;
    inFlight=true;
+   const records=pendingRecordsRef.current.filter(p=>matchesPending(p,chainFor(p,config),sessionRef.current?.wallet_address));
    try{
     const cfg=await api('/config',{signal:controller.signal});
     if(!live||g!==generation.current)return;
-    if(!matchesPending(record,chainFor(record,cfg),sessionRef.current?.wallet_address)){await refresh();return;}
-    const receipt=await readReceipt(record,controller.signal);
-    if(!live||g!==generation.current||!receipt||lock.current)return;
-    await run('同步交易结果',()=>finishTransaction(record,receipt));
+    for(const record of records){
+     if(!live||g!==generation.current)return;
+     if(!pendingRecordsRef.current.some(p=>samePending(p,record)))continue;
+     if(!matchesPending(record,chainFor(record,cfg),sessionRef.current?.wallet_address)){await refresh();return;}
+     try{
+      const receipt=await readReceipt(record,controller.signal);
+      if(!live||g!==generation.current)return;
+      if(receipt&&!lock.current)await run('同步交易结果',()=>finishTransaction(record,receipt));
+     }catch{
+      if(live&&g===generation.current)reportPending(record,'暂时无法检查交易，记录已保留，稍后自动重试。');
+     }
+    }
    }catch{
-    if(live&&g===generation.current)setPendingProgress({hash:record.hash,message:'暂时无法检查交易，记录已保留，稍后自动重试。'});
+    if(live&&g===generation.current)for(const record of records)reportPending(record,'暂时无法检查交易，记录已保留，稍后自动重试。');
    }finally{inFlight=false;}
   };
   void update();const timer=setInterval(update,30000);
   window.addEventListener('focus',update);document.addEventListener('visibilitychange',update);
   return()=>{live=false;controller.abort();clearInterval(timer);window.removeEventListener('focus',update);document.removeEventListener('visibilitychange',update);};
- },[pending?.hash,session?.address,config?.chain?.address,config?.chain?.deploymentId,config?.staking?.address,config?.staking?.deploymentId,config?.recharge?.address,config?.recharge?.deploymentId]);
- async function waitReceipt(p:Pending,isCurrent:()=>boolean){
-  const deadline=Date.now()+120000;
-  while(Date.now()<deadline&&isCurrent()){
-   await queueChainTask(p.target||'nft',config,p.hash);
-   const data=await api(`/chain/${p.target?`${p.target}/`:''}receipts/${p.hash}`),receipt=finalReceipt(data,p);
-   if(isCurrent())showReceiptProgress(p,data);
-   if(receipt)return {...receipt,credit:data.credit};
-   if(data.state==='confirming')tell('交易已打包，正在等待网络最终确认。请勿重复提交。');
-   await new Promise(resolve=>setTimeout(resolve,30000));
-  }
-  return null;
- }
+ },[activePendings.length>0,pendingCheckVersion,session?.address,config?.chain?.address,config?.chain?.deploymentId,config?.staking?.address,config?.staking?.deploymentId,config?.recharge?.address,config?.recharge?.deploymentId]);
  async function transact(label:string,send:(c:Contract,guard:()=>void)=>Promise<any>,tokenId?:string,target:'nft'|'staking'|'recharge'='nft',amountWei?:string){
   if(!sessionRef.current?.wallet_verified){await login();if(!sessionRef.current?.wallet_verified)return;}
   await run(label,async()=>{
@@ -405,7 +421,7 @@ export default function App(){
    const g=generation.current,walletVersion=walletGeneration.current;
    const isCurrent=()=>g===generation.current&&walletVersion===walletGeneration.current&&player===sessionRef.current?.address;
    const guard=()=>{if(!isCurrent())throw Error('钱包或登录账号已变化，请重新操作。');};
-   if(activePending||readPending().some(p=>matchesPending(p,chainFor(p,config),account)))throw Error('已有交易等待确认，请先检查交易状态。');
+   if([...pendingRecordsRef.current,...readPending()].some(p=>conflictsWithPending(p,{target,tokenId,label})&&matchesPending(p,chainFor(p,config),account)))throw Error('已有交易等待确认，请先检查交易状态。');
    if(!storageAvailable())throw Error('浏览器无法保存交易记录，请允许本站存储后再进行链上操作。');
    if(tokenId){setCardOperation({id:tokenId,label});cardTell(tokenId,'请在钱包中确认操作；尚未提交交易。');}
    const c=await checkedSigner(target);guard();
@@ -416,26 +432,28 @@ export default function App(){
    if(isCurrent()&&tokenId)cardTell(tokenId,'交易已提交，正在自动检查确认状态。');
    if(!isCurrent())return;
    tell(`${label}已提交，等待链上确认：${short(tx.hash)}`);
-   const receipt=await waitReceipt(record,isCurrent);
-   if(!isCurrent())return;
-   if(!receipt){tell('交易仍待最终确认，记录已保存，可稍后检查。');return;}
-   await finishTransaction(record,receipt);
+   // Persist the server task, then release the wallet submission lock. Each
+   // weapon (or recharge balance) stays locked by its own pending record.
+   try{await queueChainTask(target,config,record.hash);}
+   catch{if(isCurrent())reportPending(record,'暂时无法检查交易，记录已保留，稍后自动重试。');}
   },message=>{if(tokenId){setCardOperation(null);cardTell(tokenId,message,true);}});
   // Refresh custody/permissions once after this user action, including a
   // rejected preflight. No timer is needed to disable revoked admin controls.
   setChainViewVersion(v=>v+1);
+  setPendingCheckVersion(v=>v+1);
  }
  async function finishTransaction(p:Pending,receipt:{status:number;credit?:{state:string;coins:string}|null}){
+  if(!pendingRecordsRef.current.some(record=>samePending(record,p)))return;
   if(receipt.status===1&&p.target==='recharge'&&p.label==='充值游戏金币'&&receipt.credit?.state!=='credited'){
    const message='链上已确认，正在等待金币入账；无需再次付款。';
-   setPendingProgress({hash:p.hash,message});tell(message);return;
+   reportPending(p,message);tell(message);return;
   }
   clearPending(p);
   if(p.tokenId)cardTell(p.tokenId,receipt.status===1?`${p.label}已确认。`:'交易执行失败，可以重新操作。',receipt.status!==1);
   tell(receipt.status===1?(p.target==='recharge'&&p.label==='充值游戏金币'?t`充值已到账，增加 ${receipt.credit!.coins} 游戏金币。`:`${p.label}已确认。`):'交易执行失败，可以重新操作。',receipt.status!==1);
-  try{if(p.target==='recharge')await readGameState();else await refresh();}catch{if(p.target!=='recharge')setMarketError(true);tell('交易结果已确认，但页面数据刷新失败，请刷新状态。',true);}
+  try{if(p.target==='recharge'){await readGameState();setChainViewVersion(v=>v+1);}else await refresh();}catch{if(p.target!=='recharge')setMarketError(true);tell('交易结果已确认，但页面数据刷新失败，请刷新状态。',true);}
  }
- async function checkPending(){await run('检查交易',async()=>{
+ async function checkPending(pending?:Pending){await run('检查交易',async()=>{
   if(!pending)return;
   const g=generation.current,cfg=await api('/config');
   if(!matchesPending(pending,chainFor(pending,cfg),sessionRef.current?.wallet_address)){
@@ -465,7 +483,7 @@ export default function App(){
   };
   window.addEventListener('keydown',toggle);return()=>window.removeEventListener('keydown',toggle);
  },[tab,canToggleShield]);
- const chainDisabled=disabled||marketError||activePending||!!session?.wallet_verified&&!walletReady;
+ const chainDisabled=disabled||marketError||!!session?.wallet_verified&&!walletReady;
  const visibleNFTs=nfts.filter(n=>marketView==='mine'&&session?.wallet_verified?n.owner.toLowerCase()===session.wallet_address?.toLowerCase():n.price>0n);
  const warming=!!weapon&&weapon.heat_charges>0&&weapon.heat_ready_at>now;
  const hot=!!weapon&&weapon.heat_charges>0&&!warming;
@@ -481,14 +499,14 @@ export default function App(){
    {syncError&&<div className="service-note" role="status">{t('与服务器的同步已中断，当前显示上次保存的数据，恢复连接后会自动更新。')}</div>}
    {(tab==='bag'||tab==='market')&&config?.chain_error&&<div className="service-note">{t(config.chain_error)}</div>}
    <div className={`notice ${error?'error':''} ${!notice&&!busy?'notice-idle':''}`} role="status"><span>{busy?'◌':'✦'}</span>{busy?t`${t(busy)}中… `:''}{t(notice)}</div>
-   {pending&&<div className="pending">{t("待确认：")}{t(pending.label)} · <span title={pending.hash}>{short(pending.hash)}</span>{pending.chainId===11155111&&<a href={`https://sepolia.etherscan.io/tx/${pending.hash}`} target="_blank" rel="noreferrer">{t("查看交易")}</a>}<button onClick={checkPending} disabled={!!busy}>{t("检查待确认交易")}</button><small className="pending-progress">{t(pendingProgress?.hash===pending.hash?pendingProgress.message:'交易已提交，正在自动检查确认状态。')}</small></div>}
+   {activePendings.map(record=><div className="pending" key={pendingKey(record)} data-transaction-group={transactionGroup(record.target)} data-token-id={record.tokenId}>{t("待确认：")}{t(record.label)}{record.tokenId&&<span title={record.tokenId}> · NFT #{record.tokenId.length>16?short(record.tokenId):record.tokenId}</span>} · <span title={record.hash}>{short(record.hash)}</span>{record.chainId===11155111&&<a href={`https://sepolia.etherscan.io/tx/${record.hash}`} target="_blank" rel="noreferrer">{t("查看交易")}</a>}<button onClick={()=>void checkPending(record)} disabled={!!busy}>{t("检查待确认交易")}</button><small className="pending-progress">{t(progressFor(record)||'交易已提交，正在自动检查确认状态。')}</small></div>)}
    {tab==='forge'&&state?.can_rescue&&<div className="daily-swords"><button className="secondary" disabled={disabled} onClick={()=>action('领取普通测试剑','/test/supply')}>{t('没有可强化的剑？领取一把普通测试剑')}</button></div>}
    {tab==='forge'&&<div className="forge-layout"><section className="forge-card"><div className="panel-top"><span>{t("01 / 锻造台")}</span><span className="live-dot">{t("领剑 → 加热 → 锻造")}</span></div><WorkshopStorage weapon={weapon} storedCount={(state?.weapons.length||0)-(weapon?1:0)} disabled={disabled} onStore={storeCurrent} onOpen={()=>setTab('bag')}/><div className="scene" ref={workshopSurface} tabIndex={-1} role="region" aria-label={t("锻造操作区")}><ForgeScene handOff={handOff} onStorageOpen={()=>setStorageFeedback('')} paused={!!activeRouteOffer} supplyRemaining={state?.player.daily_swords_remaining??null} supplyTotal={balance?.daily_swords??3} onClaimSword={claimSword} storageWeapons={syncError?[]:state?.weapons||[]} storageFeedback={syncError?'与服务器的同步已中断，当前显示上次保存的数据，恢复连接后会自动更新。':busy?'正在处理操作，请稍候。':storageFeedback} onStoreWeapon={storeCurrent} workshopKey={workshopKey} weapons={syncError?[]:(state?.weapons||[]).filter((w:Weapon)=>w.status==='active')} onSelectWeapon={takeOut} level={syncError?0:weapon?.level||0} hit={hit} weapon={syncError?undefined:weapon} result={lastResult} busy={disabled} probabilities={probs} shield={shield} canToggleShield={canToggleShield} shields={state?.player.shields||0} onShield={setShield} onPlacement={setWorkshopPlace} onHeat={heatWeapon} heatWarning={heatShortage} strikeWarning={strikeShortage} strikeMaterials={strikeCost} feedback={error&&!busy?notice:''} onStrike={strikeWeapon} visualTiers={balance?.visual_tiers} maxLevel={maxLevel} heatSeconds={balance?.heat_seconds??3} heatStrikes={balance?.heat_strikes??5}/><div className="scene-caption"><span>EMBER FORGE</span><small>{t("余烬未熄，传奇未定")}</small></div><div className="scene-tag">{weapon?`${name(weapon)} +${weapon.level}`:t('等待一把新武器')}</div></div><div className="forge-footer"><span>{t("从领剑处领取基础剑，也可以消耗铁块锻造新武器。")}</span><button className="secondary" disabled={disabled} onClick={()=>action('锻造武器','/forge')}>{t("＋ 锻造新武器 ")}<small><IronAmount amount={balance?.forge_materials??10}/></small></button></div>{weapon&&<WeaponLore weapon={weapon}/>}</section>
    <section className="control-card"><div className="panel-top"><span>{t("02 / 命运之锤")}</span><span>{t("风险与回报")}</span></div><label className="field-label" htmlFor="workshop-weapon">{t("从仓库取用")}</label><select id="workshop-weapon" value={weapon?.id||''} disabled={disabled} onChange={e=>takeOut(e.target.value)}><option value="" disabled>{t("工坊空闲 · 选择武器取出")}</option>{state?.weapons.filter((w:Weapon)=>w.status==='active').map((w:Weapon)=><option key={w.id} value={w.id}>{w.demo?'[DEMO] ':''}{name(w)} +{w.level} · {w.id===weapon?.id?t('工坊中'):t('仓库中')} · {short(w.id)}</option>)}</select><WeaponRoutes weapon={weapon} chances={balance?.route_mutation_chances}/><ForgeActions weapon={weapon} maxLevel={maxLevel} mintLevel={mintLevel(weapon)} probabilities={probs} heatCost={heatCost} strikeCost={strikeCost} heatSeconds={balance?.heat_seconds??3} heatStrikes={balance?.heat_strikes??5} protectionTrigger={balance?.protection_trigger??10} shield={shield} canToggleShield={canToggleShield} onShield={setShield} heatDisabled={disabled||!weapon||weapon.status!=='active'||weapon.level>=maxLevel||weapon.heat_charges>0} strikeDisabled={disabled||!weapon||weapon.status!=='active'||!hot||workshopPlace!=='anvil'||weapon.level>=maxLevel||!!strikeShortage} heatShortage={heatShortage} strikeShortage={strikeShortage} warming={warming} hot={hot} onHeat={heatWeapon} onStrike={strikeWeapon}/></section></div>}
-   {tab==='bag'&&<section className="inventory"><div className="section-title"><h2>{t("武器仓库 ")}<span>{state?.weapons.length||0}</span></h2><button className="secondary" disabled={disabled} onClick={()=>action('锻造武器','/forge')}>{t("＋ 锻造新武器")}<small><IronAmount amount={balance?.forge_materials??10}/></small></button></div><p className="warehouse-summary">{t('取出另一把武器时，当前工坊武器会自动存回仓库；存入不会消耗资源。')}</p>{!state?.weapons.length?<div className="empty">⚒<h3>{t("这里等待着你的第一把武器")}</h3><p>{t("到工坊左侧领剑处领取基础剑，再领取材料开始锻造。")}</p></div>:<div className="weapon-grid">{state.weapons.map((w:Weapon)=><WeaponCard key={w.id} weapon={w} serial={short(w.id)} status={w.status==='active'?(w.id===weapon?.id?t('工坊中'):t('仓库中')):minted.has(w.id)?t('已铸造 NFT'):w.status==='sealed'?t('已永久封存'):w.level>=(w.max_level??maxSwordLevel(w.branch))?t('路线满级'):t('可继续强化')} statusTone={w.status==='sealed'?'sealed':'active'} valueLabel={w.status==='active'?t('系统回收估值'):t('封存状态')} value={w.status==='active'?<GoldAmount amount={formatCoins(w.recycle_price)}/>:minted.has(w.id)?t('已铭刻'):t('待铭刻')}>{w.status==='active'?<><button className="secondary card-main-action" disabled={disabled} onClick={()=>takeOut(w.id)}>{w.id===weapon?.id?t('返回工坊'):t('取出并继续锻造')}</button><button className="quiet" disabled={disabled} onClick={async()=>{if(await askConfirmation(`回收后武器消失，获得 ${formatCoins(w.recycle_price)} 游戏金币。确定？`))action('系统回收',`/weapons/${w.id}/recycle`);}}>{t("系统回收")}</button><button className="primary" disabled={disabled||!canMint(w)} onClick={async()=>{if(await askConfirmation('封存后永久固定属性，不能再强化或卖给系统。确定封存？'))action('永久封存',`/weapons/${w.id}/seal`);}}>{t("封存")}{!canMint(w)?t`（最终形态需 +${mintLevel(w)}）`:''}</button></>:minted.has(w.id)?<button className="secondary" onClick={()=>setTab('market')}>{t("查看链上收藏 ↗")}</button>:<button className="primary" disabled={chainDisabled||!config?.chain||!canMint(w)} onClick={()=>mintWeapon(w)}>{t("铭刻 NFT ↗")}{!canMint(w)?t`（最终形态需 +${mintLevel(w)}）`:null}</button>}</WeaponCard>)}</div>}</section>}
+   {tab==='bag'&&<section className="inventory"><div className="section-title"><h2>{t("武器仓库 ")}<span>{state?.weapons.length||0}</span></h2><button className="secondary" disabled={disabled} onClick={()=>action('锻造武器','/forge')}>{t("＋ 锻造新武器")}<small><IronAmount amount={balance?.forge_materials??10}/></small></button></div><p className="warehouse-summary">{t('取出另一把武器时，当前工坊武器会自动存回仓库；存入不会消耗资源。')}</p>{!state?.weapons.length?<div className="empty">⚒<h3>{t("这里等待着你的第一把武器")}</h3><p>{t("到工坊左侧领剑处领取基础剑，再领取材料开始锻造。")}</p></div>:<div className="weapon-grid">{state.weapons.map((w:Weapon)=><WeaponCard key={w.id} weapon={w} serial={short(w.id)} status={pendingForWeapon(w.id)?t('等待链上确认'):w.status==='active'?(w.id===weapon?.id?t('工坊中'):t('仓库中')):minted.has(w.id)?t('已铸造 NFT'):w.status==='sealed'?t('已永久封存'):w.level>=(w.max_level??maxSwordLevel(w.branch))?t('路线满级'):t('可继续强化')} statusTone={w.status==='sealed'?'sealed':'active'} valueLabel={w.status==='active'?t('系统回收估值'):t('封存状态')} value={w.status==='active'?<GoldAmount amount={formatCoins(w.recycle_price)}/>:minted.has(w.id)?t('已铭刻'):t('待铭刻')}>{w.status==='active'?<><button className="secondary card-main-action" disabled={disabled} onClick={()=>takeOut(w.id)}>{w.id===weapon?.id?t('返回工坊'):t('取出并继续锻造')}</button><button className="quiet" disabled={disabled} onClick={async()=>{if(await askConfirmation(`回收后武器消失，获得 ${formatCoins(w.recycle_price)} 游戏金币。确定？`))action('系统回收',`/weapons/${w.id}/recycle`);}}>{t("系统回收")}</button><button className="primary" disabled={disabled||!canMint(w)} onClick={async()=>{if(await askConfirmation('封存后永久固定属性，不能再强化或卖给系统。确定封存？'))action('永久封存',`/weapons/${w.id}/seal`);}}>{t("封存")}{!canMint(w)?t`（最终形态需 +${mintLevel(w)}）`:''}</button></>:minted.has(w.id)?<button className="secondary" onClick={()=>setTab('market')}>{t("查看链上收藏 ↗")}</button>:<button className="primary" disabled={chainDisabled||!!pendingForWeapon(w.id)||!config?.chain||!canMint(w)} onClick={()=>mintWeapon(w)}>{t(pendingForWeapon(w.id)?'等待链上确认':'铭刻 NFT ↗')}{!canMint(w)?t`（最终形态需 +${mintLevel(w)}）`:null}</button>}</WeaponCard>)}</div>}</section>}
    {tab==='market'&&state?.player.can_cheat&&<ChainDiagnostics key={`${session?.address}:${config?.chain?.deploymentId||''}`} token={session?.token} walletAccount={walletAccount} walletChain={walletChain} boundWallet={session?.wallet_address} verified={session?.wallet_verified} expectedChainId={config?.network?.chainId}/>}
-   {tab==='market'&&<section className="inventory"><div className="section-title"><h2>{t("链上收藏与交易 ")}{marketView!=='staking'&&<span>{visibleNFTs.length}</span>}</h2><div className="withdraw"><span>{t("可提取收益 ")}{formatEther(proceeds)} ETH</span><button className="secondary" disabled={chainDisabled||proceeds===0n} onClick={()=>transact('提取交易收益',c=>c.withdraw())}>{t("提取")}</button></div></div><p className="section-description">{t("成交款进入卖家的合约余额，可随时提取到钱包。系统金币与测试 ETH 分开结算。")}</p>{marketError&&<p className="market-sync-error" role="alert">{t('链上信息暂未同步，请点击刷新状态后重试。')}</p>}<div className="market-views" role="group" aria-label={t('收藏与市场')}><button className="quiet" disabled={!session?.wallet_verified} aria-pressed={marketView==='mine'&&!!session?.wallet_verified} onClick={()=>setMarketView('mine')}>{t('我的收藏')}</button><button className="quiet" aria-pressed={marketView==='listings'||!session?.wallet_verified} onClick={()=>setMarketView('listings')}>{t('在售市场')}</button><button className="quiet" aria-pressed={marketView==='staking'} onClick={()=>{setStakingToken(null);setMarketView('staking');}}>{t('NFT 质押')}</button></div><ChainHistory deploymentId={config?.chain?.deploymentId}/>{marketView==='staking'?<StakingPanel selectedToken={stakingToken} onBack={()=>setMarketView('mine')} key={session?.address} config={config?.staking} account={session?.wallet_verified?session.wallet_address||undefined:undefined} disabled={chainDisabled} nfts={nfts} revision={`${pending?.hash||''}:${chainViewVersion}`} feedback={cardFeedback} message={config?.staking_error} pendingAction={pending?{tokenId:pending.tokenId,label:pending.label,message:pendingProgress?.hash===pending.hash?pendingProgress.message:'交易已提交，正在自动检查确认状态。'}:undefined} onAction={stakingAction}/>:!visibleNFTs.length?<div className="empty">◇<h3>{t(config?.chain?(marketView==='mine'&&session?.wallet_verified?"暂无持有的 NFT":"暂无挂牌藏品"):"NFT 功能准备中")}</h3><p>{t(config?.chain?"铭刻或购买后可在我的收藏中查看；售出后会移出收藏。":"完成 NFT 业务合约部署后，这里将开放铭刻与交易。普通锻造和仓库现在就能使用。")}</p></div>:<div className="weapon-grid">{visibleNFTs.map(n=>{const mine=n.owner.toLowerCase()===session?.wallet_address?.toLowerCase();const listed=n.price>0n;const waiting=pending?.tokenId===n.id;const operating=cardOperation?.id===n.id;const feedback=cardFeedback[n.id];const message=waiting?(pendingProgress?.hash===pending.hash?pendingProgress.message:'交易已提交，正在自动检查确认状态。'):operating?'请在钱包中确认操作；尚未提交交易。':feedback?.message;return <WeaponCard key={n.id} weapon={n} serial={`#${short(n.id)}`} nft status={waiting?t('等待链上确认'):operating?t('等待钱包确认'):listed?t('正在出售'):mine?t('在你的钱包 · 未挂牌'):t('未挂牌')} statusTone={listed?'listed':'sealed'} detail={<><span>{t("持有人")}</span><span title={n.owner}>{short(n.owner)}{mine?t(' · 你'):''}</span></>} showValue={listed} valueLabel={t("挂牌价格")} value={listed?formatEther(n.price):t('未设置')} valueUnit={listed?t('测试 ETH'):undefined}>{message&&<p className={`nft-action-feedback${!waiting&&!operating&&feedback?.error?' error':''}`} role="status" aria-live="polite">{t(message)}</p>}{mine?<NFTActions key={`${n.id}:${n.owner}:${n.price}`} listed={listed} disabled={chainDisabled} price={prices[n.id]||''} onPrice={value=>setPrices({...prices,[n.id]:value})} onStake={()=>{setStakingToken(n.id);setMarketView('staking');}} onList={()=>void transact('挂牌 NFT',c=>{const price=parseEther(prices[n.id]||'0');if(price<=0n)throw Error('请输入大于零的 ETH 价格。');return c.list(n.id,price);},n.id)} onCancel={()=>void transact('撤销挂牌',c=>c.cancel(n.id),n.id)}/>:<button className="primary" disabled={chainDisabled||!listed} onClick={()=>transact('购买 NFT',c=>c.buy(n.id,n.seller,n.price,{value:n.price}),n.id)}>{listed?t('购买收藏品'):t('等待持有人挂牌')}</button>}</WeaponCard>;})}</div>}</section>}
-   {tab==='recharge'&&<RechargePanel key={session?.address} config={config?.recharge} account={session?.wallet_verified?session.wallet_address||undefined:undefined} disabled={disabled||activePending||!walletReady} revision={`${pending?.hash||''}:${chainViewVersion}`} message={config?.recharge_error} onAdminChange={changeRechargeAdmin} onRecharge={rechargeCoins} onWithdraw={withdrawRecharge} walletReady={walletReady} busy={busy} pending={pending?.target==='recharge'?pending:undefined} progress={pendingProgress?.hash===pending?.hash?pendingProgress?.message:undefined} onCheck={checkPending}/>}
+   {tab==='market'&&<section className="inventory"><div className="section-title"><h2>{t("链上收藏与交易 ")}{marketView!=='staking'&&<span>{visibleNFTs.length}</span>}</h2><div className="withdraw"><span>{t("可提取收益 ")}{formatEther(proceeds)} ETH</span><button className="secondary" disabled={chainDisabled||proceedsPending||proceeds===0n} onClick={()=>transact('提取交易收益',c=>c.withdraw())}>{t("提取")}</button></div></div><p className="section-description">{t("成交款进入卖家的合约余额，可随时提取到钱包。系统金币与测试 ETH 分开结算。")}</p>{marketError&&<p className="market-sync-error" role="alert">{t('链上信息暂未同步，请点击刷新状态后重试。')}</p>}<div className="market-views" role="group" aria-label={t('收藏与市场')}><button className="quiet" disabled={!session?.wallet_verified} aria-pressed={marketView==='mine'&&!!session?.wallet_verified} onClick={()=>setMarketView('mine')}>{t('我的收藏')}</button><button className="quiet" aria-pressed={marketView==='listings'||!session?.wallet_verified} onClick={()=>setMarketView('listings')}>{t('在售市场')}</button><button className="quiet" aria-pressed={marketView==='staking'} onClick={()=>{setStakingToken(null);setMarketView('staking');}}>{t('NFT 质押')}</button></div><ChainHistory deploymentId={config?.chain?.deploymentId}/>{marketView==='staking'?<StakingPanel selectedToken={stakingToken} onBack={()=>setMarketView('mine')} key={session?.address} config={config?.staking} account={session?.wallet_verified?session.wallet_address||undefined:undefined} disabled={chainDisabled||unknownNFTPending} nfts={nfts} revision={`${nftPendingSignature}:${chainViewVersion}`} feedback={cardFeedback} message={config?.staking_error} pendingActions={nftPendings.map(record=>({tokenId:record.tokenId,label:record.label,message:progressFor(record)||'交易已提交，正在自动检查确认状态。'}))} onAction={stakingAction}/>:!visibleNFTs.length?<div className="empty">◇<h3>{t(config?.chain?(marketView==='mine'&&session?.wallet_verified?"暂无持有的 NFT":"暂无挂牌藏品"):"NFT 功能准备中")}</h3><p>{t(config?.chain?"铭刻或购买后可在我的收藏中查看；售出后会移出收藏。":"完成 NFT 业务合约部署后，这里将开放铭刻与交易。普通锻造和仓库现在就能使用。")}</p></div>:<div className="weapon-grid">{visibleNFTs.map(n=>{const mine=n.owner.toLowerCase()===session?.wallet_address?.toLowerCase();const listed=n.price>0n;const nftPending=pendingForWeapon(n.id);const waiting=!!nftPending;const operating=cardOperation?.id===n.id;const feedback=cardFeedback[n.id];const message=waiting?(progressFor(nftPending)||'交易已提交，正在自动检查确认状态。'):operating?'请在钱包中确认操作；尚未提交交易。':feedback?.message;return <WeaponCard key={n.id} weapon={n} serial={`#${short(n.id)}`} nft status={waiting?t('等待链上确认'):operating?t('等待钱包确认'):listed?t('正在出售'):mine?t('在你的钱包 · 未挂牌'):t('未挂牌')} statusTone={listed?'listed':'sealed'} detail={<><span>{t("持有人")}</span><span title={n.owner}>{short(n.owner)}{mine?t(' · 你'):''}</span></>} showValue={listed} valueLabel={t("挂牌价格")} value={listed?formatEther(n.price):t('未设置')} valueUnit={listed?t('测试 ETH'):undefined}>{message&&<p className={`nft-action-feedback${!waiting&&!operating&&feedback?.error?' error':''}`} role="status" aria-live="polite">{t(message)}</p>}{mine?<NFTActions key={`${n.id}:${n.owner}:${n.price}`} listed={listed} disabled={chainDisabled||waiting} price={prices[n.id]||''} onPrice={value=>setPrices({...prices,[n.id]:value})} onStake={()=>{setStakingToken(n.id);setMarketView('staking');}} onList={()=>void transact('挂牌 NFT',c=>{const price=parseEther(prices[n.id]||'0');if(price<=0n)throw Error('请输入大于零的 ETH 价格。');return c.list(n.id,price);},n.id)} onCancel={()=>void transact('撤销挂牌',c=>c.cancel(n.id),n.id)}/>:<button className="primary" disabled={chainDisabled||waiting||!listed} onClick={()=>transact('购买 NFT',c=>c.buy(n.id,n.seller,n.price,{value:n.price}),n.id)}>{listed?t('购买收藏品'):t('等待持有人挂牌')}</button>}</WeaponCard>;})}</div>}</section>}
+   {tab==='recharge'&&<RechargePanel key={session?.address} config={config?.recharge} account={session?.wallet_verified?session.wallet_address||undefined:undefined} disabled={disabled||!!rechargePending||!walletReady} revision={`${rechargePending?.hash||''}:${chainViewVersion}`} message={config?.recharge_error} onAdminChange={changeRechargeAdmin} onRecharge={rechargeCoins} onWithdraw={withdrawRecharge} walletReady={walletReady} busy={busy} pending={rechargePending} progress={progressFor(rechargePending)} onCheck={()=>checkPending(rechargePending)}/>}
    {tab==='mail'&&<Mailbox key={session?.address||'guest'} account={session?.username?session.address:undefined} canTest={!!state?.player.can_cheat} busy={disabled} summaryVersion={`${state?.player.mail_count||0}:${state?.player.mail_unread||0}`} onAction={action}/>}
    {tab!=='mail'&&tab!=='recharge'&&state?.player.can_cheat&&<CheatPanel busy={disabled} maxLevel={balance?.max_level??100} heatStrikes={balance?.heat_strikes??5} weapon={weapon} onAction={action}/>}
    {tab!=='mail'&&tab!=='recharge'&&<WorkshopSupplies balance={balance} coins={state?.player.coins??0} disabled={disabled} canClaimDemo={!!state?.player.can_cheat} demoDisabled={disabled||!!state?.player.demo_claimed||!config?.chain} onBuy={item=>{if(item==='sword')void action('购买普通剑','/shop/sword');else if(item==='iron')void action('补充铁块','/materials');else void action('购买保护符','/shop/wards');}} onDemo={()=>void action('领取演示武器','/demo/seed')}/>}<footer>FORGE OF FATE <span>{t("游戏进度由本机服务保存 · 链上交易通过钱包确认")}</span></footer>

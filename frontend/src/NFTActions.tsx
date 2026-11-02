@@ -7,7 +7,7 @@ export default function NFTActions({listed,disabled,price,onPrice,onList,onCance
  const {t}=useI18n();const [editing,setEditing]=useState(false);
  return <div className="nft-controls">
   {!editing?<>
-   <button className="secondary nft-stake-action nft-wide" onClick={onStake}>{t('质押 NFT')}</button>
+   {!listed&&<button className="secondary nft-stake-action nft-wide" disabled={disabled} onClick={onStake}>{t('质押 NFT')}</button>}
    <button className="primary nft-list-action nft-wide" disabled={disabled} onClick={()=>setEditing(true)}>{t(listed?'更新价格':'挂牌出售')}</button>
    {listed&&<button className="quiet nft-wide" disabled={disabled} onClick={onCancel}>{t('撤销挂牌')}</button>}
   </>:<>

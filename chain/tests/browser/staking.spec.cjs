@@ -3,10 +3,10 @@ const {Wallet,Interface,ZeroAddress}=require('ethers');
 const nftArtifact=require('../../artifacts/contracts/ForgeOfFate.sol/ForgeOfFate.json');
 const stakeArtifact=require('../../artifacts/contracts/ForgeStaking.sol/ForgeStaking.json');
 const nft='0x'+'34'.repeat(20),staking='0x'+'56'.repeat(20),nftEpoch='0x'+'ab'.repeat(32),epoch='0x'+'ef'.repeat(32),hash='0x'+'cd'.repeat(32);
-async function setup(page,game,{approved=false,staked=false,pending=false,pendingAction='质押 NFT',pendingTarget='staking',token='42'}={}){
+async function setup(page,game,{approved=false,staked=false,pending=false,pendingAction='质押 NFT',pendingTarget='staking',token='42',listed=false,staleHoldings=false}={}){
  const account=await register(page,false,game),wallet=Wallet.createRandom();
  game.sql('INSERT INTO wallet_bindings(account_id,wallet_address,verified_at) SELECT id,?,1 FROM accounts WHERE game_address=?',[wallet.address,account.address]);
- const control={approved,staked,offline:false,final:false,sends:[],reads:[],receiptReads:0};
+ const control={approved,staked,listed,staleHoldings,offline:false,final:false,sends:[],reads:[],receiptReads:0};
  const nftApi=new Interface(nftArtifact.abi),stakeApi=new Interface(stakeArtifact.abi);
  await page.exposeFunction('stakingRpc',({method,params})=>{
   if(method==='eth_blockNumber')return '0x20';
@@ -17,6 +17,7 @@ async function setup(page,game,{approved=false,staked=false,pending=false,pendin
    const decoded=api.parseTransaction({data:params[0].data});control.reads.push(decoded.name);
    if(decoded.name==='deploymentId')return api.encodeFunctionResult('deploymentId',[isStake?epoch:nftEpoch]);
    if(decoded.name==='nft')return api.encodeFunctionResult('nft',[nft]);
+   if(decoded.name==='listings')return api.encodeFunctionResult('listings',[control.listed?wallet.address:ZeroAddress,control.listed?10000000000000000n:0n]);
    if(decoded.name==='ownerOf')return api.encodeFunctionResult('ownerOf',[wallet.address]);
    if(decoded.name==='stake')return api.encodeFunctionResult('stake',[9]);
    if(['approve','unstake'].includes(decoded.name))return '0x';
@@ -42,8 +43,8 @@ async function setup(page,game,{approved=false,staked=false,pending=false,pendin
   await route.fulfill({json:d});
  });
  const uri='data:application/json;base64,'+Buffer.from(JSON.stringify({name:'余烬君王',name_en:'Sovereign of Ash',branch:'greatsword',tier_id:'greatsword-60'})).toString('base64');
- await page.route('**/api/chain/nfts?*',route=>route.fulfill({json:{chainId:11155111,deploymentId:nftEpoch,blockNumber:20,total:1,proceeds:'0',items:[{id:token,owner:control.staked?staking:wallet.address,seller:ZeroAddress,price:'0',level:70,uri}]}}));
- await page.route('**/api/chain/staking',route=>control.offline?route.fulfill({status:503,json:{detail:'offline'}}):route.fulfill({json:{account:wallet.address,deploymentId:epoch,chainId:11155111,blockNumber:20,available:control.staked?[]:[{tokenId:token,approved:control.approved}],positions:control.staked?[{tokenId:token,positionId:'9',startedAt:1793440000}]:[]}}));
+ await page.route('**/api/chain/nfts?*',route=>route.fulfill({json:{chainId:11155111,deploymentId:nftEpoch,blockNumber:20,total:1,proceeds:'0',items:[{id:token,owner:control.staked?staking:wallet.address,seller:control.listed?wallet.address:ZeroAddress,price:control.listed?'10000000000000000':'0',level:70,uri}]}}));
+ await page.route('**/api/chain/staking',route=>control.offline?route.fulfill({status:503,json:{detail:'offline'}}):route.fulfill({json:{account:wallet.address,deploymentId:epoch,chainId:11155111,blockNumber:20,available:control.staked||(control.listed&&!control.staleHoldings)?[]:[{tokenId:token,approved:control.approved}],positions:control.staked?[{tokenId:token,positionId:'9',startedAt:1793440000}]:[]}}));
  await page.route(pendingTarget==='staking'?'**/api/chain/staking/receipts/*':'**/api/chain/receipts/*',route=>{control.receiptReads++;return route.fulfill({json:{chainId:11155111,deploymentId:pendingTarget==='staking'?epoch:nftEpoch,state:control.final?'confirmed':'confirming',receipt:{hash,from:wallet.address,status:1,finalized:control.final}}});});
  const record={hash,account:wallet.address,contract:pendingTarget==='staking'?staking:nft,epoch:pendingTarget==='staking'?epoch:nftEpoch,chainId:11155111,label:pendingAction,tokenId:token,...(pendingTarget==='staking'?{target:'staking'}:{})};
  const key=`forge:transaction:11155111:${record.contract}:${record.epoch}:${hash}`;
@@ -183,4 +184,33 @@ test('an idle staking page makes no timed chain reads; manual refresh still upda
  await page.getByRole('button',{name:'↻ 刷新状态',exact:true}).click();
  await expect.poll(()=>reads).toBeGreaterThan(0);
  await expect(s.panel.getByRole('button',{name:'取回 NFT',exact:true})).toBeEnabled();
+});
+
+for(const staleHoldings of [false,true])test(`listed NFTs disappear from staking and regain the entry after cancellation (stale holdings: ${staleHoldings})`,async({page,game})=>{
+ const s=await setup(page,game,{listed:true,staleHoldings});
+ await expect(s.panel.locator('.staking-item')).toHaveCount(0);
+ await expect(s.panel.locator('.staking-stat').last().locator('strong')).toHaveText('0');
+ await s.panel.getByRole('button',{name:'返回我的收藏',exact:true}).click();
+ const card=page.locator('.weapon-card[data-nft]');
+ await expect(card.getByRole('button',{name:'质押 NFT',exact:true})).toHaveCount(0);
+ await expect(card.getByRole('button',{name:'更新价格',exact:true})).toBeVisible();
+ await expect(card.getByRole('button',{name:'撤销挂牌',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Switch to English',exact:true}).click();
+ await expect(card.getByRole('button',{name:'Stake NFT',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'切换为中文',exact:true}).click();
+ s.control.listed=false;await page.getByRole('button',{name:'↻ 刷新状态',exact:true}).click();
+ await expect(card.getByRole('button',{name:'质押 NFT',exact:true})).toBeEnabled();
+ await card.getByRole('button',{name:'质押 NFT',exact:true}).click();
+ await expect(s.panel.getByRole('button',{name:'授权此 NFT',exact:true})).toBeEnabled();
+ await expect(s.panel.locator('.staking-stat').last().locator('strong')).toHaveText('1');
+ expect(s.control.sends).toHaveLength(0);
+});
+for(const approved of [false,true])test(`a new listing during staking confirmation blocks the wallet send (approved: ${approved})`,async({page,game})=>{
+ const s=await setup(page,game,{approved});
+ await s.panel.getByRole('button',{name:approved?'确认质押':'授权此 NFT',exact:true}).click();
+ await expect(page.getByRole('alertdialog')).toBeVisible();s.control.listed=true;await confirm(page);
+ await expect(page.locator('.notice')).toContainText('请先撤销挂牌并等待确认');
+ await expect(s.panel.locator('.staking-item')).toHaveCount(0);
+ expect(s.control.sends).toHaveLength(0);
+ expect(s.control.reads).toContain('listings');
 });

@@ -53,6 +53,9 @@ class StakingReader(ChainReader):
             for token in tokens:
                 owner=nft.functions.ownerOf(token).call(block_identifier=block)
                 if owner.lower()==account.lower():
+                    _,price=nft.functions.listings(token).call(block_identifier=block)
+                    if price>0:
+                        continue  # Delist first; sale and staking are separate UI flows.
                     approved=(nft.functions.getApproved(token).call(block_identifier=block).lower()==info['address'].lower()
                               or nft.functions.isApprovedForAll(account,info['address']).call(block_identifier=block))
                     available.append({'tokenId':str(token),'approved':bool(approved)})

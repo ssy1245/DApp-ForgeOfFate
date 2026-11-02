@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import ts from 'typescript';
 const source=await fs.readFile(new URL('../client/transactions.ts',import.meta.url),'utf8');
 const {outputText}=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
-const {readPending,writePending,removePending,samePending,matchesPending,storageAvailable,finalReceipt}=await import('data:text/javascript;base64,'+Buffer.from(outputText).toString('base64'));
+const {readPending,writePending,removePending,samePending,matchesPending,storageAvailable,finalReceipt,conflictsWithPending}=await import('data:text/javascript;base64,'+Buffer.from(outputText).toString('base64'));
 const p={hash:'0x'+'ab'.repeat(32),account:'0x'+'12'.repeat(20),contract:'0x'+'34'.repeat(20),epoch:'0x'+'56'.repeat(32),chainId:11155111,label:'Mint NFT'};
 const chain={address:p.contract,deploymentId:p.epoch,chainId:p.chainId};
 class Storage {
@@ -73,4 +73,27 @@ test('recharge progress retains amount and time while malformed display values c
  assert.ok(writePending(record,storage));assert.deepEqual(readPending(storage,new Storage()),[record]);
  for(const amountWei of ['-1','0','1.5',String(2n**256n),'9'.repeat(79)])assert.equal(writePending({...record,amountWei},storage),false);
  for(const submittedAt of [0,-1,NaN,9007199254740991,'today'])assert.equal(writePending({...record,submittedAt},storage),false);
+});
+
+test('weapon locks span mint, trade and staking without losing uint256 precision or blocking other weapons',()=>{
+ const id='70040015053319833925070134247553094792372603883471276971352987907260594856800';
+ for(const target of [undefined,'staking']){
+  const record={...p,target,tokenId:id};
+  for(const operationTarget of ['nft','staking']){
+   assert.equal(conflictsWithPending(record,{target:operationTarget,tokenId:id,label:'质押 NFT'}),true);
+   assert.equal(conflictsWithPending(record,{target:operationTarget,tokenId:'0x'+BigInt(id).toString(16),label:'铭刻 NFT'}),true);
+   assert.equal(conflictsWithPending(record,{target:operationTarget,tokenId:(BigInt(id)+1n).toString(),label:'挂牌 NFT'}),false);
+  }
+  assert.equal(conflictsWithPending(record,{target:'recharge',label:'充值游戏金币'}),false);
+ }
+});
+test('recharge and proceeds keep their own duplicate protection; unidentified legacy NFT records fail closed',()=>{
+ const deposit={...p,target:'recharge',label:'充值游戏金币'};
+ for(const label of ['充值游戏金币','提现充值收入','添加充值管理员'])assert.equal(conflictsWithPending(deposit,{target:'recharge',label}),true);
+ const proceeds={...p,label:'提取交易收益'};
+ assert.equal(conflictsWithPending(proceeds,{target:'nft',label:'提取交易收益'}),true);
+ assert.equal(conflictsWithPending(proceeds,{target:'nft',tokenId:'42',label:'挂牌 NFT'}),false);
+ assert.equal(conflictsWithPending({...p,tokenId:'42'},{target:'nft',label:'提取交易收益'}),false);
+ assert.equal(conflictsWithPending(p,{target:'nft',tokenId:'42',label:'挂牌 NFT'}),true);
+ assert.equal(conflictsWithPending(p,{target:'recharge',label:'充值游戏金币'}),false);
 });

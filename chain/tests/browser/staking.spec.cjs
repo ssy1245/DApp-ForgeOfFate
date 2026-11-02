@@ -34,6 +34,7 @@ async function setup(page,game,{approved=false,staked=false,pending=false,pendin
   }};
   window.changeStakeWallet=()=>{current='0x'+'78'.repeat(20);for(const f of listeners.accountsChanged||[])f([current]);};
  },wallet.address);
+ await page.route('**/api/chain/tasks',route=>route.fulfill({json:{id:'test-task',state:'pending',checkInterval:30}}));
  await page.route('**/api/config',async route=>{
   const r=await route.fetch(),d=await r.json();d.network.chainId=11155111;
   d.chain={address:nft,chainId:11155111,deploymentId:nftEpoch,abi:nftArtifact.abi};d.chain_error=null;
@@ -100,9 +101,9 @@ test('wallet switch during staking confirmation sends nothing',async({page,game}
  await expect(page.locator('.notice')).toContainText('钱包或登录账号已变化');expect(s.control.sends).toHaveLength(0);
 });
 test('failed custody reads disable actions until the server recovers',async({page,game})=>{
- const s=await setup(page,game,{staked:true});s.control.offline=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ const s=await setup(page,game,{staked:true});s.control.offline=true;await page.getByRole('button',{name:'↻ 刷新状态',exact:true}).click();
  await expect(s.panel.getByRole('alert')).toBeVisible();await expect(s.panel.getByRole('button',{name:'取回 NFT',exact:true})).toBeDisabled();
- s.control.offline=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ s.control.offline=false;await page.getByRole('button',{name:'↻ 刷新状态',exact:true}).click();
  await expect(s.panel.getByRole('button',{name:'取回 NFT',exact:true})).toBeEnabled();
 });
 
@@ -168,4 +169,18 @@ test('pending approval shows its own phase and unlocks staking only after final 
  s.control.final=true;await page.getByRole('button',{name:'检查待确认交易',exact:true}).click();
  await expect(row.getByRole('button',{name:'确认质押',exact:true})).toBeEnabled();
  await expect(row).toContainText('已授权，尚未质押');expect(s.control.sends).toHaveLength(0);
+});
+
+test('an idle staking page makes no timed chain reads; manual refresh still updates custody',async({page,game})=>{
+ await page.clock.install();
+ const s=await setup(page,game,{staked:true});
+ await expect(s.panel.getByRole('button',{name:'取回 NFT',exact:true})).toBeEnabled();
+ let reads=0;
+ page.on('request',request=>{if(/\/api\/chain\/(nfts\?|staking$|recharge\/treasury$|diagnostics$)/.test(request.url()))reads++;});
+ await page.clock.fastForward(90000);
+ await page.waitForTimeout(100);
+ expect(reads).toBe(0);
+ await page.getByRole('button',{name:'↻ 刷新状态',exact:true}).click();
+ await expect.poll(()=>reads).toBeGreaterThan(0);
+ await expect(s.panel.getByRole('button',{name:'取回 NFT',exact:true})).toBeEnabled();
 });

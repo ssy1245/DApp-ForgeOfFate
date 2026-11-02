@@ -24,12 +24,20 @@ from chain.server.wallets import identity, create_challenge, bind_wallet, check_
 from chain.server.rpc import ChainSettings, ChainReader
 from chain.server.nft import mint_authorization
 from chain.server.diagnostics import inspect_chain
+from chain.server.tasks import enqueue, manifest, task_receipt, worker_status
 from .game import BALANCE, probabilities, recycle_price, strike, strike_material_cost, weapon_name, weapon_tier, weapon_max_level, weapon_mint_level, weapon_can_mint, SWORD_BRANCHES, next_mutation, apply_mutation, passed_mutation_level
 
 LOCAL = ChainSettings.from_env().directory
 
 class AddressBody(BaseModel):
     address: str
+
+class ChainTaskBody(BaseModel):
+    target: Literal['nft', 'staking', 'recharge']
+    chain_id: int
+    deployment_id: str = Field(max_length=66)
+    tx_hash: str | None = Field(default=None, pattern=r'^0x[0-9a-fA-F]{64}$')
+    retry: bool = False
 
 class LoginBody(BaseModel):
     challenge_id: str
@@ -245,8 +253,7 @@ def create_app(db_path=None, demo=None):
     def config():
         result = {'balance': BALANCE, 'demo_mode': demo_enabled, 'network': settings.public(), 'chain': None, 'chain_error': None, 'staking': None, 'staking_error': None}
         try:
-            info, _, _ = chain()
-            result['chain'] = {k: info[k] for k in ['address', 'chainId', 'deploymentId', 'abi']}
+            result['chain'] = reader.public_config()
         except HTTPException as e:
             result['chain_error'] = e.detail
         if result['chain']:
@@ -268,17 +275,39 @@ def create_app(db_path=None, demo=None):
                 with store.connection() as db:
                     source=db.execute('SELECT * FROM recharge_sources WHERE chain_id=? AND contract=? COLLATE NOCASE AND deployment=?',
                         (recharge['chainId'],recharge['address'],recharge['deploymentId'])).fetchone()
+                    worker_running=worker_status(db)['running'] or (not db.execute('SELECT 1 FROM chain_worker').fetchone()
+                        and source is not None and time.time()-source['updated_at']<=120)
                 recharge.update(weiPerUnit=str(wei),coinsPerUnit=coins,ready=bool(source
                     and source['wei_per_unit']==str(wei) and source['coins_per_unit']==coins
-                    and source['state']=='ready' and time.time()-source['updated_at']<=120))
+                    and source['state']=='ready' and worker_running))
             result['recharge']=recharge
         except (HTTPException,ValueError):
             result['recharge_error']='充值配置暂时不可用，请检查部署和兑换比例。'
         return result
 
+    @app.post('/api/chain/tasks')
+    def submit_chain_task(body: ChainTaskBody, authorization: str | None = Header(default=None)):
+        address = authenticated(authorization)
+        info = manifest(settings, body.target)
+        if (body.chain_id, body.deployment_id) != (info['chainId'], info['deploymentId']):
+            raise HTTPException(409, '部署信息已变化，请刷新页面。')
+        with store.connection() as db:
+            player = identity(db, address)
+            if not player['wallet_verified']:
+                raise HTTPException(403, '请先绑定钱包，再同步链上任务。')
+            key = enqueue(db, body.target, info, kind='transaction' if body.tx_hash else 'sync',
+                          tx_hash=body.tx_hash, wallet=player['wallet_address'])
+            if body.retry and body.tx_hash:
+                if db.execute("SELECT COUNT(*) FROM chain_tasks WHERE wallet=? AND state='pending' AND kind='transaction'", (player['wallet_address'].lower(),)).fetchone()[0] >= 10:
+                    raise HTTPException(429, '待确认交易过多，请先处理已有交易。')
+                db.execute("UPDATE chain_tasks SET state='pending',expires_at=?,updated_at=?,error='' WHERE id=? AND state='expired'",
+                           (time.time()+86400,time.time(),key))
+            row = db.execute('SELECT state,error FROM chain_tasks WHERE id=?', (key,)).fetchone()
+        return {'id': key, 'state': row['state'], 'message': row['error'], 'checkInterval': 30}
+
     @app.get('/api/chain/recharge/receipts/{tx_hash}')
     def recharge_receipt(tx_hash: str):
-        result=recharge_reader.receipt(tx_hash)
+        result=task_receipt(store,settings,'recharge',tx_hash) or recharge_reader.receipt(tx_hash)
         result['credit']=None
         if result.get('state')=='confirmed' and (result.get('receipt') or {}).get('status')==1:
             with store.connection() as db:
@@ -331,7 +360,7 @@ def create_app(db_path=None, demo=None):
 
     @app.get('/api/chain/staking/receipts/{tx_hash}')
     def staking_receipt(tx_hash: str):
-        return staking_reader.receipt(tx_hash)
+        return task_receipt(store,settings,'staking',tx_hash) or staking_reader.receipt(tx_hash)
 
     @app.get('/api/chain/nfts')
     def nfts(account: str | None = None, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100), block: int | None = Query(None, ge=0)):
@@ -353,7 +382,7 @@ def create_app(db_path=None, demo=None):
 
     @app.get('/api/chain/receipts/{tx_hash}')
     def receipt(tx_hash: str):
-        return reader.receipt(tx_hash)
+        return task_receipt(store,settings,'nft',tx_hash) or reader.receipt(tx_hash)
 
     def binding_origin(request):
         origin = request.headers.get('origin', wallet_origin)

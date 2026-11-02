@@ -25,8 +25,8 @@ export default function RechargeTreasury({config,account,disabled,revision,onWit
     if(live){setAccess({balance:value,canManage,admins});setSeen(true);setFailed(false);}
    }catch{if(live){setAccess(null);setFailed(true);}}finally{inFlight=false;}
   };
-  void update();const timer=setInterval(update,10000);window.addEventListener('focus',update);document.addEventListener('visibilitychange',update);
-  return()=>{live=false;abort.abort();clearInterval(timer);window.removeEventListener('focus',update);document.removeEventListener('visibilitychange',update);};
+  void update();
+  return()=>{live=false;abort.abort();};
  },[config.address,config.chainId,config.deploymentId,config.treasury,account,revision]);
  // Ordinary players never see management controls. Previously authorized users see revocation/errors.
  if(!seen&&!access)return null;

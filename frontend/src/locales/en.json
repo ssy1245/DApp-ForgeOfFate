@@ -1096,5 +1096,10 @@
   "{0} 秒 · 可敲 {1} 锤": "{0}s · Up to {1} strikes",
   "按当前武器阶段计费": "Based on current weapon stage",
   "单锤成本随武器阶段变化，突变或降级后会重新计算，以当前显示为准。": "Strike costs change with the weapon stage and update after mutation or downgrade. The current cost is shown above.",
-  "成功": "Success"
+  "成功": "Success",
+  "暂无任务 · 按需同步": "No tasks · Syncs on demand",
+  "打开页面或刷新时同步链上状态；有任务时每 30 秒检查，空闲时暂停查询。": "Syncs when you open or refresh this page. Active tasks are checked every 30 seconds; no checks while idle.",
+  "链上信息暂未同步，请点击刷新状态后重试。": "Chain data is not synced. Click Refresh to try again.",
+  "质押状态暂时无法读取，请点击刷新状态重试。": "Staking data could not be loaded. Click Refresh to try again.",
+  "自动检查已暂停；请核对钱包交易，并用刷新状态补同步，不要重复付款。": "Automatic checks are paused. Check the wallet transaction and refresh to sync. Do not pay again."
 }

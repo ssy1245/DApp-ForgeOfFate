@@ -32,6 +32,7 @@ async function setup(page,game,{pending=false,ready=true,administrator=false,tre
   }};
   window.changeRechargeWallet=()=>{current='0x'+'78'.repeat(20);for(const f of listeners.accountsChanged||[])f([current]);};
  },wallet.address);
+ await page.route('**/api/chain/tasks',route=>route.fulfill({json:{id:'test-task',state:'pending',checkInterval:30}}));
  await page.route('**/api/config',async route=>{
   const r=await route.fetch(),d=await r.json();d.network.chainId=11155111;
   d.chain={address:nft,chainId:11155111,deploymentId:epoch,abi:nftArtifact.abi};d.chain_error=null;
@@ -169,7 +170,7 @@ test('root can add and remove admins; malformed, self and duplicate targets are 
  await input.fill(target);await add.click();await expect(page.getByRole('alertdialog')).toContainText(target);await confirm(page);
  await expect.poll(()=>s.control.sends.length).toBe(1);let call=s.abi.parseTransaction({data:s.control.sends[0].data});expect(call.name).toBe('addAdmin');expect(call.args[0]).toBe(target);
  await expect(page.locator('.notice')).toContainText('操作已取消');
- s.control.admins.push(target);await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ s.control.admins.push(target);await page.getByRole('button',{name:'↻ 刷新状态',exact:true}).click();
  await expect(panel.locator('li')).toHaveCount(2);await expect(add).toBeDisabled();
  await panel.getByRole('button',{name:`移除 ${target}`,exact:true}).click();await expect(page.getByRole('alertdialog')).toContainText('将不能再发起提现');await confirm(page);
  await expect.poll(()=>s.control.sends.length).toBe(2);call=s.abi.parseTransaction({data:s.control.sends[1].data});expect(call.name).toBe('removeAdmin');expect(call.args[0]).toBe(target);

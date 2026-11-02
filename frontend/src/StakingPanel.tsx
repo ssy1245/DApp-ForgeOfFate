@@ -29,9 +29,8 @@ export default function StakingPanel({config,account,disabled,nfts,revision,mess
     if(live){setData(snapshot);setFailed(false);}
    }catch{if(live)setFailed(true);}finally{inFlight=false;if(live)setLoading(false);}
   };
-  setLoading(true);void update();const timer=setInterval(update,15000);window.addEventListener('focus',update);
-  document.addEventListener('visibilitychange',update);
-  return()=>{live=false;controller.abort();clearInterval(timer);window.removeEventListener('focus',update);document.removeEventListener('visibilitychange',update);};
+  setLoading(true);void update();
+  return()=>{live=false;controller.abort();};
  },[config?.address,config?.deploymentId,account,revision]);
  const blocked=disabled||loading||failed;
  const compactId=(id:string)=>id.length>16?`${id.slice(0,7)}…${id.slice(-5)}`:id;
@@ -58,7 +57,7 @@ export default function StakingPanel({config,account,disabled,nfts,revision,mess
   <details className="staking-rules"><summary>{t('奖励与取回规则')}<span aria-hidden="true">＋</span></summary><div><p>{t('质押后 NFT 由质押合约保管，可随时取回。奖励按 UTC 日历日的实际质押时长折算，通过邮箱领取。')}</p><p>{t('北京时间每日 08:00 跨日后，待链上最终确认再发放前一日奖励；服务器停机后会补发。')}</p></div></details>
   {!config?<p className="staking-empty">{t('质押合约尚未配置。部署完成后刷新页面。')}</p>:!account?<p className="staking-empty">{t('请先绑定钱包，再查看质押。')}</p>:<>
    {!config.dailyCoins&&<p className="staking-notice">{t('等待服务器确认奖励费率；取回功能不受影响。')}</p>}
-   {failed&&<p className="staking-notice error" role="alert">{t('质押状态暂时无法读取，正在重试。')}</p>}
+   {failed&&<p className="staking-notice error" role="alert">{t('质押状态暂时无法读取，请点击刷新状态重试。')}</p>}
    {loading&&<p className="staking-notice" role="status">{t('正在读取质押状态…')}</p>}
    {message&&<p className="nft-action-feedback" role="status">{t(message)}</p>}
    <h4 className="staking-section-heading">{t('质押中的 NFT')}<span>{data?.positions.length??0}</span></h4>

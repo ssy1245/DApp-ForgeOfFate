@@ -295,13 +295,25 @@ def main():
         staking = StakingIndexer(store, RpcStakingSource(settings), batch_size)
         recharge = RechargeIndexer(store, RpcRechargeSource(settings), batch_size)
         indexer = Indexer(store, RpcSource(settings), batch_size, staking=staking, recharge=recharge)
-        interval = int(os.getenv('FORGE_INDEX_INTERVAL', '5'))
-        if not 1 <= interval <= 30:
-            raise IndexFailure('FORGE_INDEX_INTERVAL 必须为 1–30 秒。')
         stopping = threading.Event()
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, lambda *_: stopping.set())
         try:
+            if not args.once:
+                from .tasks import TaskWorker
+                # Use the canonical module types even when this file is run
+                # with -m; task error classification must share IndexHalt.
+                from .indexer import Indexer as NftIndexer, RpcSource as NftSource
+                from .staking_reader import StakingReader
+                from .recharge_indexer import RechargeReader
+                worker = TaskWorker(store, settings,
+                    {'nft': NftIndexer(store, NftSource(settings), batch_size), 'staking': staking, 'recharge': recharge},
+                    {'nft': ChainReader(settings), 'staking': StakingReader(settings), 'recharge': RechargeReader(settings)})
+                print('按需同步已启动：有任务时每 30 秒检查，空闲时不访问 RPC。', flush=True)
+                while not stopping.is_set():
+                    worker.tick()
+                    stopping.wait(1)  # Local queue + UTC clock only; no idle RPC.
+                return
             while not stopping.is_set():
                 try:
                     caught_up = indexer.tick()
@@ -316,9 +328,10 @@ def main():
                     if args.once:
                         raise
                     print(str(error), flush=True)
-                stopping.wait(interval)
+                stopping.wait(30)
         finally:
             with indexer.store.connection() as db:
+                db.execute('UPDATE chain_worker SET running=0,heartbeat=? WHERE id=1', (time.time(),))
                 db.execute("UPDATE chain_scan SET state='stopped',updated_at=? WHERE id=1 AND state!='halted'", (time.time(),))
 
 

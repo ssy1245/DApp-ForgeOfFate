@@ -50,6 +50,16 @@ class ChainReader:
     def __init__(self, settings):
         self.settings = settings
 
+    def public_config(self):
+        # Loading the game/config is not a reason to contact a paid provider.
+        # Actual reads, signatures and indexers still verify the deployment.
+        from .tasks import manifest
+        info = manifest(self.settings, 'nft')
+        try:
+            return {key: info[key] for key in ('address', 'chainId', 'deploymentId', 'abi')}
+        except KeyError:
+            raise HTTPException(503, '当前合约部署配置不可用。') from None
+
     def connect(self):
         file = self.settings.directory / 'deployment.json'
         if not file.exists():

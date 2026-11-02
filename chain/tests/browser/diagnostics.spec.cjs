@@ -74,3 +74,19 @@ test('diagnostics show independent wallet, contract and sync checks with failure
   expect(await page.evaluate(()=>window.walletCalls.every(method=>['eth_accounts','eth_chainId'].includes(method)))).toBe(true);
   expect(requests).toBeGreaterThanOrEqual(3);
 });
+
+test('leaving diagnostics open does not keep querying the provider',async({page,game})=>{
+ await page.clock.install();
+ await register(page,true,game);
+ let reads=0;
+ await page.route('**/api/chain/diagnostics',route=>{reads++;return route.fulfill({json:snapshot()});});
+ await page.getByRole('button',{name:'命运集市',exact:false}).click();
+ const panel=page.getByRole('region',{name:'链上状态',exact:true});
+ await expect(panel.getByText('NFT 合约与当前配置匹配。')).toBeVisible();
+ const before=reads;
+ await page.clock.fastForward(90000);
+ await page.waitForTimeout(100);
+ expect(reads).toBe(before);
+ await panel.getByRole('button',{name:'重新检查'}).click();
+ await expect.poll(()=>reads).toBe(before+1);
+});

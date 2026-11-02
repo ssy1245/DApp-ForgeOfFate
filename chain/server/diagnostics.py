@@ -8,6 +8,11 @@ from web3 import Web3
 
 from .rpc import NETWORKS
 from .store import index_status
+from .tasks import worker_status
+
+
+def listener_alive(db, updated_at):
+    return worker_status(db)['running'] if db.execute('SELECT 1 FROM chain_worker').fetchone() else time.time()-updated_at <= 120
 
 
 def public_hex(value, size):
@@ -184,12 +189,13 @@ def inspect_staking(settings, store):
             saved = db.execute('''SELECT l.state,l.updated_at,s.scanned_block,s.settled_until,s.daily_coins,
                 s.chain_id,s.contract,s.deployment FROM staking_listener l
                 JOIN staking_sources s ON s.source=l.source WHERE l.id=1''').fetchone()
+            alive = listener_alive(db, saved['updated_at']) if saved else False
         status = 'waiting'
         if saved:
             matches = (saved['chain_id'] == manifest['chainId'] and saved['contract'].lower() == manifest['address'].lower()
                        and saved['deployment'] == manifest['deploymentId'])
             status = ('error' if not matches or saved['state'] in ('halted','error') else 'ok'
-                      if saved['state'] == 'ready' and time.time()-saved['updated_at'] <= 120 else 'waiting')
+                      if saved['state'] == 'ready' and alive else 'waiting')
         result['checks'].append(dict(label='质押事件与奖励结算', status=status))
         statuses = {c['status'] for c in result['checks']}
         result['status'] = 'error' if 'error' in statuses else 'waiting' if 'waiting' in statuses else 'ok'
@@ -211,11 +217,12 @@ def inspect_recharge(settings, store):
         result['checks']=[dict(label='部署身份',status='ok'),dict(label='部署最终确认',status='ok' if confirmed>=manifest['deploymentBlock'] else 'waiting')]
         with store.connection() as db:
             saved=db.execute('SELECT * FROM recharge_sources LIMIT 1').fetchone()
+            alive=listener_alive(db,saved['updated_at']) if saved else False
         status='waiting'
         if saved:
             matches=(saved['chain_id']==manifest['chainId'] and saved['contract'].lower()==manifest['address'].lower()
                      and saved['deployment']==manifest['deploymentId'] and (int(saved['wei_per_unit']),saved['coins_per_unit'])==rate())
-            status='error' if not matches or saved['state'] in ('halted','error') else 'ok' if saved['state']=='ready' and time.time()-saved['updated_at']<=120 else 'waiting'
+            status='error' if not matches or saved['state'] in ('halted','error') else 'ok' if saved['state']=='ready' and alive else 'waiting'
         result['checks'].append(dict(label='充值监听与金币入账',status=status))
         states={c['status'] for c in result['checks']}
         result['status']='error' if 'error' in states else 'waiting' if 'waiting' in states else 'ok'

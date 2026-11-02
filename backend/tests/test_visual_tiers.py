@@ -62,7 +62,7 @@ def test_catalog_assets_and_mint_metadata():
 
 def test_every_supplied_sword_is_connected():
     assets=Path(__file__).resolve().parents[2]/'assets/3d'
-    supplied={path.relative_to(assets).as_posix() for path in assets.rglob('*.glb')} - {'hammer.glb','anvil.glb'}
+    supplied={path.relative_to(assets).as_posix() for path in assets.rglob('*.glb')} - {'hammer.glb','anvil.glb','weapon storage.glb'}
     configured={f"{tier['model']}.glb" for tier in SWORD_CATALOG}
     assert configured==supplied
     assert not any(tier.get('model_status')=='placeholder' for tier in SWORD_CATALOG)

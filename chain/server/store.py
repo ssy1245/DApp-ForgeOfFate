@@ -34,23 +34,31 @@ def migrate_chain(db):
 
 
 def index_status(store):
+    from .tasks import worker_status
     with store.connection() as db:
         scan = db.execute('SELECT * FROM chain_scan WHERE id=1').fetchone()
         environment = db.execute('SELECT manifest FROM chain_environment WHERE id=1').fetchone()
         pending = db.execute('SELECT COUNT(*) FROM chain_events WHERE processed=0').fetchone()[0]
         total = db.execute('SELECT COUNT(*) FROM chain_events').fetchone()[0]
+        worker = worker_status(db)
+        has_worker = bool(db.execute('SELECT 1 FROM chain_worker WHERE id=1').fetchone())
     if scan is None:
-        return {'state': 'not_started', 'running': False, 'caughtUp': False, 'rpcAvailable': False,
+        return {**worker, 'state': 'starting' if worker['running'] else 'not_started', 'running': worker['running'], 'caughtUp': False, 'rpcAvailable': False,
                 'fundingReady': False, 'message': '链上监听尚未启动。', 'pendingEvents': 0, 'eventCount': 0}
     scan = dict(scan)
     manifest = json.loads(environment['manifest']) if environment else None
-    running = scan['state'] not in ('stopped', 'halted') and time.time() - scan['updated_at'] < 60
+    running = (worker['running'] if has_worker else time.time() - scan['updated_at'] < 60) and scan['state'] not in ('halted',)
+    if not has_worker and scan['state'] == 'stopped':
+        running = False
     caught_up = (scan['state'] != 'halted' and scan['confirmed_block'] is not None and scan['processed_block'] >= scan['confirmed_block']
                  and manifest is not None and scan['confirmed_block'] >= manifest['deploymentBlock'])
-    return {'state': scan['state'] if running or scan['state'] == 'halted' else 'stopped',
+    state = 'idle' if has_worker and running and worker['pendingTasks'] == 0 and scan['state'] not in ('halted','error') else scan['state']
+    if has_worker and running and state == 'stopped':
+        state = 'syncing'
+    return {**worker, 'state': state if running or scan['state'] == 'halted' else 'stopped',
             'running': running, 'caughtUp': caught_up,
             'rpcAvailable': bool(scan['rpc_ok']) and running,
-            # Recharging and staking accounting are not implemented in this stage.
+            # Module readiness is exposed separately through /api/config.
             'fundingReady': False, 'message': scan['message'],
             'headBlock': scan['head_block'], 'confirmedBlock': scan['confirmed_block'],
             'scannedBlock': scan['scanned_block'], 'processedBlock': scan['processed_block'],

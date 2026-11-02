@@ -40,10 +40,8 @@ export default function ChainDiagnostics({token,walletAccount,walletChain,boundW
       finally{inFlight=false;if(live)setBusy(false);}
     }
     refresh.current=()=>{void read();};
-    void read();const timer=setInterval(read,30000);
-    window.addEventListener('focus',read);document.addEventListener('visibilitychange',read);
-    return()=>{live=false;controller.abort();clearInterval(timer);refresh.current=()=>{};
-      window.removeEventListener('focus',read);document.removeEventListener('visibilitychange',read);};
+    void read();
+    return()=>{live=false;controller.abort();refresh.current=()=>{};};
   },[open,token]);
   const expected=data?.network.expectedChainId??expectedChainId;
   const walletStatus:CheckState=!walletAccount||!verified||!boundWallet?'waiting':

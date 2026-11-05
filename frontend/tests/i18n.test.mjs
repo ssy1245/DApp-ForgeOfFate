@@ -61,6 +61,7 @@ test('Chinese and English UI, runtime messages, weapon identities and saved pref
     });
     await t.test('server responses and pending actions translate without changing user data', () => {
       const cases = [
+        ['当前合约部署配置不可用。', 'The current contract deployment configuration is unavailable.'],
         ['已领取一把 +0 普通剑，今日还可领 2 把。', 'Claimed one +0 common sword. You can claim 2 more today.'],
         ['加热需要 2 铁块，当前剩余 0。请领取每日补给或补充铁块。', 'Heating requires 2 iron; you have 0. Claim daily supplies or buy more iron.'],
         ['已放入熔炉，加热 3 秒后可敲击 5 次。', 'Weapon placed in the furnace. After 3 seconds, it will be ready for 5 strikes.'],

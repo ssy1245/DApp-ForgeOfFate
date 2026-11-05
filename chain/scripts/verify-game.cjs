@@ -123,7 +123,7 @@ async function main() {
     const cfg = await (await fetch(apiUrl + '/api/config')).json(), balance = cfg.balance;
     assert.equal(cfg.chain.deploymentId, epoch);
     assert.ok(!Object.keys(balance).some(key => key.endsWith('_ap')));
-    const credentials = { username: 'verify_' + randomUUID().slice(0, 8), password: randomUUID() };
+    const credentials = { username: 'verify_' + randomUUID().slice(0, 8), password: randomUUID().slice(0, 20) };
     const player = apiClient(apiUrl);
     await player.request('/session', {});
     await player.request('/account/register', credentials);
@@ -181,7 +181,7 @@ async function main() {
     for (const wallet of [wa, wb]) await (await funder.sendTransaction({ to: wallet.address, value: parseEther('2') })).wait();
     async function walletClient(wallet) {
       const client = apiClient(apiUrl);
-      await client.request('/account/register', { username: 'wallet_' + randomUUID().slice(0, 8), password: randomUUID() });
+      await client.request('/account/register', { username: 'wallet_' + randomUUID().slice(0, 8), password: randomUUID().slice(0, 20) });
       const c = await client.request('/wallet/challenge', { address: wallet.address });
       await client.request('/wallet/bind', { challenge_id: c.challenge_id, signature: await wallet.signMessage(c.message) });
       return client;
@@ -269,12 +269,18 @@ async function main() {
     check('Persistent NFT history indexes real logs and repeated scans do not duplicate events');
 
     const beforeRestart = await restored.state();
+    const sellerBeforeRestart = await tester.state();
+    assert.ok(!sellerBeforeRestart.weapons.some(item => item.id === seeded.weapon_id),
+      'A sold weapon stays archived even if its NFT later returns to the seller');
     const beforeOffline=await provider.send('evm_snapshot',[]);
     await stop(backend);
     await (await sellerContract['safeTransferFrom(address,address,uint256)'](wa.address,wb.address,id)).wait();
     backend = startBackend(); await ready();
     assert.deepEqual(await restored.state(), beforeRestart);
-    assert.equal((await tester.state()).weapons.find(item => item.id === seeded.weapon_id).status, 'sealed');
+    assert.deepEqual(await tester.state(), sellerBeforeRestart);
+    await run(python, ['-c',
+      "import sqlite3,sys; db=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True); row=db.execute('SELECT status FROM weapons WHERE id=?',(sys.argv[2],)).fetchone(); assert row and row[0]=='sold', row; db.close()",
+      path.join(directory, 'game.sqlite3'), seeded.weapon_id], 'sold-archive-check', env);
     check('Backend restart preserves accounts, weapons, resources and authenticated sessions');
     assert.equal((await tester.request('/chain/indexed-nfts')).items[0].owner,wa.address);
     await catchUp();

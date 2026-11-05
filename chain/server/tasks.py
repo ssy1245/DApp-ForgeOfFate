@@ -125,9 +125,16 @@ class TaskWorker:
                 enqueue(db, 'staking', info, kind='daily', until_time=day, now=now)
 
     def finish(self, job, state='done', error=''):
+        from backend.purchase_locks import finish as finish_purchase
         with self.store.connection() as db:
+            if state == 'done' and db.execute("SELECT 1 FROM nft_purchase_locks WHERE task_id=? AND state='pending' AND validated=0", (job['id'],)).fetchone():
+                # A reservation can attach while this worker is reading a
+                # previously registered hash. Validate it on the next tick.
+                return
             db.execute('UPDATE chain_tasks SET state=?,updated_at=?,error=? WHERE id=?',
                        (state,self.clock(),error,job['id']))
+            if state == 'done' and job['tx_hash']:
+                finish_purchase(db, job['id'])
 
     def tick(self):
         now = self.clock()
@@ -163,6 +170,16 @@ class TaskWorker:
                     eligible.append(job)
                     continue
                 try:
+                    if target == 'nft':
+                        with self.store.connection() as db:
+                            purchase = db.execute("SELECT * FROM nft_purchase_locks WHERE task_id=? AND state='pending' AND validated=0", (job['id'],)).fetchone()
+                        if purchase:
+                            # Register the hash durably before doing RPC. A
+                            # closed browser or temporarily invisible mempool
+                            # transaction cannot strand an untracked purchase.
+                            self.readers[target].validate_purchase(job['tx_hash'], dict(purchase))
+                            with self.store.connection() as db:
+                                db.execute('UPDATE nft_purchase_locks SET validated=1 WHERE id=?', (purchase['id'],))
                     result = json.loads(job['result']) if job['result'] else None
                     if not result or result['state'] not in ('confirmed','failed'):
                         result = self.readers[target].receipt(job['tx_hash'])
@@ -180,7 +197,7 @@ class TaskWorker:
                     elif result['state'] == 'confirmed':
                         eligible.append(job)
                 except HTTPException as error:
-                    if error.status_code == 400:
+                    if error.status_code in (400, 409):
                         self.finish(job, 'rejected', error.detail)
                     else:
                         raise

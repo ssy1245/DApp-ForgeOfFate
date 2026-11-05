@@ -1102,5 +1102,19 @@
   "打开页面或刷新时同步链上状态；有任务时每 30 秒检查，空闲时暂停查询。": "Syncs when you open or refresh this page. Active tasks are checked every 30 seconds; no checks while idle.",
   "链上信息暂未同步，请点击刷新状态后重试。": "Chain data is not synced. Click Refresh to try again.",
   "质押状态暂时无法读取，请点击刷新状态重试。": "Staking data could not be loaded. Click Refresh to try again.",
-  "自动检查已暂停；请核对钱包交易，并用刷新状态补同步，不要重复付款。": "Automatic checks are paused. Check the wallet transaction and refresh to sync. Do not pay again."
+  "自动检查已暂停；请核对钱包交易，并用刷新状态补同步，不要重复付款。": "Automatic checks are paused. Check the wallet transaction and refresh to sync. Do not pay again.",
+  "该 NFT 正在被购买，请等待交易完成后刷新。": "This NFT is being purchased. Wait for the transaction to finish, then refresh.",
+  "找不到属于当前钱包和部署的购买锁。": "No purchase reservation was found for this wallet and deployment.",
+  "购买预留已失效，请刷新后重新购买。": "The purchase reservation has expired. Refresh before trying again.",
+  "购买交易已提交，请等待最终确认。": "The purchase transaction has been submitted. Wait for final confirmation.",
+  "购买锁状态已变化，请核对原交易。": "The purchase reservation has changed. Check the original transaction.",
+  "该 NFT 已不在出售，请刷新市场。": "This NFT is no longer listed. Refresh the market.",
+  "交易与购买预留不匹配，请核对原交易。": "The transaction does not match the purchase reservation. Check the original transaction.",
+  "购买交易暂时无法核验，购买锁已保留，请稍后重试。": "The purchase transaction cannot be verified yet. Its reservation is retained; try again later.",
+  "请先绑定钱包，再购买 NFT。": "Bind your wallet before buying an NFT.",
+  "NFT 编号或价格超出范围。": "The NFT ID or price is out of range.",
+  "挂牌信息已变化，请刷新市场后重新购买。": "The listing has changed. Refresh the market before buying.",
+  "不能购买自己挂牌的 NFT。": "You cannot buy your own NFT listing.",
+  "购买锁只能关联 NFT 购买交易。": "Purchase reservations can only be linked to NFT purchase transactions.",
+  "当前合约部署配置不可用。": "The current contract deployment configuration is unavailable."
 }

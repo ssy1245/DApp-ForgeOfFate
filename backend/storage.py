@@ -8,6 +8,7 @@ from chain.server.wallets import migrate_wallets
 from .mailbox import migrate_mailbox
 from .staking_rewards import migrate_staking
 from .market import migrate_market
+from .purchase_locks import migrate_purchase_locks
 from .recharge import migrate_recharge
 from chain.server.tasks import migrate_tasks
 
@@ -59,6 +60,7 @@ class Store:
             migrate_market(db)
             migrate_recharge(db)
             migrate_tasks(db)
+            migrate_purchase_locks(db)
     @contextmanager
     def connection(self):
         db = sqlite3.connect(self.path, timeout=15, isolation_level=None)

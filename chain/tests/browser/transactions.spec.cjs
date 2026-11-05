@@ -40,7 +40,10 @@ for(const mismatch of ['sender','hash','epoch'])test(`a receipt with mismatched 
  s.setReceipt(r);await check(page);await expect(page.locator('.notice.error')).toBeVisible();await expect(page.locator('.pending')).toBeVisible();expect(await saved(page,s.key)).not.toBeNull();
 });
 test('changing deployments hides but preserves the original transaction; switching back recovers it',async({page,game})=>{
- const s=await setup(page,game);s.setChain({...s.chain,deploymentId:hash});await check(page);await expect(page.locator('.notice')).toContainText('记录已保留');await expect(page.locator('.pending')).toHaveCount(0);expect(await saved(page,s.key)).not.toBeNull();
+ const s=await setup(page,game);
+ // Finish the initial automatic check before exercising manual deployment detection.
+ await expect(page.locator('.pending-progress')).toContainText('链上执行成功');
+ s.setChain({...s.chain,deploymentId:hash});await check(page);await expect(page.locator('.notice')).toContainText('记录已保留');await expect(page.locator('.pending')).toHaveCount(0);expect(await saved(page,s.key)).not.toBeNull();
  s.setChain(s.chain);await page.reload();await expect(page.locator('.pending')).toBeVisible();
 });
 test('a missing receipt after a reorg remains pending and is never reported as failed',async({page,game})=>{

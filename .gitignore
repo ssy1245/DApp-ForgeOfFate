@@ -152,6 +152,8 @@ backend/data/
 *.lprof
 
 # Local backups / exports / scratch data (keep source migrations and assets)
+# Experiment report PDF, LaTeX source package and editable report sources.
+/report/
 /backups/
 /database-backups/
 /tmp/

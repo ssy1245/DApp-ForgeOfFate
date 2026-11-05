@@ -13,11 +13,11 @@ const openMarket=page=>page.locator('.nav-item').filter({hasText:'命运集市'}
 const confirm=page=>page.getByRole('alertdialog').getByRole('button',{name:'确认',exact:true}).click();
 const check=(page,target)=>group(page,target).getByRole('button',{name:'检查待确认交易',exact:true}).click();
 
-async function setup(page,game,{saved=[],nftOffline=false,tokens=['42']}={}){
+async function setup(page,game,{saved=[],nftOffline=false,tokens=['42'],listed=false}={}){
  const account=await register(page,false,game),wallet=Wallet.createRandom();
  game.sql('INSERT INTO wallet_bindings(account_id,wallet_address,verified_at) SELECT id,?,1 FROM accounts WHERE game_address=?',[wallet.address,account.address]);
  const abis={nft:new Interface(nftArtifact.abi),recharge:new Interface(rechargeArtifact.abi)};
- const control={sends:[],tasks:[],nftOffline,tokens,results:{},holdWallet:false,releaseWallet:null,final:{nft:false,recharge:false,staking:false},failed:{nft:false,recharge:false,staking:false},credited:false};
+ const control={purchaseRequests:[],purchaseConflict:false,sends:[],tasks:[],nftOffline,tokens,results:{},holdWallet:false,releaseWallet:null,final:{nft:false,recharge:false,staking:false},failed:{nft:false,recharge:false,staking:false},credited:false};
  const records={
   staking:{hash:hashes.staking,account:wallet.address,contract:staking,epoch,chainId:11155111,label:'质押 NFT',tokenId:'42',target:'staking'},
   nft:{hash:hashes.nft,account:wallet.address,contract:nft,epoch,chainId:11155111,label:'铭刻 NFT',tokenId:'42'},
@@ -50,6 +50,7 @@ async function setup(page,game,{saved=[],nftOffline=false,tokens=['42']}={}){
   window.ethereum={on(){},removeListener(){},async request(r){
    if(['eth_accounts','eth_requestAccounts'].includes(r.method))return [address];
    if(r.method==='eth_chainId')return '0xaa36a7';
+   if(r.method==='eth_sendTransaction'&&window.purchaseError)throw {code:window.purchaseError,message:'Wallet request failed'};
    return window.groupRpc(r);
   }};
  },wallet.address);
@@ -60,8 +61,14 @@ async function setup(page,game,{saved=[],nftOffline=false,tokens=['42']}={}){
   d.recharge={address:recharge,chainId:11155111,deploymentId:epoch,abi:rechargeArtifact.abi,treasury:wallet.address,weiPerUnit:'10000000000000000',coinsPerUnit:10000,ready:true};
   await route.fulfill({json:d});
  });
+ await page.route('**/api/chain/purchases{,/**}',route=>{
+  const path=new URL(route.request().url()).pathname;
+  control.purchaseRequests.push({path,body:route.request().postDataJSON()});
+  if(control.purchaseConflict&&path.endsWith('/purchases'))return route.fulfill({status:409,json:{detail:'该 NFT 正在被购买，请等待交易完成后刷新。'}});
+  return route.fulfill({json:path.endsWith('/purchases')?{id:'aa'.repeat(32),expiresAt:Date.now()/1000+300}:{ok:true}});
+ });
  await page.route('**/api/chain/tasks',route=>{control.tasks.push(route.request().postDataJSON());return route.fulfill({json:{id:'test-task',state:'pending',checkInterval:30}});});
- await page.route('**/api/chain/nfts?*',route=>route.fulfill({json:{chainId:11155111,deploymentId:epoch,blockNumber:20,total:control.tokens.length,proceeds:'10000000000000000',items:control.tokens.map(id=>({id,owner:wallet.address,seller:'0x'+'00'.repeat(20),price:'0',level:70,uri:''}))}}));
+ await page.route('**/api/chain/nfts?*',route=>route.fulfill({json:{chainId:11155111,deploymentId:epoch,blockNumber:20,total:control.tokens.length,proceeds:'10000000000000000',items:control.tokens.map(id=>({id,owner:listed?nft:wallet.address,seller:listed?nft:'0x'+'00'.repeat(20),price:listed?'10000000000000000':'0',level:70,uri:''}))}}));
  await page.route('**/api/chain/recharge?*',route=>route.fulfill({json:{account:wallet.address,total:0,items:[]}}));
  await page.route('**/api/chain/recharge/treasury',route=>route.fulfill({status:403,json:{detail:'no access'}}));
  await page.route('**/api/chain/staking',route=>route.fulfill({json:{account:wallet.address,deploymentId:epoch,chainId:11155111,blockNumber:20,available:control.tokens.map(tokenId=>({tokenId,approved:false})),positions:[]}}));
@@ -195,4 +202,40 @@ test('staking and market share only the same weapon lock and show each pending a
  await expect(row('42').getByRole('button',{name:'授权此 NFT',exact:true})).toBeEnabled();
  await expect(row('43').getByRole('button',{name:'交易确认中',exact:true})).toBeDisabled();
  expect(s.control.sends.map(tx=>tx.tokenId)).toEqual(['43']);
+});
+
+
+test('purchase reserves before sending and restores its server lock ID after reload',async({page,game})=>{
+ const s=await setup(page,game,{listed:true});
+ await openMarket(page);await page.getByRole('button',{name:'在售市场',exact:true}).click();
+ await page.getByRole('button',{name:'购买收藏品',exact:true}).click();
+ await expect(group(page,'nft')).toBeVisible();
+ expect(s.control.purchaseRequests.map(r=>r.path)).toEqual(['/api/chain/purchases','/api/chain/purchases/'+ 'aa'.repeat(32)+'/begin']);
+ expect(s.control.purchaseRequests[0].body).toMatchObject({token_id:'42',seller:nft,price_wei:'10000000000000000'});
+ await expect.poll(()=>s.control.tasks.some(t=>t.tx_hash===hashes.nft&&t.purchase_lock_id==='aa'.repeat(32))).toBe(true);
+ s.control.tasks=[];
+ await page.reload();await expect(group(page,'nft')).toBeVisible();
+ await expect.poll(()=>s.control.tasks.some(t=>t.tx_hash===hashes.nft&&t.purchase_lock_id==='aa'.repeat(32))).toBe(true);
+ expect(s.control.sends).toHaveLength(1);
+ expect(s.control.purchaseRequests.some(r=>r.path.endsWith('/release'))).toBe(false);
+});
+
+test('a conflicting purchase never opens a wallet transaction',async({page,game})=>{
+ const s=await setup(page,game,{listed:true});s.control.purchaseConflict=true;
+ await openMarket(page);await page.getByRole('button',{name:'在售市场',exact:true}).click();
+ await page.getByRole('button',{name:'购买收藏品',exact:true}).click();
+ await expect(page.locator('.notice.error')).toContainText('正在被购买');
+ expect(s.control.sends).toHaveLength(0);
+ expect(s.control.purchaseRequests).toHaveLength(1);
+});
+
+for(const [error,released] of [[4001,true],[-32603,false]])test(`wallet error ${error} ${released?'releases':'retains'} the purchase lock`,async({page,game})=>{
+ const s=await setup(page,game,{listed:true});
+ await page.evaluate(code=>window.purchaseError=code,error);
+ await openMarket(page);await page.getByRole('button',{name:'在售市场',exact:true}).click();
+ await page.getByRole('button',{name:'购买收藏品',exact:true}).click();
+ await expect(page.locator('.notice.error')).toBeVisible();
+ expect(s.control.purchaseRequests.some(r=>r.path.endsWith('/begin'))).toBe(true);
+ expect(s.control.purchaseRequests.some(r=>r.path.endsWith('/release'))).toBe(released);
+ expect(s.control.tasks.some(t=>t.tx_hash)).toBe(false);
 });

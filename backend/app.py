@@ -17,6 +17,7 @@ from web3 import Web3
 
 from .storage import Store
 from . import mailbox
+from . import purchase_locks
 from .recharge import rate as recharge_rate
 from chain.server.store import index_status, event_history
 from .accounts import normalize_username, hash_password, verify_password
@@ -38,6 +39,16 @@ class ChainTaskBody(BaseModel):
     deployment_id: str = Field(max_length=66)
     tx_hash: str | None = Field(default=None, pattern=r'^0x[0-9a-fA-F]{64}$')
     retry: bool = False
+    purchase_lock_id: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$')
+
+class PurchaseScope(BaseModel):
+    chain_id: int
+    deployment_id: str = Field(max_length=66)
+
+class PurchaseBody(PurchaseScope):
+    token_id: str = Field(pattern=r'^(0|[1-9][0-9]{0,77})$')
+    seller: str = Field(pattern=r'^0x[0-9a-fA-F]{40}$')
+    price_wei: str = Field(pattern=r'^[1-9][0-9]{0,77}$')
 
 class LoginBody(BaseModel):
     challenge_id: str
@@ -285,18 +296,63 @@ def create_app(db_path=None, demo=None):
             result['recharge_error']='充值配置暂时不可用，请检查部署和兑换比例。'
         return result
 
+    def purchase_context(body, authorization):
+        address = authenticated(authorization)
+        info = manifest(settings, 'nft')
+        if (body.chain_id, body.deployment_id) != (info['chainId'], info['deploymentId']):
+            raise HTTPException(409, '部署信息已变化，请刷新页面。')
+        with store.connection() as db:
+            player = identity(db, address)
+        if not player['wallet_verified']:
+            raise HTTPException(403, '请先绑定钱包，再购买 NFT。')
+        return info, player['wallet_address']
+
+    @app.post('/api/chain/purchases')
+    def reserve_purchase(body: PurchaseBody, authorization: str | None = Header(default=None)):
+        info, buyer = purchase_context(body, authorization)
+        if int(body.token_id) >= 2**256 or int(body.price_wei) >= 2**256:
+            raise HTTPException(400, 'NFT 编号或价格超出范围。')
+        # Never hold SQLite's write transaction across a network call.
+        current, seller, price = reader.purchase_listing(body.token_id)
+        if (current['chainId'], current['address'], current['deploymentId']) != (info['chainId'], info['address'], info['deploymentId']):
+            raise HTTPException(409, '部署信息已变化，请刷新页面。')
+        if (seller.lower(), price) != (body.seller.lower(), body.price_wei):
+            raise HTTPException(409, '挂牌信息已变化，请刷新市场后重新购买。')
+        if buyer.lower() == seller.lower():
+            raise HTTPException(409, '不能购买自己挂牌的 NFT。')
+        with store.connection() as db:
+            return purchase_locks.reserve(db, info, body.token_id, buyer, seller, price)
+
+    @app.post('/api/chain/purchases/{lock_id}/{action}')
+    def update_purchase(lock_id: str, action: Literal['begin', 'release'], body: PurchaseScope,
+                        authorization: str | None = Header(default=None)):
+        info, buyer = purchase_context(body, authorization)
+        with store.connection() as db:
+            row = purchase_locks.owned_lock(db, lock_id, info, buyer)
+            if action == 'begin':
+                purchase_locks.begin(db, row)
+            else:
+                purchase_locks.release(db, row)
+        return {'ok': True}
+
     @app.post('/api/chain/tasks')
     def submit_chain_task(body: ChainTaskBody, authorization: str | None = Header(default=None)):
         address = authenticated(authorization)
         info = manifest(settings, body.target)
         if (body.chain_id, body.deployment_id) != (info['chainId'], info['deploymentId']):
             raise HTTPException(409, '部署信息已变化，请刷新页面。')
+        if body.purchase_lock_id:
+            if body.target != 'nft' or not body.tx_hash:
+                raise HTTPException(400, '购买锁只能关联 NFT 购买交易。')
         with store.connection() as db:
             player = identity(db, address)
             if not player['wallet_verified']:
                 raise HTTPException(403, '请先绑定钱包，再同步链上任务。')
             key = enqueue(db, body.target, info, kind='transaction' if body.tx_hash else 'sync',
                           tx_hash=body.tx_hash, wallet=player['wallet_address'])
+            if body.purchase_lock_id:
+                reservation = purchase_locks.owned_lock(db, body.purchase_lock_id, info, player['wallet_address'])
+                purchase_locks.attach(db, reservation, body.tx_hash.lower(), key)
             if body.retry and body.tx_hash:
                 if db.execute("SELECT COUNT(*) FROM chain_tasks WHERE wallet=? AND state='pending' AND kind='transaction'", (player['wallet_address'].lower(),)).fetchone()[0] >= 10:
                     raise HTTPException(429, '待确认交易过多，请先处理已有交易。')

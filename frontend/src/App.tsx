@@ -119,10 +119,10 @@ export default function App(){
   }while(offset<total);
   if(!signal?.aborted&&g===generation.current&&request===nftRequest.current){setNfts(list);setProceeds(BigInt(proceeds));setMarketError(false);}
  }
- async function queueChainTask(target:'nft'|'staking'|'recharge',cfg=config,hash?:string,retry=false){
+ async function queueChainTask(target:'nft'|'staking'|'recharge',cfg=config,hash?:string,retry=false,purchaseLockId?:string){
   if(!sessionRef.current?.wallet_verified)return;
   const chain=target==='nft'?cfg?.chain:cfg?.[target];if(!chain)return;
-  return api('/chain/tasks',{method:'POST',body:JSON.stringify({target,chain_id:chain.chainId,deployment_id:chain.deploymentId,...(hash?{tx_hash:hash}:{}),retry})});
+  return api('/chain/tasks',{method:'POST',body:JSON.stringify({target,chain_id:chain.chainId,deployment_id:chain.deploymentId,...(hash?{tx_hash:hash}:{}),...(purchaseLockId?{purchase_lock_id:purchaseLockId}:{}),retry})});
  }
  useEffect(()=>{
   if(!session?.wallet_verified)return;
@@ -377,7 +377,7 @@ export default function App(){
  }
  async function readReceipt(p:Pending,signal?:AbortSignal){
   const g=generation.current;
-  await queueChainTask(p.target||'nft',config,p.hash);
+  await queueChainTask(p.target||'nft',config,p.hash,false,p.purchaseLockId);
   if(g!==generation.current||signal?.aborted)return null;
   const data=await api(`/chain/${p.target?`${p.target}/`:''}receipts/${p.hash}`,{signal}),receipt=finalReceipt(data,p);
   if(g===generation.current)showReceiptProgress(p,data);
@@ -424,17 +424,39 @@ export default function App(){
    if([...pendingRecordsRef.current,...readPending()].some(p=>conflictsWithPending(p,{target,tokenId,label})&&matchesPending(p,chainFor(p,config),account)))throw Error('已有交易等待确认，请先检查交易状态。');
    if(!storageAvailable())throw Error('浏览器无法保存交易记录，请允许本站存储后再进行链上操作。');
    if(tokenId){setCardOperation({id:tokenId,label});cardTell(tokenId,'请在钱包中确认操作；尚未提交交易。');}
-   const c=await checkedSigner(target);guard();
-   const tx=await send(c,guard);
+   let purchaseLockId:string|undefined,sendStarted=false;
+   const purchaseScope={chain_id:chain.chainId,deployment_id:chain.deploymentId};
+   const updatePurchase=(action:'begin'|'release')=>api(`/chain/purchases/${purchaseLockId}/${action}`,{method:'POST',headers:{'X-Forge-Player':player},body:JSON.stringify(purchaseScope)});
+   let tx;
+   try{
+    if(target==='nft'&&label==='购买 NFT'&&tokenId){
+     const listing=nfts.find(n=>n.id===tokenId);
+     if(!listing)throw Error('挂牌信息已变化，请刷新市场后重新购买。');
+     const reservation=await api('/chain/purchases',{method:'POST',headers:{'X-Forge-Player':player},body:JSON.stringify({...purchaseScope,token_id:tokenId,seller:listing.seller,price_wei:listing.price.toString()})});
+     purchaseLockId=reservation.id;guard();
+    }
+    const c=await checkedSigner(target);guard();
+    if(purchaseLockId){await updatePurchase('begin');guard();}
+    sendStarted=true;
+    tx=await send(c,guard);
+   }catch(error){
+    // An RPC/transport error can occur after broadcast. Only a pre-send
+    // failure or explicit rejection proves it is safe to release the lock.
+    const {code,action}=(error as {code?:string|number;action?:string})||{};
+    if(purchaseLockId&&(!sendStarted||code==='ACTION_REJECTED'||code===4001||(code==='CALL_EXCEPTION'&&action==='estimateGas'))){
+     try{await updatePurchase('release');}catch{/* Keep the server lock if release cannot be confirmed. */}
+    }
+    throw error;
+   }
    // A wallet change after broadcast cannot undo the transaction. Retain its original identity.
-   const record={hash:tx.hash,account,contract:chain.address,epoch:chain.deploymentId,chainId:chain.chainId,label,...(amountWei?{amountWei,submittedAt:Date.now()}:{}),...(target!=='nft'?{target}:{}),...(tokenId?{tokenId}:{})};
+   const record={hash:tx.hash,...(purchaseLockId?{purchaseLockId}:{}),account,contract:chain.address,epoch:chain.deploymentId,chainId:chain.chainId,label,...(amountWei?{amountWei,submittedAt:Date.now()}:{}),...(target!=='nft'?{target}:{}),...(tokenId?{tokenId}:{})};
    savePending(record);setCardOperation(null);
    if(isCurrent()&&tokenId)cardTell(tokenId,'交易已提交，正在自动检查确认状态。');
    if(!isCurrent())return;
    tell(`${label}已提交，等待链上确认：${short(tx.hash)}`);
    // Persist the server task, then release the wallet submission lock. Each
    // weapon (or recharge balance) stays locked by its own pending record.
-   try{await queueChainTask(target,config,record.hash);}
+   try{await queueChainTask(target,config,record.hash,false,record.purchaseLockId);}
    catch{if(isCurrent())reportPending(record,'暂时无法检查交易，记录已保留，稍后自动重试。');}
   },message=>{if(tokenId){setCardOperation(null);cardTell(tokenId,message,true);}});
   // Refresh custody/permissions once after this user action, including a
@@ -459,7 +481,7 @@ export default function App(){
   if(!matchesPending(pending,chainFor(pending,cfg),sessionRef.current?.wallet_address)){
    await refresh();tell('交易所属环境已变化，记录已保留；切回原环境后可继续检查。');return;
   }
-  await queueChainTask(pending.target||'nft',cfg,pending.hash,true);
+  await queueChainTask(pending.target||'nft',cfg,pending.hash,true,pending.purchaseLockId);
   const receipt=await readReceipt(pending);
   if(g!==generation.current)return;
   if(!receipt){tell('交易仍待最终确认，记录已保存，可稍后检查。');return;}

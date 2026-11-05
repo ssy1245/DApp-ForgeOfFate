@@ -100,6 +100,40 @@ class ChainReader:
         except Exception:
             raise HTTPException(503, '链上数据暂时无法读取，请稍后重试。') from None
 
+    def purchase_listing(self, token_id):
+        info, w3, contract = self.connect()
+        try:
+            height = w3.eth.block_number
+            seller, price = contract.functions.listings(int(token_id)).call(block_identifier=height)
+            if not price:
+                raise HTTPException(409, '该 NFT 已不在出售，请刷新市场。')
+            owner = contract.functions.ownerOf(int(token_id)).call(block_identifier=height)
+            if owner.lower() != seller.lower():
+                raise HTTPException(409, '该 NFT 已不在出售，请刷新市场。')
+            return info, seller, str(price)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(503, '链上数据暂时无法读取，请稍后重试。') from None
+
+    def validate_purchase(self, tx_hash, lock):
+        info, w3, contract = self.connect()
+        try:
+            tx = w3.eth.get_transaction(tx_hash)
+            function, args = contract.decode_function_input(tx['input'])
+            if (info['chainId'] != lock['chain_id'] or info['deploymentId'].lower() != lock['deployment']
+                    or info['address'].lower() != lock['contract']
+                    or not tx['to'] or tx['to'].lower() != lock['contract']
+                    or tx['from'].lower() != lock['buyer'] or function.fn_name != 'buy'
+                    or str(args['tokenId']) != lock['token_id']
+                    or args['expectedSeller'].lower() != lock['seller']
+                    or str(args['expectedPrice']) != lock['price_wei'] or str(tx['value']) != lock['price_wei']):
+                raise HTTPException(409, '交易与购买预留不匹配，请核对原交易。')
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(503, '购买交易暂时无法核验，购买锁已保留，请稍后重试。') from None
+
     def receipt(self, tx_hash):
         if not re.fullmatch(r'0x[0-9a-fA-F]{64}', tx_hash):
             raise HTTPException(400, '交易哈希格式无效。')

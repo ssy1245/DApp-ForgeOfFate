@@ -97,3 +97,11 @@ test('recharge and proceeds keep their own duplicate protection; unidentified le
  assert.equal(conflictsWithPending(p,{target:'nft',tokenId:'42',label:'挂牌 NFT'}),true);
  assert.equal(conflictsWithPending(p,{target:'recharge',label:'充值游戏金币'}),false);
 });
+
+
+test('purchase reservation identity survives storage and rejects malformed lock IDs',()=>{
+ const storage=new Storage(),legacy=new Storage(),purchase={...p,tokenId:'42',purchaseLockId:'aa'.repeat(32)};
+ assert.ok(writePending(purchase,storage));
+ assert.deepEqual(readPending(storage,legacy),[purchase]);
+ assert.equal(writePending({...purchase,purchaseLockId:'bad'},storage),false);
+});
